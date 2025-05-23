@@ -49,9 +49,12 @@ st.markdown("""
     }
     .info-box {
         background-color: #f0f2f6;
+        color: #222;
         padding: 1rem;
         border-radius: 0.5rem;
         margin-bottom: 1rem;
+        font-family: monospace;
+        white-space: pre-wrap;
     }
     .stButton>button {
         width: 100%;
@@ -73,6 +76,13 @@ with st.sidebar:
     # Depth control
     depth = st.slider("Exploration depth", min_value=1, max_value=3, value=1, 
                      help="How deep to explore relationships (higher values create larger graphs)")
+    
+    # Edge type toggles
+    st.markdown("### Relationship Types")
+    show_hypernyms = st.checkbox("Include Hypernyms (↑)", value=True)
+    show_hyponyms = st.checkbox("Include Hyponyms (↓)", value=True)
+    show_meronyms = st.checkbox("Include Meronyms (⊂)", value=True)
+    show_holonyms = st.checkbox("Include Holonyms (⊃)", value=True)
     
     # Display options
     st.markdown("### Display Options")
@@ -142,7 +152,13 @@ if word:
             st.markdown('<h2 class="sub-header">Relationship Graph</h2>', unsafe_allow_html=True)
             
             with st.spinner(f"Building WordNet graph for '{word}'..."):
-                G, node_labels = build_wordnet_graph(word, depth)
+                G, node_labels = build_wordnet_graph(
+                    word, depth,
+                    include_hypernyms=show_hypernyms,
+                    include_hyponyms=show_hyponyms,
+                    include_meronyms=show_meronyms,
+                    include_holonyms=show_holonyms
+                )
                 
                 if G.number_of_nodes() > 0:
                     st.info(f"Graph created with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges")

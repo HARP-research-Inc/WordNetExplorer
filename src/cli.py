@@ -35,7 +35,7 @@ Examples:
     parser.add_argument('word', nargs='?', help='The word to explore')
     parser.add_argument('-w', '--word', help='The word to explore (alternative way)')
     parser.add_argument('-d', '--depth', type=int, default=1, 
-                       help='Depth of exploration (default: 2)')
+                       help='Depth of exploration (default: 1)')
     parser.add_argument('-i', '--info', action='store_true',
                        help='Show detailed word information')
     parser.add_argument('-s', '--save', help='Save graph to file (PNG format)')

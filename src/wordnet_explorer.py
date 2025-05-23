@@ -31,13 +31,21 @@ def get_synsets_for_word(word: str) -> List:
     from nltk.corpus import wordnet as wn
     return wn.synsets(word)
 
-def build_wordnet_graph(word: str, depth: int = 1) -> Tuple[nx.Graph, Dict]:
+def build_wordnet_graph(word: str, depth: int = 1, 
+                        include_hypernyms: bool = True,
+                        include_hyponyms: bool = True,
+                        include_meronyms: bool = True,
+                        include_holonyms: bool = True) -> Tuple[nx.Graph, Dict]:
     """
     Build a NetworkX graph of WordNet connections for a given word.
     
     Args:
         word: The input word to explore
         depth: How many levels deep to explore relationships
+        include_hypernyms: Whether to include hypernym relationships
+        include_hyponyms: Whether to include hyponym relationships
+        include_meronyms: Whether to include meronym relationships
+        include_holonyms: Whether to include holonym relationships
         
     Returns:
         Tuple of (graph, node_labels)
@@ -76,47 +84,51 @@ def build_wordnet_graph(word: str, depth: int = 1) -> Tuple[nx.Graph, Dict]:
         # Add definition as node attribute
         G.nodes[synset_node]['definition'] = synset.definition()
         
-        # Add hypernyms (more general concepts)
-        for hypernym in synset.hypernyms():
-            hyper_node = f"{hypernym.name()}_hyper"
-            G.add_node(hyper_node)
-            node_labels[hyper_node] = f"↑ {hypernym.lemma_names()[0].replace('_', ' ')}"
-            G.add_edge(synset_node, hyper_node)
-            G.nodes[hyper_node]['definition'] = hypernym.definition()
-            G.nodes[hyper_node]['relation_type'] = 'hypernym'
-            
-            if current_depth < depth:
-                add_synset_connections(hypernym, current_depth + 1, hyper_node)
+        # Add hypernyms (more general concepts) - only if enabled
+        if include_hypernyms:
+            for hypernym in synset.hypernyms():
+                hyper_node = f"{hypernym.name()}_hyper"
+                G.add_node(hyper_node)
+                node_labels[hyper_node] = f"↑ {hypernym.lemma_names()[0].replace('_', ' ')}"
+                G.add_edge(synset_node, hyper_node)
+                G.nodes[hyper_node]['definition'] = hypernym.definition()
+                G.nodes[hyper_node]['relation_type'] = 'hypernym'
+                
+                if current_depth < depth:
+                    add_synset_connections(hypernym, current_depth + 1, hyper_node)
         
-        # Add hyponyms (more specific concepts)
-        for hyponym in synset.hyponyms():
-            hypo_node = f"{hyponym.name()}_hypo"
-            G.add_node(hypo_node)
-            node_labels[hypo_node] = f"↓ {hyponym.lemma_names()[0].replace('_', ' ')}"
-            G.add_edge(synset_node, hypo_node)
-            G.nodes[hypo_node]['definition'] = hyponym.definition()
-            G.nodes[hypo_node]['relation_type'] = 'hyponym'
-            
-            if current_depth < depth:
-                add_synset_connections(hyponym, current_depth + 1, hypo_node)
+        # Add hyponyms (more specific concepts) - only if enabled
+        if include_hyponyms:
+            for hyponym in synset.hyponyms():
+                hypo_node = f"{hyponym.name()}_hypo"
+                G.add_node(hypo_node)
+                node_labels[hypo_node] = f"↓ {hyponym.lemma_names()[0].replace('_', ' ')}"
+                G.add_edge(synset_node, hypo_node)
+                G.nodes[hypo_node]['definition'] = hyponym.definition()
+                G.nodes[hypo_node]['relation_type'] = 'hyponym'
+                
+                if current_depth < depth:
+                    add_synset_connections(hyponym, current_depth + 1, hypo_node)
         
-        # Add meronyms (part-of relationships)
-        for meronym in synset.part_meronyms():
-            mero_node = f"{meronym.name()}_mero"
-            G.add_node(mero_node)
-            node_labels[mero_node] = f"⊂ {meronym.lemma_names()[0].replace('_', ' ')}"
-            G.add_edge(synset_node, mero_node)
-            G.nodes[mero_node]['definition'] = meronym.definition()
-            G.nodes[mero_node]['relation_type'] = 'meronym'
+        # Add meronyms (part-of relationships) - only if enabled
+        if include_meronyms:
+            for meronym in synset.part_meronyms():
+                mero_node = f"{meronym.name()}_mero"
+                G.add_node(mero_node)
+                node_labels[mero_node] = f"⊂ {meronym.lemma_names()[0].replace('_', ' ')}"
+                G.add_edge(synset_node, mero_node)
+                G.nodes[mero_node]['definition'] = meronym.definition()
+                G.nodes[mero_node]['relation_type'] = 'meronym'
         
-        # Add holonyms (whole-of relationships)
-        for holonym in synset.part_holonyms():
-            holo_node = f"{holonym.name()}_holo"
-            G.add_node(holo_node)
-            node_labels[holo_node] = f"⊃ {holonym.lemma_names()[0].replace('_', ' ')}"
-            G.add_edge(synset_node, holo_node)
-            G.nodes[holo_node]['definition'] = holonym.definition()
-            G.nodes[holo_node]['relation_type'] = 'holonym'
+        # Add holonyms (whole-of relationships) - only if enabled
+        if include_holonyms:
+            for holonym in synset.part_holonyms():
+                holo_node = f"{holonym.name()}_holo"
+                G.add_node(holo_node)
+                node_labels[holo_node] = f"⊃ {holonym.lemma_names()[0].replace('_', ' ')}"
+                G.add_edge(synset_node, holo_node)
+                G.nodes[holo_node]['definition'] = holonym.definition()
+                G.nodes[holo_node]['relation_type'] = 'holonym'
     
     # Process each synset of the main word
     for synset in synsets:
