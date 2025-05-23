@@ -39,10 +39,12 @@ python run_app.py
 
 This will start a local web server and open the WordNet Explorer in your default browser. The web interface provides:
 
-- Easy word input
-- Interactive depth control
-- Toggle options for information and graph display
-- Save functionality for graphs
+- Easy word input with instant search
+- Interactive depth control slider
+- Relationship type filtering (toggle hypernyms, hyponyms, etc.)
+- Interactive graph visualization with zoom, pan, and hover features
+- Detailed word information display
+- Save functionality for interactive HTML graphs
 - Responsive design for all devices
 
 ### Command Line Interface
@@ -66,14 +68,14 @@ python main.py dog --info
 # Control exploration depth (default: 1)
 python main.py dog --depth 3
 
-# Save graph to file
-python main.py dog --save dog_graph.png
+# Save interactive graph to HTML file
+python main.py dog --save dog_graph.html
 
 # Show only word info, no graph
 python main.py dog --info --no-graph
 
 # Combine options
-python main.py tree --depth 3 --info --save tree_relationships.png
+python main.py tree --depth 3 --info --save tree_relationships.html
 ```
 
 ### Command Line Options
@@ -82,9 +84,20 @@ python main.py tree --depth 3 --info --save tree_relationships.png
 - `-w, --word` - Alternative way to specify the word
 - `-d, --depth` - Depth of exploration (default: 1)
 - `-i, --info` - Show detailed word information
-- `-s, --save` - Save graph to PNG file
+- `-s, --save` - Save interactive graph to HTML file
 - `--no-graph` - Don't display the graph visualization
 - `-h, --help` - Show help message
+
+## Interactive Graph Features
+
+The visualizations are fully interactive and provide:
+
+- **Zoom**: Mouse wheel or pinch to zoom in/out
+- **Pan**: Click and drag to move around the graph
+- **Node Interaction**: Hover over nodes to see definitions and relationship types
+- **Physics Simulation**: Nodes automatically arrange themselves for optimal viewing
+- **Color Coding**: Different colors for each relationship type
+- **Responsive Layout**: Automatically adjusts to graph size and complexity
 
 ## Graph Legend
 
@@ -99,11 +112,11 @@ The visualization uses different colors to represent different types of relation
 
 ## Examples
 
-### Example 1: Basic word exploration
+### Example 1: Basic interactive exploration
 ```bash
 python main.py car
 ```
-This will show a graph of relationships for "car" including vehicle types, car parts, etc.
+This will show an interactive graph of relationships for "car" including vehicle types, car parts, etc. Hover over nodes to see definitions.
 
 ### Example 2: Deep exploration with info
 ```bash
@@ -111,14 +124,14 @@ python main.py animal --depth 3 --info
 ```
 This will:
 - Show detailed information about all senses of "animal"
-- Create a deep graph (3 levels) of animal relationships
-- Display definitions and examples
+- Create a deep interactive graph (3 levels) of animal relationships
+- Allow exploration of complex semantic networks
 
-### Example 3: Save visualization
+### Example 3: Save interactive visualization
 ```bash
-python main.py computer --save computer_network.png
+python main.py computer --save computer_network.html
 ```
-This will create and save a PNG file of the computer-related word network.
+This will create and save an interactive HTML file that can be opened in any web browser.
 
 ## Project Structure
 
@@ -139,8 +152,9 @@ WordNetExplorer/
 
 - **nltk**: Natural Language Toolkit for WordNet access
 - **networkx**: Graph creation and manipulation
-- **matplotlib**: Graph visualization
+- **pyvis**: Interactive network visualization
 - **streamlit**: Web interface framework
+- **matplotlib**: Fallback static visualization
 
 ## Requirements
 

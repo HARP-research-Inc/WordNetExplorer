@@ -21,6 +21,7 @@ from src.wordnet_explorer import (
     download_nltk_data,
     get_synsets_for_word,
     build_wordnet_graph,
+    build_focused_wordnet_graph,
     visualize_graph,
     print_word_info
 )
@@ -32,6 +33,14 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Initialize session state for navigation
+if 'navigation_history' not in st.session_state:
+    st.session_state.navigation_history = []
+if 'current_word' not in st.session_state:
+    st.session_state.current_word = None
+if 'graph_center' not in st.session_state:
+    st.session_state.graph_center = None
 
 # Custom CSS
 st.markdown("""
@@ -74,37 +83,124 @@ with st.sidebar:
     # Word input
     word = st.text_input("Enter a word to explore", "").strip().lower()
     
-    # Depth control
+    # Navigation buttons if we have history
+    if st.session_state.navigation_history:
+        st.markdown("### 🧭 Navigation")
+        col_back, col_home = st.columns(2)
+        with col_back:
+            if st.button("← Back", help="Go back to previous word"):
+                if st.session_state.navigation_history:
+                    st.session_state.navigation_history.pop()
+                    if st.session_state.navigation_history:
+                        st.session_state.current_word = st.session_state.navigation_history[-1]
+                    else:
+                        st.session_state.current_word = None
+                    st.rerun()
+        with col_home:
+            if st.button("🏠 Home", help="Return to original word"):
+                st.session_state.navigation_history = []
+                st.session_state.current_word = None
+                st.rerun()
+        
+        # Show breadcrumb
+        breadcrumb_text = " → ".join(st.session_state.navigation_history)
+        st.markdown(f"**Path:** {breadcrumb_text}")
+    
+    # Basic settings
     depth = st.slider("Exploration depth", min_value=1, max_value=3, value=1, 
                      help="How deep to explore relationships (higher values create larger graphs)")
     
-    # Edge type toggles
-    st.markdown("### Relationship Types")
-    show_hypernyms = st.checkbox("Include Hypernyms (↑)", value=True)
-    show_hyponyms = st.checkbox("Include Hyponyms (↓)", value=True)
-    show_meronyms = st.checkbox("Include Meronyms (⊂)", value=True)
-    show_holonyms = st.checkbox("Include Holonyms (⊃)", value=True)
+    # Relationship types - collapsible
+    with st.expander("🔗 Relationship Types", expanded=True):
+        show_hypernyms = st.checkbox("Include Hypernyms (↑)", value=True)
+        show_hyponyms = st.checkbox("Include Hyponyms (↓)", value=True)
+        show_meronyms = st.checkbox("Include Meronyms (⊂)", value=True)
+        show_holonyms = st.checkbox("Include Holonyms (⊃)", value=True)
+    
+    # Advanced graph settings - collapsible
+    with st.expander("🎨 Graph Appearance"):
+        # Layout options
+        layout_type = st.selectbox(
+            "Graph Layout",
+            ["Force-directed (default)", "Hierarchical", "Circular", "Grid"],
+            help="Choose how nodes are arranged in the graph"
+        )
+        
+        # Node size settings
+        node_size_multiplier = st.slider(
+            "Node Size", 
+            min_value=0.5, 
+            max_value=2.0, 
+            value=1.0, 
+            step=0.1,
+            help="Adjust the size of nodes in the graph"
+        )
+        
+        # Color scheme
+        color_scheme = st.selectbox(
+            "Color Scheme",
+            ["Default", "Pastel", "Vibrant", "Monochrome"],
+            help="Choose a color scheme for the graph"
+        )
+    
+    # Physics simulation settings - collapsible
+    with st.expander("⚙️ Physics Simulation"):
+        enable_physics = st.checkbox("Enable Physics", value=True, 
+                                    help="Allow nodes to move and settle automatically")
+        
+        if enable_physics:
+            spring_strength = st.slider(
+                "Spring Strength", 
+                min_value=0.01, 
+                max_value=0.1, 
+                value=0.04, 
+                step=0.01,
+                help="How strongly nodes are pulled together"
+            )
+            
+            central_gravity = st.slider(
+                "Central Gravity", 
+                min_value=0.1, 
+                max_value=1.0, 
+                value=0.3, 
+                step=0.1,
+                help="How strongly nodes are pulled to the center"
+            )
+        else:
+            spring_strength = 0.04
+            central_gravity = 0.3
+    
+    # Visual options - collapsible
+    with st.expander("👁️ Visual Options"):
+        show_labels = st.checkbox("Show Node Labels", value=True)
+        show_arrows = st.checkbox("Show Directional Arrows", value=False)
+        edge_width = st.slider("Edge Width", min_value=1, max_value=5, value=2)
     
     # Display options
-    st.markdown("### Display Options")
-    show_info = st.checkbox("Show word information", value=True)
-    show_graph = st.checkbox("Show relationship graph", value=True)
+    with st.expander("📋 Display Options", expanded=True):
+        show_info = st.checkbox("Show word information", value=True)
+        show_graph = st.checkbox("Show relationship graph", value=True)
     
-    # Save options
-    st.markdown("### Save Options")
-    save_graph = st.checkbox("Save graph to file")
-    if save_graph:
-        filename = st.text_input("Filename (without extension)", "wordnet_graph")
-        if not filename:
-            filename = "wordnet_graph"
-        if not filename.endswith(".png"):
-            filename += ".png"
+    # Save options - collapsible
+    with st.expander("💾 Save Options"):
+        save_graph = st.checkbox("Save graph to file")
+        if save_graph:
+            filename = st.text_input("Filename (without extension)", "wordnet_graph")
+            if not filename:
+                filename = "wordnet_graph"
+            if not filename.endswith(".html"):
+                filename += ".html"
     
     # About section
     st.markdown("---")
     st.markdown("### About")
     st.markdown("""
     This tool uses NLTK's WordNet to explore semantic relationships between words.
+    
+    **Navigation:**
+    - Double-click any node to explore that concept
+    - Use breadcrumb navigation to go back
+    - Grey dotted nodes are navigation breadcrumbs
     
     **Relationship Types:**
     - 🔴 Main word
@@ -117,6 +213,12 @@ with st.sidebar:
 
 # Main content
 if word:
+    # Update session state if this is a new word
+    if word != st.session_state.current_word and word not in st.session_state.navigation_history:
+        if st.session_state.current_word is not None:
+            st.session_state.navigation_history.append(st.session_state.current_word)
+        st.session_state.current_word = word
+    
     try:
         # Download NLTK data if needed
         with st.spinner("Loading WordNet data..."):
@@ -152,20 +254,47 @@ if word:
         if show_graph:
             st.markdown('<h2 class="sub-header">Relationship Graph</h2>', unsafe_allow_html=True)
             
+            # Show navigation breadcrumb if we have history
+            if st.session_state.navigation_history:
+                breadcrumb_display = " → ".join(st.session_state.navigation_history + [word.upper()])
+                st.markdown(f"**Navigation Path:** {breadcrumb_display}")
+            
             with st.spinner(f"Building WordNet graph for '{word}'..."):
-                G, node_labels = build_wordnet_graph(
-                    word, depth,
-                    include_hypernyms=show_hypernyms,
-                    include_hyponyms=show_hyponyms,
-                    include_meronyms=show_meronyms,
-                    include_holonyms=show_holonyms
-                )
+                # Use focused graph if we're navigating, otherwise use regular graph
+                if st.session_state.navigation_history:
+                    previous_word = st.session_state.navigation_history[-1] if st.session_state.navigation_history else None
+                    G, node_labels = build_focused_wordnet_graph(
+                        word, previous_word, None, depth,
+                        include_hypernyms=show_hypernyms,
+                        include_hyponyms=show_hyponyms,
+                        include_meronyms=show_meronyms,
+                        include_holonyms=show_holonyms
+                    )
+                else:
+                    G, node_labels = build_wordnet_graph(
+                        word, depth,
+                        include_hypernyms=show_hypernyms,
+                        include_hyponyms=show_hyponyms,
+                        include_meronyms=show_meronyms,
+                        include_holonyms=show_holonyms
+                    )
                 
                 if G.number_of_nodes() > 0:
                     st.info(f"Graph created with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges")
                     
                     # Generate the interactive graph
-                    html_path = visualize_graph(G, node_labels, word)
+                    html_path = visualize_graph(
+                        G, node_labels, word,
+                        layout_type=layout_type,
+                        node_size_multiplier=node_size_multiplier,
+                        enable_physics=enable_physics,
+                        spring_strength=spring_strength,
+                        central_gravity=central_gravity,
+                        show_labels=show_labels,
+                        show_arrows=show_arrows,
+                        edge_width=edge_width,
+                        color_scheme=color_scheme
+                    )
                     
                     if html_path:
                         # Read the HTML content
@@ -175,6 +304,124 @@ if word:
                         # Display the interactive graph
                         components.html(html_content, height=600)
                         
+                        # Add a comprehensive legend below the graph
+                        st.markdown("---")
+                        st.markdown("### 🗝️ Graph Legend & Controls")
+                        
+                        # Color scheme legend
+                        color_schemes = {
+                            "Default": {"main": "#FF6B6B", "synset": "#DDA0DD", "hyper": "#4ECDC4", "hypo": "#45B7D1", "mero": "#96CEB4", "holo": "#FFEAA7"},
+                            "Pastel": {"main": "#FFB3BA", "synset": "#BFBFFF", "hyper": "#BAFFCA", "hypo": "#B3E5FF", "mero": "#C7FFB3", "holo": "#FFFFB3"},
+                            "Vibrant": {"main": "#FF0000", "synset": "#9932CC", "hyper": "#00CED1", "hypo": "#1E90FF", "mero": "#32CD32", "holo": "#FFD700"},
+                            "Monochrome": {"main": "#2C2C2C", "synset": "#5A5A5A", "hyper": "#777777", "hypo": "#949494", "mero": "#B1B1B1", "holo": "#CECECE"}
+                        }
+                        
+                        colors = color_schemes.get(color_scheme, color_schemes["Default"])
+                        
+                        # Create legend in columns
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            st.markdown("#### 🎨 Node Types")
+                            st.markdown(f"""
+                            <div style="padding: 10px; background-color: #f8f9fa; border-radius: 8px; margin-bottom: 10px;">
+                                <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                    <div style="width: 20px; height: 20px; background-color: {colors['main']}; border-radius: 50%; margin-right: 10px;"></div>
+                                    <strong>Main Word</strong> - Your input word
+                                </div>
+                                <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                    <div style="width: 20px; height: 20px; background-color: {colors['synset']}; border-radius: 50%; margin-right: 10px;"></div>
+                                    <strong>Word Senses</strong> - Different meanings of the word
+                                </div>
+                                <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                    <div style="width: 20px; height: 20px; background-color: {colors['hyper']}; border-radius: 50%; margin-right: 10px;"></div>
+                                    <strong>Hypernyms ↑</strong> - More general concepts
+                                </div>
+                                <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                    <div style="width: 20px; height: 20px; background-color: {colors['hypo']}; border-radius: 50%; margin-right: 10px;"></div>
+                                    <strong>Hyponyms ↓</strong> - More specific concepts
+                                </div>
+                                <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                    <div style="width: 20px; height: 20px; background-color: {colors['mero']}; border-radius: 50%; margin-right: 10px;"></div>
+                                    <strong>Meronyms ⊂</strong> - Part-of relationships
+                                </div>
+                                <div style="display: flex; align-items: center;">
+                                    <div style="width: 20px; height: 20px; background-color: {colors['holo']}; border-radius: 50%; margin-right: 10px;"></div>
+                                    <strong>Holonyms ⊃</strong> - Whole-of relationships
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        with col2:
+                            st.markdown("#### 🎮 Interactive Controls")
+                            st.markdown(f"""
+                            <div style="padding: 10px; background-color: #f8f9fa; border-radius: 8px; margin-bottom: 10px; color: #333;">
+                                <div style="margin-bottom: 8px;">
+                                    <strong style="color: #333;">🖱️ Mouse Controls:</strong>
+                                    <ul style="margin: 5px 0; padding-left: 20px; color: #333;">
+                                        <li><strong>Scroll</strong> - Zoom in/out</li>
+                                        <li><strong>Click & Drag</strong> - Pan around the graph</li>
+                                        <li><strong>Drag Node</strong> - Move individual nodes</li>
+                                        <li><strong>Hover</strong> - View definitions and details</li>
+                                        <li><strong>Double-click Node</strong> - Recenter on that word</li>
+                                    </ul>
+                                </div>
+                                <div style="margin-bottom: 8px;">
+                                    <strong style="color: #333;">📊 Graph Info:</strong>
+                                    <ul style="margin: 5px 0; padding-left: 20px; color: #333;">
+                                        <li><strong>Nodes:</strong> {G.number_of_nodes()}</li>
+                                        <li><strong>Edges:</strong> {G.number_of_edges()}</li>
+                                        <li><strong>Depth:</strong> {depth} level(s)</li>
+                                        <li><strong>Physics:</strong> {'Enabled' if enable_physics else 'Disabled'}</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        # Additional info section
+                        st.markdown("#### 💡 Tips for Exploration")
+                        
+                        tips_col1, tips_col2, tips_col3 = st.columns(3)
+                        
+                        with tips_col1:
+                            st.markdown("""
+                            <div style="color: #333;">
+                            <strong>🎯 Focus Your Search:</strong>
+                            <ul>
+                            <li>Use relationship filters to see specific connections</li>
+                            <li>Adjust depth to control complexity</li>
+                            <li>Try different color schemes for clarity</li>
+                            <li>Double-click nodes to explore deeper</li>
+                            </ul>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        with tips_col2:
+                            st.markdown("""
+                            <div style="color: #333;">
+                            <strong>🔍 Analyze Relationships:</strong>
+                            <ul>
+                            <li>Hover over nodes for definitions</li>
+                            <li>Look for clusters of related concepts</li>
+                            <li>Follow paths to discover semantic chains</li>
+                            <li>Use breadcrumb navigation to backtrack</li>
+                            </ul>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
+                        with tips_col3:
+                            st.markdown("""
+                            <div style="color: #333;">
+                            <strong>⚙️ Customize Display:</strong>
+                            <ul>
+                            <li>Adjust node sizes for readability</li>
+                            <li>Enable/disable physics for static layouts</li>
+                            <li>Toggle labels on/off for cleaner views</li>
+                            <li>Switch color schemes for accessibility</li>
+                            </ul>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        
                         # Save the graph if requested
                         if save_graph:
                             # Create a downloads directory if it doesn't exist
@@ -182,7 +429,7 @@ if word:
                             downloads_dir.mkdir(exist_ok=True)
                             
                             # Save the file
-                            save_path = downloads_dir / filename.replace('.png', '.html')
+                            save_path = downloads_dir / filename.replace('.html', '.html')
                             import shutil
                             shutil.copy(html_path, save_path)
                             st.success(f"Interactive graph saved to: {save_path}")
