@@ -21,7 +21,6 @@ from src.wordnet_explorer import (
     download_nltk_data,
     get_synsets_for_word,
     build_wordnet_graph,
-    build_focused_wordnet_graph,
     visualize_graph,
     print_word_info
 )
@@ -81,30 +80,55 @@ with st.sidebar:
     st.markdown("### Settings")
     
     # Word input
-    word = st.text_input("Enter a word to explore", "").strip().lower()
+    word = st.text_input(
+        "Enter a word to explore", 
+        value=st.session_state.current_word if st.session_state.current_word else "",
+        key="word_input"
+    ).strip().lower()
     
-    # Navigation buttons if we have history
+    # Navigation History - collapsible section directly under word input
     if st.session_state.navigation_history:
-        st.markdown("### 🧭 Navigation")
-        col_back, col_home = st.columns(2)
-        with col_back:
-            if st.button("← Back", help="Go back to previous word"):
-                if st.session_state.navigation_history:
-                    st.session_state.navigation_history.pop()
-                    if st.session_state.navigation_history:
-                        st.session_state.current_word = st.session_state.navigation_history[-1]
-                    else:
-                        st.session_state.current_word = None
-                    st.rerun()
-        with col_home:
-            if st.button("🏠 Home", help="Return to original word"):
+        with st.expander("📚 Navigation History", expanded=True):
+            st.markdown("Click any word to return to it:")
+            
+            # Create a more compact display with fewer columns
+            max_cols = min(3, len(st.session_state.navigation_history))
+            if max_cols > 0:
+                # Split history into rows of max 3 items
+                history_items = st.session_state.navigation_history
+                for i in range(0, len(history_items), max_cols):
+                    row_items = history_items[i:i + max_cols]
+                    cols = st.columns(len(row_items))
+                    
+                    for j, hist_word in enumerate(row_items):
+                        with cols[j]:
+                            if st.button(f"📍 {hist_word}", key=f"hist_{i+j}", help=f"Return to '{hist_word}'"):
+                                # Navigate back to this word
+                                # Remove everything after this word in history
+                                st.session_state.navigation_history = st.session_state.navigation_history[:i+j]
+                                st.session_state.current_word = hist_word
+                                st.rerun()
+            
+            # Show current word
+            if st.session_state.current_word:
+                st.markdown(f"**🎯 Current: {st.session_state.current_word}**")
+            
+            # Clear history button
+            if st.button("🗑️ Clear History", help="Clear navigation history"):
                 st.session_state.navigation_history = []
-                st.session_state.current_word = None
                 st.rerun()
+    
+    # Navigation controls if we have history
+    if st.session_state.navigation_history:
+        st.markdown("### 🧭 Quick Navigation")
+        if st.button("🏠 Start Fresh", help="Clear history and start fresh"):
+            st.session_state.navigation_history = []
+            st.session_state.current_word = None
+            st.rerun()
         
-        # Show breadcrumb
-        breadcrumb_text = " → ".join(st.session_state.navigation_history)
-        st.markdown(f"**Path:** {breadcrumb_text}")
+        # Show current path
+        path_display = " → ".join(st.session_state.navigation_history + [st.session_state.current_word if st.session_state.current_word else ""])
+        st.markdown(f"**Current Path:** {path_display}")
     
     # Basic settings
     depth = st.slider("Exploration depth", min_value=1, max_value=3, value=1, 
@@ -212,12 +236,31 @@ with st.sidebar:
     """)
 
 # Main content
-if word:
-    # Update session state if this is a new word
-    if word != st.session_state.current_word and word not in st.session_state.navigation_history:
-        if st.session_state.current_word is not None:
+# Check for navigation from URL parameters
+query_params = st.experimental_get_query_params()
+if 'navigate_to' in query_params:
+    navigate_to_word = query_params['navigate_to'][0]  # Get first value
+    clicked_node = query_params.get('clicked_node', [''])[0]
+    
+    if navigate_to_word and navigate_to_word != st.session_state.current_word:
+        # Add current word to history before navigating (if not already there)
+        if st.session_state.current_word and st.session_state.current_word not in st.session_state.navigation_history:
             st.session_state.navigation_history.append(st.session_state.current_word)
-        st.session_state.current_word = word
+        
+        # Set the new word as current
+        st.session_state.current_word = navigate_to_word
+        
+        # Clear the URL parameters and rerun
+        st.experimental_set_query_params()
+        st.rerun()
+
+# Use the current word from session state, or fall back to text input
+current_display_word = st.session_state.current_word if st.session_state.current_word else word
+
+if word or current_display_word:
+    # Update session state if this is a new word
+    if current_display_word != st.session_state.current_word:
+        st.session_state.current_word = current_display_word
     
     try:
         # Download NLTK data if needed
@@ -238,7 +281,7 @@ if word:
                 sys.stdout = temp
                 
                 # Call the function
-                print_word_info(word)
+                print_word_info(current_display_word)
                 
                 # Reset stdout
                 sys.stdout = original_stdout
@@ -254,37 +297,25 @@ if word:
         if show_graph:
             st.markdown('<h2 class="sub-header">Relationship Graph</h2>', unsafe_allow_html=True)
             
-            # Show navigation breadcrumb if we have history
-            if st.session_state.navigation_history:
-                breadcrumb_display = " → ".join(st.session_state.navigation_history + [word.upper()])
-                st.markdown(f"**Navigation Path:** {breadcrumb_display}")
+            # Show navigation info
+            st.info("💡 **Double-click any node** to explore that concept! Your navigation history is saved above.")
             
-            with st.spinner(f"Building WordNet graph for '{word}'..."):
-                # Use focused graph if we're navigating, otherwise use regular graph
-                if st.session_state.navigation_history:
-                    previous_word = st.session_state.navigation_history[-1] if st.session_state.navigation_history else None
-                    G, node_labels = build_focused_wordnet_graph(
-                        word, previous_word, None, depth,
-                        include_hypernyms=show_hypernyms,
-                        include_hyponyms=show_hyponyms,
-                        include_meronyms=show_meronyms,
-                        include_holonyms=show_holonyms
-                    )
-                else:
-                    G, node_labels = build_wordnet_graph(
-                        word, depth,
-                        include_hypernyms=show_hypernyms,
-                        include_hyponyms=show_hyponyms,
-                        include_meronyms=show_meronyms,
-                        include_holonyms=show_holonyms
-                    )
+            with st.spinner(f"Building WordNet graph for '{current_display_word}'..."):
+                # Always use the regular graph building (simpler approach)
+                G, node_labels = build_wordnet_graph(
+                    current_display_word, depth,
+                    include_hypernyms=show_hypernyms,
+                    include_hyponyms=show_hyponyms,
+                    include_meronyms=show_meronyms,
+                    include_holonyms=show_holonyms
+                )
                 
                 if G.number_of_nodes() > 0:
                     st.info(f"Graph created with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges")
                     
                     # Generate the interactive graph
                     html_path = visualize_graph(
-                        G, node_labels, word,
+                        G, node_labels, current_display_word,
                         layout_type=layout_type,
                         node_size_multiplier=node_size_multiplier,
                         enable_physics=enable_physics,
@@ -437,7 +468,7 @@ if word:
                         # Clean up the temporary file
                         os.unlink(html_path)
                 else:
-                    st.warning(f"No WordNet connections found for '{word}'")
+                    st.warning(f"No WordNet connections found for '{current_display_word}'")
     
     except Exception as e:
         st.error(f"Error: {e}")

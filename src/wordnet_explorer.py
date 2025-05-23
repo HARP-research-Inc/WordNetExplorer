@@ -284,23 +284,48 @@ def visualize_graph(G: nx.Graph, node_labels: Dict, word: str, save_path: str = 
         navigation_js = """
         <script type="text/javascript">
         window.addEventListener('load', function() {
-            if (window.network) {
-                window.network.on("doubleClick", function (params) {
-                    if (params.nodes.length > 0) {
-                        const nodeId = params.nodes[0];
-                        console.log('Double-clicked node:', nodeId);
-                        
-                        // Send navigation event to Streamlit
-                        window.parent.postMessage({
-                            type: 'streamlit:componentMessage',
-                            message: {
-                                action: 'navigate_to_node',
-                                nodeId: nodeId
+            // Wait for the network to be created
+            setTimeout(function() {
+                if (window.network) {
+                    window.network.on("doubleClick", function (params) {
+                        if (params.nodes.length > 0) {
+                            const nodeId = params.nodes[0];
+                            console.log('Double-clicked node:', nodeId);
+                            
+                            // Extract the word/synset name from the node ID
+                            let targetWord = nodeId;
+                            
+                            // Handle different node types
+                            if (nodeId.includes('_main')) {
+                                targetWord = nodeId.replace('_main', '');
+                            } else if (nodeId.includes('_breadcrumb')) {
+                                targetWord = nodeId.replace('_breadcrumb', '');
+                            } else if (nodeId.includes('.')) {
+                                // It's a synset - extract the lemma
+                                targetWord = nodeId.split('.')[0];
+                            } else if (nodeId.includes('_')) {
+                                // Remove relationship suffixes
+                                targetWord = nodeId.replace(/_hyper$|_hypo$|_mero$|_holo$/g, '');
+                                if (targetWord.includes('.')) {
+                                    targetWord = targetWord.split('.')[0];
+                                }
                             }
-                        }, '*');
-                    }
-                });
-            }
+                            
+                            // Navigate by setting URL parameter
+                            const url = new URL(window.location);
+                            url.searchParams.set('navigate_to', targetWord);
+                            url.searchParams.set('clicked_node', nodeId);
+                            window.location.href = url.toString();
+                        }
+                    });
+                    
+                    console.log('Double-click navigation enabled');
+                } else {
+                    console.log('Network not found, retrying...');
+                    // Retry after a longer delay
+                    setTimeout(arguments.callee, 1000);
+                }
+            }, 500);
         });
         </script>
         """
