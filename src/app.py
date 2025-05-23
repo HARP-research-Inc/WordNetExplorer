@@ -7,6 +7,7 @@ using Streamlit.
 """
 
 import streamlit as st
+import streamlit.components.v1 as components
 import tempfile
 import os
 import sys
@@ -163,30 +164,31 @@ if word:
                 if G.number_of_nodes() > 0:
                     st.info(f"Graph created with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges")
                     
-                    # Create a temporary file for the graph
-                    with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as tmp:
-                        temp_path = tmp.name
+                    # Generate the interactive graph
+                    html_path = visualize_graph(G, node_labels, word)
                     
-                    # Generate the graph
-                    visualize_graph(G, node_labels, word, temp_path)
-                    
-                    # Display the graph
-                    st.image(temp_path, use_column_width=True)
-                    
-                    # Save the graph if requested
-                    if save_graph:
-                        # Create a downloads directory if it doesn't exist
-                        downloads_dir = Path("downloads")
-                        downloads_dir.mkdir(exist_ok=True)
+                    if html_path:
+                        # Read the HTML content
+                        with open(html_path, 'r', encoding='utf-8') as f:
+                            html_content = f.read()
                         
-                        # Save the file
-                        save_path = downloads_dir / filename
-                        import shutil
-                        shutil.copy(temp_path, save_path)
-                        st.success(f"Graph saved to: {save_path}")
-                    
-                    # Clean up the temporary file
-                    os.unlink(temp_path)
+                        # Display the interactive graph
+                        components.html(html_content, height=600)
+                        
+                        # Save the graph if requested
+                        if save_graph:
+                            # Create a downloads directory if it doesn't exist
+                            downloads_dir = Path("downloads")
+                            downloads_dir.mkdir(exist_ok=True)
+                            
+                            # Save the file
+                            save_path = downloads_dir / filename.replace('.png', '.html')
+                            import shutil
+                            shutil.copy(html_path, save_path)
+                            st.success(f"Interactive graph saved to: {save_path}")
+                        
+                        # Clean up the temporary file
+                        os.unlink(html_path)
                 else:
                     st.warning(f"No WordNet connections found for '{word}'")
     

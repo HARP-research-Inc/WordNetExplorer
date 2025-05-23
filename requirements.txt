@@ -2,3 +2,4 @@ streamlit
 nltk
 networkx
 matplotlib
+pyvis

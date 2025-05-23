@@ -9,8 +9,11 @@ Provides functions for building and visualizing word relationship graphs.
 import nltk
 import networkx as nx
 import matplotlib.pyplot as plt
+from pyvis.network import Network
 from collections import defaultdict
 from typing import Set, Dict, List, Tuple
+import tempfile
+import os
 
 def download_nltk_data():
     """Download required NLTK data if not already present."""
@@ -139,7 +142,95 @@ def build_wordnet_graph(word: str, depth: int = 1,
     return G, node_labels
 
 def visualize_graph(G: nx.Graph, node_labels: Dict, word: str, save_path: str = None):
-    """Visualize the WordNet graph using matplotlib."""
+    """Create an interactive visualization of the WordNet graph using pyvis."""
+    if G.number_of_nodes() == 0:
+        print("No graph to display - no WordNet connections found.")
+        return None
+    
+    # Create a pyvis network
+    net = Network(
+        height="600px",
+        width="100%",
+        bgcolor="#ffffff",
+        font_color="black",
+        directed=False
+    )
+    
+    # Configure physics for better layout
+    net.set_options("""
+    var options = {
+      "physics": {
+        "enabled": true,
+        "stabilization": {"iterations": 100},
+        "barnesHut": {
+          "gravitationalConstant": -8000,
+          "centralGravity": 0.3,
+          "springLength": 95,
+          "springConstant": 0.04,
+          "damping": 0.09
+        }
+      }
+    }
+    """)
+    
+    # Add nodes with custom colors and properties
+    for node in G.nodes():
+        # Determine node color and size based on type
+        if '_main' in node:
+            color = '#FF6B6B'  # Red for main word
+            size = 25
+            title = f"Main word: {word.upper()}"
+        elif '_hyper' in node:
+            color = '#4ECDC4'  # Teal for hypernyms
+            size = 20
+            title = f"Hypernym: {node_labels.get(node, node)}\nDefinition: {G.nodes[node].get('definition', 'No definition')}"
+        elif '_hypo' in node:
+            color = '#45B7D1'  # Blue for hyponyms
+            size = 20
+            title = f"Hyponym: {node_labels.get(node, node)}\nDefinition: {G.nodes[node].get('definition', 'No definition')}"
+        elif '_mero' in node:
+            color = '#96CEB4'  # Green for meronyms
+            size = 18
+            title = f"Meronym (part-of): {node_labels.get(node, node)}\nDefinition: {G.nodes[node].get('definition', 'No definition')}"
+        elif '_holo' in node:
+            color = '#FFEAA7'  # Yellow for holonyms
+            size = 18
+            title = f"Holonym (whole-of): {node_labels.get(node, node)}\nDefinition: {G.nodes[node].get('definition', 'No definition')}"
+        else:
+            color = '#DDA0DD'  # Purple for synsets
+            size = 22
+            title = f"Word sense: {node_labels.get(node, node)}\nDefinition: {G.nodes[node].get('definition', 'No definition')}"
+        
+        # Add the node
+        net.add_node(
+            node,
+            label=node_labels.get(node, node),
+            color=color,
+            size=size,
+            title=title,
+            font={'size': 12, 'color': 'black'}
+        )
+    
+    # Add edges
+    for edge in G.edges():
+        net.add_edge(edge[0], edge[1], color='#888888', width=2)
+    
+    # Save to file
+    if save_path:
+        # For CLI usage, save as HTML
+        if save_path.endswith('.png'):
+            save_path = save_path.replace('.png', '.html')
+        net.save_graph(save_path)
+        print(f"Interactive graph saved to: {save_path}")
+        return save_path
+    else:
+        # For Streamlit, save to a temporary file
+        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.html')
+        net.save_graph(temp_file.name)
+        return temp_file.name
+
+def visualize_graph_static(G: nx.Graph, node_labels: Dict, word: str, save_path: str = None):
+    """Create a static matplotlib visualization (fallback option)."""
     if G.number_of_nodes() == 0:
         print("No graph to display - no WordNet connections found.")
         return

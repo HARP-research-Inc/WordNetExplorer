@@ -1,15 +1,16 @@
 # WordNet Explorer
 
-A powerful tool that uses NLTK and NetworkX to visualize WordNet semantic relationships for any word. Explore word meanings, synonyms, hypernyms, hyponyms, and more through interactive visualizations.
+A powerful tool that uses NLTK and NetworkX to visualize WordNet semantic relationships for any word. Explore word meanings, synonyms, hypernyms, hyponyms, and more through **interactive** visualizations.
 
 ## Features
 
 - 🔍 **Word Exploration**: Discover semantic relationships for any English word
-- 📊 **Graph Visualization**: Interactive network graphs showing word connections
+- 🎮 **Interactive Graphs**: Zoom, pan, drag nodes, and hover for definitions
 - 🎨 **Color-coded Relationships**: Different colors for hypernyms, hyponyms, meronyms, etc.
 - 📖 **Detailed Information**: View definitions, examples, and related words
-- 💾 **Save Graphs**: Export visualizations as PNG images
+- 💾 **Save Graphs**: Export interactive visualizations as HTML files
 - 🎯 **Configurable Depth**: Control how deep to explore relationships
+- 🎛️ **Relationship Filtering**: Toggle which types of relationships to display
 - ⚡ **Fast Setup**: Automatic NLTK data download
 - 🌐 **Web Interface**: User-friendly Streamlit UI for easy exploration
 

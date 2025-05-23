@@ -10,7 +10,12 @@ from typing import Dict, Tuple
 import networkx as nx
 import matplotlib.pyplot as plt
 
-from .wordnet_explorer import (
+# Import using absolute imports to avoid relative import issues
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from src.wordnet_explorer import (
     download_nltk_data,
     get_synsets_for_word,
     build_wordnet_graph,
@@ -28,7 +33,7 @@ Examples:
   %(prog)s dog                    # Basic graph for 'dog'
   %(prog)s --word cat --depth 3   # Deeper exploration for 'cat'
   %(prog)s car --info             # Show detailed word information
-  %(prog)s tree --save tree.png   # Save graph to file
+  %(prog)s tree --save tree.html  # Save interactive graph to file
         """
     )
     
@@ -38,7 +43,7 @@ Examples:
                        help='Depth of exploration (default: 1)')
     parser.add_argument('-i', '--info', action='store_true',
                        help='Show detailed word information')
-    parser.add_argument('-s', '--save', help='Save graph to file (PNG format)')
+    parser.add_argument('-s', '--save', help='Save graph to file (HTML format)')
     parser.add_argument('--no-graph', action='store_true',
                        help='Don\'t display the graph visualization')
     
