@@ -18,8 +18,8 @@ def render_word_input():
     selected_word = st.session_state.get('selected_history_word', None)
     log_word_input_event("SELECTED_WORD_CHECK", selected_word=selected_word)
     
-    # Word input field
-    input_value = selected_word if selected_word else (st.session_state.current_word if st.session_state.current_word else "")
+    # Word input field - only set value if a history word was selected
+    input_value = selected_word if selected_word else ""
     log_word_input_event("INPUT_VALUE_CALCULATION", input_value=input_value, selected_word=selected_word, current_word=st.session_state.get('current_word', 'None'))
     
     word = st.text_input(
@@ -44,6 +44,7 @@ def render_word_input():
             log_word_input_event("ADDING_SELECTED_TO_HISTORY", selected_word=selected_word, last_searched=last_searched)
             add_to_search_history(selected_word)
             st.session_state.last_searched_word = selected_word
+            st.session_state.previous_word_input = selected_word  # Update this too
             log_word_input_event("ADDED_SELECTED_TO_HISTORY", selected_word=selected_word)
         else:
             log_word_input_event("SKIPPED_SELECTED_DUPLICATE", selected_word=selected_word, last_searched=last_searched)
@@ -52,20 +53,31 @@ def render_word_input():
         log_word_input_event("RETURNING_SELECTED_WORD", selected_word=selected_word)
         return selected_word
     
-    # Only process word changes when the input actually changes
-    # Use a separate tracking variable to avoid Streamlit rerun issues
-    previous_input = st.session_state.get('previous_word_input', '')
-    log_word_input_event("NORMAL_INPUT_CHECK", word=word, previous_input=previous_input, condition_met=bool(word and word != previous_input))
+    # Use a more robust tracking mechanism that handles multiple function calls
+    # Track the actual widget value instead of relying on previous_input
+    current_widget_value = st.session_state.get('word_input', '')
+    last_processed_value = st.session_state.get('last_processed_word_input', '')
     
-    # Add word to search history only when the input actually changes
-    if word and word != previous_input:
-        log_word_input_event("ADDING_NORMAL_TO_HISTORY", word=word, previous_input=previous_input)
+    log_word_input_event("ROBUST_INPUT_CHECK", 
+                        word=word, 
+                        current_widget_value=current_widget_value,
+                        last_processed_value=last_processed_value,
+                        condition_met=bool(word and word != last_processed_value))
+    
+    # Add word to search history only when we have a new word that hasn't been processed
+    if word and word != last_processed_value:
+        log_word_input_event("ADDING_NORMAL_TO_HISTORY", word=word, last_processed_value=last_processed_value)
         add_to_search_history(word)
         st.session_state.last_searched_word = word
         st.session_state.previous_word_input = word
+        st.session_state.last_processed_word_input = word  # Track what we've processed
         log_word_input_event("ADDED_NORMAL_TO_HISTORY", word=word)
     else:
-        log_word_input_event("SKIPPED_NORMAL_INPUT", word=word, previous_input=previous_input, word_exists=bool(word), words_different=word != previous_input)
+        log_word_input_event("SKIPPED_NORMAL_INPUT", 
+                            word=word, 
+                            last_processed_value=last_processed_value, 
+                            word_exists=bool(word), 
+                            words_different=word != last_processed_value)
     
     log_session_state("FUNCTION_END")
     log_word_input_event("FUNCTION_EXIT", returning_word=word)

@@ -49,6 +49,7 @@ def log_session_state(prefix=""):
         'current_word': st.session_state.get('current_word', 'None'),
         'last_searched_word': st.session_state.get('last_searched_word', 'None'),
         'previous_word_input': st.session_state.get('previous_word_input', 'None'),
+        'last_processed_word_input': st.session_state.get('last_processed_word_input', 'None'),
         'selected_history_word': st.session_state.get('selected_history_word', 'None'),
         'search_history_length': len(st.session_state.get('search_history', [])),
         'search_history': st.session_state.get('search_history', [])

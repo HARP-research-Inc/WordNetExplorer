@@ -19,6 +19,8 @@ def initialize_session_state():
         st.session_state.selected_history_word = None
     if 'previous_word_input' not in st.session_state:
         st.session_state.previous_word_input = ''
+    if 'last_processed_word_input' not in st.session_state:
+        st.session_state.last_processed_word_input = ''
 
 
 def add_to_navigation_history(word):
