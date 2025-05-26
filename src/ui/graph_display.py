@@ -6,11 +6,8 @@ import streamlit as st
 import streamlit.components.v1 as components
 import os
 import shutil
-from ..config.settings import COLOR_SCHEMES
-from ..utils.helpers import ensure_downloads_directory, validate_filename
-from ..wordnet_explorer import build_wordnet_graph, visualize_graph
-
-
+from src.config.settings import COLOR_SCHEMES
+from src.utils.helpers import ensure_downloads_directory, validate_filename
 def render_color_legend(color_scheme):
     """
     Render the color legend for the graph.
@@ -127,37 +124,44 @@ def render_exploration_tips():
         """, unsafe_allow_html=True)
 
 
-def render_graph_visualization(word, settings):
+def render_graph_visualization(word, settings, explorer=None):
     """
     Render the complete graph visualization section.
     
     Args:
         word (str): The word to visualize
         settings (dict): Dictionary containing all graph settings
+        explorer: WordNetExplorer instance (optional, will create if not provided)
     """
     st.markdown('<h2 class="sub-header">Relationship Graph</h2>', unsafe_allow_html=True)
     
     # Show navigation info
     st.info("💡 **Double-click any node** to explore that concept! Your navigation history is saved above.")
     
+    # Create explorer if not provided
+    if explorer is None:
+        from src.core import WordNetExplorer
+        explorer = WordNetExplorer()
+    
     with st.spinner(f"Building WordNet graph for '{word}'..."):
-        # Build the graph
-        G, node_labels = build_wordnet_graph(
-            word, 
-            settings['depth'],
+        # Build the graph using the new modular explorer
+        G, node_labels = explorer.explore_word(
+            word=word, 
+            depth=settings['depth'],
+            sense_number=settings.get('parsed_sense_number'),
             include_hypernyms=settings['show_hypernyms'],
             include_hyponyms=settings['show_hyponyms'],
             include_meronyms=settings['show_meronyms'],
-            include_holonyms=settings['show_holonyms'],
-            sense_number=settings.get('parsed_sense_number')
+            include_holonyms=settings['show_holonyms']
         )
         
         if G.number_of_nodes() > 0:
             st.info(f"Graph created with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges")
             
-            # Generate the interactive graph
-            html_path = visualize_graph(
+            # Generate the interactive graph using the new modular explorer
+            html_content = explorer.visualize_graph(
                 G, node_labels, word,
+                save_path=None,  # Don't save to file, get HTML content
                 layout_type=settings['layout_type'],
                 node_size_multiplier=settings['node_size_multiplier'],
                 enable_physics=settings['enable_physics'],
@@ -168,11 +172,8 @@ def render_graph_visualization(word, settings):
                 color_scheme=settings['color_scheme']
             )
             
-            if html_path:
-                # Read and display the HTML content
-                with open(html_path, 'r', encoding='utf-8') as f:
-                    html_content = f.read()
-                
+            if html_content:
+                # Display the HTML content directly
                 components.html(html_content, height=600)
                 
                 # Add comprehensive legend and controls
@@ -180,10 +181,7 @@ def render_graph_visualization(word, settings):
                 
                 # Save the graph if requested
                 if settings['save_graph']:
-                    save_graph_file(html_path, settings['filename'])
-                
-                # Clean up the temporary file
-                os.unlink(html_path)
+                    save_graph_to_file(explorer, G, node_labels, word, settings)
             else:
                 st.error("Failed to generate graph visualization")
         else:
@@ -217,17 +215,33 @@ def render_graph_legend_and_controls(G, settings):
     render_exploration_tips()
 
 
-def save_graph_file(html_path, filename):
+def save_graph_to_file(explorer, G, node_labels, word, settings):
     """
     Save the graph HTML file to the downloads directory.
     
     Args:
-        html_path (str): Path to the temporary HTML file
-        filename (str): Desired filename for the saved file
+        explorer: WordNetExplorer instance
+        G: NetworkX graph
+        node_labels: Node labels dictionary
+        word: The word being visualized
+        settings: Settings dictionary containing filename and other options
     """
     downloads_dir = ensure_downloads_directory()
-    validated_filename = validate_filename(filename, ".html")
+    validated_filename = validate_filename(settings['filename'], ".html")
     save_path = downloads_dir / validated_filename
     
-    shutil.copy(html_path, save_path)
+    # Generate HTML and save to file
+    explorer.visualize_graph(
+        G, node_labels, word,
+        save_path=str(save_path),
+        layout_type=settings['layout_type'],
+        node_size_multiplier=settings['node_size_multiplier'],
+        enable_physics=settings['enable_physics'],
+        spring_strength=settings['spring_strength'],
+        central_gravity=settings['central_gravity'],
+        show_labels=settings['show_labels'],
+        edge_width=settings['edge_width'],
+        color_scheme=settings['color_scheme']
+    )
+    
     st.success(f"Interactive graph saved to: {save_path}") 
