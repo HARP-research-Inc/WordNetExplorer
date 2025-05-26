@@ -19,6 +19,7 @@ DEFAULT_SETTINGS = {
     'edge_width': 2,
     'show_info': True,
     'show_graph': True,
+    'sense_number': None,  # Specific sense to display (None = all senses)
 }
 
 # Color schemes for graph visualization - updated for new structure

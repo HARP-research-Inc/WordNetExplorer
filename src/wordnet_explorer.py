@@ -38,7 +38,8 @@ def build_wordnet_graph(word: str, depth: int = 1,
                         include_hypernyms: bool = True,
                         include_hyponyms: bool = True,
                         include_meronyms: bool = True,
-                        include_holonyms: bool = True) -> Tuple[nx.Graph, Dict]:
+                        include_holonyms: bool = True,
+                        sense_number: int = None) -> Tuple[nx.Graph, Dict]:
     """
     Build a NetworkX graph of WordNet connections for a given word.
     Uses a cleaner structure with:
@@ -53,6 +54,7 @@ def build_wordnet_graph(word: str, depth: int = 1,
         include_hyponyms: Whether to include hyponym relationships
         include_meronyms: Whether to include meronym relationships
         include_holonyms: Whether to include holonym relationships
+        sense_number: Specific sense number to display (1-based, None for all)
         
     Returns:
         Tuple of (graph, node_labels)
@@ -67,6 +69,14 @@ def build_wordnet_graph(word: str, depth: int = 1,
     if not synsets:
         print(f"No WordNet entries found for '{word}'")
         return G, node_labels
+    
+    # Filter synsets by sense number if specified
+    if sense_number is not None:
+        if sense_number <= len(synsets):
+            synsets = [synsets[sense_number - 1]]  # Convert to 0-based index
+        else:
+            print(f"Sense number {sense_number} not found for '{word}' (only {len(synsets)} senses available)")
+            return G, node_labels
     
     # Start with the main word node
     main_node = f"{word}_main"
@@ -499,7 +509,8 @@ def build_focused_wordnet_graph(center_word: str, previous_word: str = None,
                                 include_hypernyms: bool = True,
                                 include_hyponyms: bool = True,
                                 include_meronyms: bool = True,
-                                include_holonyms: bool = True) -> Tuple[nx.Graph, Dict]:
+                                include_holonyms: bool = True,
+                                sense_number: int = None) -> Tuple[nx.Graph, Dict]:
     """
     Build a focused WordNet graph centered on a specific word, with breadcrumb navigation.
     
@@ -512,6 +523,7 @@ def build_focused_wordnet_graph(center_word: str, previous_word: str = None,
         include_hyponyms: Whether to include hyponym relationships
         include_meronyms: Whether to include meronym relationships
         include_holonyms: Whether to include holonym relationships
+        sense_number: Specific sense number to display (1-based, None for all)
         
     Returns:
         Tuple of (graph, node_labels)

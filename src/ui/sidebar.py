@@ -29,6 +29,25 @@ def render_word_input():
         help="Press Enter to add the word to your search history"
     ).strip().lower()
     
+    # Sense number input field
+    sense_number = st.text_input(
+        "Sense number (optional)",
+        value="",
+        key="sense_number_input",
+        help="Enter a specific sense number (1, 2, 3, etc.) to show only that sense. Leave blank to show all senses."
+    ).strip()
+    
+    # Convert sense number to integer if provided
+    parsed_sense_number = None
+    if sense_number:
+        try:
+            parsed_sense_number = int(sense_number)
+            if parsed_sense_number < 1:
+                st.warning("Sense number must be 1 or greater")
+                parsed_sense_number = None
+        except ValueError:
+            st.warning("Please enter a valid number for sense number")
+    
     log_word_input_event("TEXT_INPUT_RESULT", word=word, input_value=input_value)
     
     # Handle selected word from history
@@ -51,7 +70,7 @@ def render_word_input():
         
         # Return the selected word to ensure it's processed
         log_word_input_event("RETURNING_SELECTED_WORD", selected_word=selected_word)
-        return selected_word
+        return selected_word, parsed_sense_number
     
     # Use a more robust tracking mechanism that handles multiple function calls
     # Track the actual widget value instead of relying on previous_input
@@ -81,7 +100,7 @@ def render_word_input():
     
     log_session_state("FUNCTION_END")
     log_word_input_event("FUNCTION_EXIT", returning_word=word)
-    return word
+    return word, parsed_sense_number
 
 
 def render_search_history():
@@ -269,7 +288,7 @@ def render_sidebar():
         st.markdown("### Settings")
         
         # Word input
-        word = render_word_input()
+        word, parsed_sense_number = render_word_input()
         
         # Search history
         render_search_history()
@@ -322,5 +341,6 @@ def render_sidebar():
             'show_info': show_info,
             'show_graph': show_graph,
             'save_graph': save_graph,
-            'filename': filename
+            'filename': filename,
+            'parsed_sense_number': parsed_sense_number
         } 

@@ -148,7 +148,8 @@ def render_graph_visualization(word, settings):
             include_hypernyms=settings['show_hypernyms'],
             include_hyponyms=settings['show_hyponyms'],
             include_meronyms=settings['show_meronyms'],
-            include_holonyms=settings['show_holonyms']
+            include_holonyms=settings['show_holonyms'],
+            sense_number=settings.get('parsed_sense_number')
         )
         
         if G.number_of_nodes() > 0:
