@@ -69,16 +69,67 @@ class GraphVisualizer:
         self._add_nodes(net, G, node_labels)
         self._add_edges(net, G)
         
-        # Add navigation JavaScript if not saving to file
-        if not save_path:
-            self._add_navigation_js(net)
-        
-        # Generate and return HTML
+        # Generate HTML and inject JavaScript
         if save_path:
-            net.save_graph(save_path)
+            # Save to file with JavaScript injection
+            import tempfile
+            import os
+            
+            # Create temporary file first
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.html')
+            temp_file.close()  # Close the file handle before using it
+            net.save_graph(temp_file.name)
+            
+            # Read the HTML and inject our JavaScript
+            with open(temp_file.name, 'r', encoding='utf-8') as f:
+                html_content = f.read()
+            
+            # Get navigation JavaScript
+            navigation_js = self._add_navigation_js(net)
+            
+            # Inject our navigation JavaScript before closing body tag
+            html_content = html_content.replace('</body>', navigation_js + '</body>')
+            
+            # Write to the final save path
+            with open(save_path, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            
+            # Clean up temp file
+            try:
+                os.unlink(temp_file.name)
+            except PermissionError:
+                # On Windows, sometimes the file is still locked
+                pass
+            
             return save_path
         else:
-            return net.generate_html()
+            # For Streamlit display, generate HTML with JavaScript
+            import tempfile
+            import os
+            
+            # Create temporary file
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.html')
+            temp_file.close()  # Close the file handle before using it
+            net.save_graph(temp_file.name)
+            
+            # Read the HTML and inject our JavaScript
+            with open(temp_file.name, 'r', encoding='utf-8') as f:
+                html_content = f.read()
+            
+            # Get navigation JavaScript
+            navigation_js = self._add_navigation_js(net)
+            
+            # Inject our navigation JavaScript before closing body tag
+            html_content = html_content.replace('</body>', navigation_js + '</body>')
+            
+            # Clean up temp file
+            try:
+                os.unlink(temp_file.name)
+            except PermissionError:
+                # On Windows, sometimes the file is still locked
+                pass
+            
+            return html_content
     
     def visualize_static(self, G: nx.Graph, node_labels: Dict, 
                         word: str, save_path: str = None) -> Optional[str]:
@@ -238,44 +289,91 @@ class GraphVisualizer:
             net.add_edge(source, target, **edge_config)
     
     def _add_navigation_js(self, net: Network):
-        """Add JavaScript for double-click navigation."""
+        """Add JavaScript for double-click navigation with enhanced console logging."""
         navigation_js = """
         <script type="text/javascript">
         window.addEventListener('load', function() {
             setTimeout(function() {
                 if (window.network) {
+                    // Enhanced console logging for double-click events
                     window.network.on("doubleClick", function (params) {
                         if (params.nodes.length > 0) {
                             const nodeId = params.nodes[0];
-                            console.log('Double-clicked node:', nodeId);
                             
+                            // Get node data from the network
+                            const nodeData = window.network.body.data.nodes.get(nodeId);
+                            
+                            // Enhanced console logging with detailed information
+                            console.group('🖱️ Node Double-Click Event');
+                            console.log('Node ID:', nodeId);
+                            console.log('Node Label:', nodeData ? nodeData.label : 'Unknown');
+                            console.log('Node Title:', nodeData ? nodeData.title : 'Unknown');
+                            console.log('Node Color:', nodeData ? nodeData.color : 'Unknown');
+                            console.log('Node Size:', nodeData ? nodeData.size : 'Unknown');
+                            console.log('Click Position:', params.pointer.DOM);
+                            console.log('Canvas Position:', params.pointer.canvas);
+                            console.log('Timestamp:', new Date().toISOString());
+                            
+                            // Log node type detection
+                            let nodeType = 'unknown';
                             let targetWord = nodeId;
                             
                             if (nodeId.includes('_main')) {
+                                nodeType = 'main word';
                                 targetWord = nodeId.replace('_main', '');
                             } else if (nodeId.includes('_breadcrumb')) {
+                                nodeType = 'breadcrumb';
                                 targetWord = nodeId.replace('_breadcrumb', '');
                             } else if (nodeId.includes('_word')) {
+                                nodeType = 'related word';
                                 targetWord = nodeId.replace('_word', '');
                             } else if (nodeId.includes('.')) {
+                                nodeType = 'synset';
                                 targetWord = nodeId.split('.')[0];
                             }
                             
+                            console.log('Detected Node Type:', nodeType);
+                            console.log('Target Word for Navigation:', targetWord);
+                            console.groupEnd();
+                            
+                            // Navigate by setting URL parameter
                             const url = new URL(window.location);
                             url.searchParams.set('navigate_to', targetWord);
                             url.searchParams.set('clicked_node', nodeId);
                             window.location.href = url.toString();
+                        } else {
+                            console.log('🖱️ Double-click detected but no nodes selected');
                         }
                     });
                     
-                    console.log('Double-click navigation enabled');
+                    // Also log single clicks for additional debugging
+                    window.network.on("click", function (params) {
+                        if (params.nodes.length > 0) {
+                            const nodeId = params.nodes[0];
+                            const nodeData = window.network.body.data.nodes.get(nodeId);
+                            console.log('🖱️ Single-click on node:', nodeId, '| Label:', nodeData ? nodeData.label : 'Unknown');
+                        }
+                    });
+                    
+                    // Log when hovering over nodes
+                    window.network.on("hoverNode", function (params) {
+                        const nodeId = params.node;
+                        const nodeData = window.network.body.data.nodes.get(nodeId);
+                        console.log('🖱️ Hovering over node:', nodeId, '| Label:', nodeData ? nodeData.label : 'Unknown');
+                    });
+                    
+                    console.log('✅ Enhanced double-click navigation and logging enabled');
+                    console.log('💡 Double-click any node to see detailed logging information');
+                } else {
+                    console.log('⚠️ Network not found, retrying...');
+                    // Retry after a longer delay
+                    setTimeout(arguments.callee, 1000);
                 }
-            }, 1000);
+            }, 500);
         });
         </script>
         """
-        # Note: This would need to be properly integrated with pyvis
-        # For now, this is a placeholder for the navigation functionality
+        return navigation_js
     
     def _draw_colored_edges(self, G: nx.Graph, pos: Dict):
         """Draw edges with different colors based on relationship type."""

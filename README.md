@@ -99,9 +99,25 @@ The visualizations are fully interactive and provide:
 - **Pan**: Click and drag to move around the graph
 - **Node Interaction**: Hover over nodes to see definitions and relationship types
 - **Double-click Navigation**: Click nodes to recenter and explore that concept
+- **Enhanced Console Logging**: Detailed logging of node interactions in browser console
 - **Physics Simulation**: Nodes automatically arrange themselves for optimal viewing
 - **Color Coding**: Different colors for each relationship type
 - **Responsive Layout**: Automatically adjusts to graph size and complexity
+
+### 🔍 Console Logging Feature
+
+For developers and advanced users, the WordNet Explorer includes **enhanced console logging** that provides detailed information about node interactions:
+
+- **Open browser developer tools** (F12) and go to the Console tab
+- **Double-click any node** to see comprehensive logging information including:
+  - Node ID, label, and type
+  - Node properties (color, size, title)
+  - Click coordinates and timestamp
+  - Navigation target information
+- **Single-click and hover events** are also logged for debugging
+- Perfect for understanding graph structure and debugging interactions
+
+See `docs/CONSOLE_LOGGING_FEATURE.md` for detailed documentation.
 
 ## Graph Legend
 
