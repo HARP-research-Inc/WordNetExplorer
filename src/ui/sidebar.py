@@ -6,35 +6,76 @@ import streamlit as st
 from ..config.settings import DEFAULT_SETTINGS, LAYOUT_OPTIONS
 from .navigation import render_navigation_history, render_navigation_controls
 from ..utils.session_state import add_to_search_history, clear_search_history
+from ..utils.debug_logger import log_word_input_event, log_session_state
 
 
 def render_word_input():
     """Render the word input field with search history."""
+    log_session_state("FUNCTION_START")
+    log_word_input_event("FUNCTION_ENTRY", function="render_word_input")
+    
     # Check if a history word was selected
     selected_word = st.session_state.get('selected_history_word', None)
+    log_word_input_event("SELECTED_WORD_CHECK", selected_word=selected_word)
     
     # Word input field
+    input_value = selected_word if selected_word else (st.session_state.current_word if st.session_state.current_word else "")
+    log_word_input_event("INPUT_VALUE_CALCULATION", input_value=input_value, selected_word=selected_word, current_word=st.session_state.get('current_word', 'None'))
+    
     word = st.text_input(
         "Enter a word to explore", 
-        value=selected_word if selected_word else (st.session_state.current_word if st.session_state.current_word else ""),
+        value=input_value,
         key="word_input",
         help="Press Enter to add the word to your search history"
     ).strip().lower()
     
-    # Clear the selected history word after using it
-    if selected_word:
-        st.session_state.selected_history_word = None
+    log_word_input_event("TEXT_INPUT_RESULT", word=word, input_value=input_value)
     
-    # Add word to search history when entered
-    if word and word != st.session_state.get('last_searched_word', ''):
+    # Handle selected word from history
+    if selected_word:
+        log_word_input_event("PROCESSING_SELECTED_WORD", selected_word=selected_word)
+        # Clear the selected history word
+        st.session_state.selected_history_word = None
+        log_word_input_event("CLEARED_SELECTED_WORD")
+        
+        # Add to search history and update last searched word
+        last_searched = st.session_state.get('last_searched_word', '')
+        if selected_word != last_searched:
+            log_word_input_event("ADDING_SELECTED_TO_HISTORY", selected_word=selected_word, last_searched=last_searched)
+            add_to_search_history(selected_word)
+            st.session_state.last_searched_word = selected_word
+            log_word_input_event("ADDED_SELECTED_TO_HISTORY", selected_word=selected_word)
+        else:
+            log_word_input_event("SKIPPED_SELECTED_DUPLICATE", selected_word=selected_word, last_searched=last_searched)
+        
+        # Return the selected word to ensure it's processed
+        log_word_input_event("RETURNING_SELECTED_WORD", selected_word=selected_word)
+        return selected_word
+    
+    # Only process word changes when the input actually changes
+    # Use a separate tracking variable to avoid Streamlit rerun issues
+    previous_input = st.session_state.get('previous_word_input', '')
+    log_word_input_event("NORMAL_INPUT_CHECK", word=word, previous_input=previous_input, condition_met=bool(word and word != previous_input))
+    
+    # Add word to search history only when the input actually changes
+    if word and word != previous_input:
+        log_word_input_event("ADDING_NORMAL_TO_HISTORY", word=word, previous_input=previous_input)
         add_to_search_history(word)
         st.session_state.last_searched_word = word
+        st.session_state.previous_word_input = word
+        log_word_input_event("ADDED_NORMAL_TO_HISTORY", word=word)
+    else:
+        log_word_input_event("SKIPPED_NORMAL_INPUT", word=word, previous_input=previous_input, word_exists=bool(word), words_different=word != previous_input)
     
+    log_session_state("FUNCTION_END")
+    log_word_input_event("FUNCTION_EXIT", returning_word=word)
     return word
 
 
 def render_search_history():
     """Render the search history in a collapsible expander."""
+    log_word_input_event("SEARCH_HISTORY_RENDER_START", history_length=len(st.session_state.get('search_history', [])))
+    
     if st.session_state.search_history:
         with st.expander("🔍 Search History", expanded=False):
             st.markdown("Click any word to explore it again:")
@@ -45,14 +86,21 @@ def render_search_history():
             with col1:
                 # Display search history as clickable buttons
                 for i, hist_word in enumerate(st.session_state.search_history):
+                    log_word_input_event("RENDERING_HISTORY_BUTTON", index=i, hist_word=hist_word, button_key=f"search_history_{i}")
                     if st.button(f"📝 {hist_word}", key=f"search_history_{i}", help=f"Click to explore '{hist_word}'"):
+                        log_word_input_event("HISTORY_BUTTON_CLICKED", hist_word=hist_word, index=i)
                         st.session_state.selected_history_word = hist_word
+                        log_word_input_event("SET_SELECTED_HISTORY_WORD", hist_word=hist_word)
+                        log_session_state("BEFORE_RERUN")
                         st.rerun()
             
             with col2:
                 if st.button("🗑️", help="Clear search history", key="clear_search_history"):
+                    log_word_input_event("CLEAR_HISTORY_CLICKED")
                     clear_search_history()
                     st.rerun()
+    else:
+        log_word_input_event("NO_SEARCH_HISTORY_TO_RENDER")
 
 
 def render_basic_settings():
