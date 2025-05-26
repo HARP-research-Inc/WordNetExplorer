@@ -30,26 +30,29 @@ def render_word_input():
         add_to_search_history(word)
         st.session_state.last_searched_word = word
     
-    # Display search history
-    if st.session_state.search_history:
-        st.markdown("**Recent Searches:**")
-        
-        # Create columns for history items and clear button
-        col1, col2 = st.columns([4, 1])
-        
-        with col1:
-            # Display search history as clickable buttons
-            for i, hist_word in enumerate(st.session_state.search_history):
-                if st.button(f"🔍 {hist_word}", key=f"history_{i}", help=f"Click to explore '{hist_word}'"):
-                    st.session_state.selected_history_word = hist_word
-                    st.rerun()
-        
-        with col2:
-            if st.button("🗑️", help="Clear search history", key="clear_history"):
-                clear_search_history()
-                st.rerun()
-    
     return word
+
+
+def render_search_history():
+    """Render the search history in a collapsible expander."""
+    if st.session_state.search_history:
+        with st.expander("🔍 Search History", expanded=False):
+            st.markdown("Click any word to explore it again:")
+            
+            # Create columns for history items and clear button
+            col1, col2 = st.columns([4, 1])
+            
+            with col1:
+                # Display search history as clickable buttons
+                for i, hist_word in enumerate(st.session_state.search_history):
+                    if st.button(f"📝 {hist_word}", key=f"search_history_{i}", help=f"Click to explore '{hist_word}'"):
+                        st.session_state.selected_history_word = hist_word
+                        st.rerun()
+            
+            with col2:
+                if st.button("🗑️", help="Clear search history", key="clear_search_history"):
+                    clear_search_history()
+                    st.rerun()
 
 
 def render_basic_settings():
@@ -204,6 +207,9 @@ def render_sidebar():
         
         # Word input
         word = render_word_input()
+        
+        # Search history
+        render_search_history()
         
         # Navigation history
         render_navigation_history()
