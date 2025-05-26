@@ -342,8 +342,21 @@ class GraphVisualizer:
                             
                             console.log('🔄 Navigating in same window to:', newUrl);
                             
-                            // Use window.location.href for same-window navigation
-                            window.location.href = newUrl;
+                            // Ensure same-window navigation with multiple fallback methods
+                            try {
+                                // Method 1: Direct assignment (most reliable)
+                                window.location.href = newUrl;
+                            } catch (e) {
+                                console.error('Navigation method 1 failed:', e);
+                                try {
+                                    // Method 2: Using location.assign
+                                    window.location.assign(newUrl);
+                                } catch (e2) {
+                                    console.error('Navigation method 2 failed:', e2);
+                                    // Method 3: Using location.replace (last resort)
+                                    window.location.replace(newUrl);
+                                }
+                            }
                         } else {
                             console.log('🖱️ Double-click detected but no nodes selected');
                         }
