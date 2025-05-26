@@ -208,10 +208,9 @@ def render_visual_options():
     """Render visual options settings."""
     with st.expander("👁️ Visual Options"):
         show_labels = st.checkbox("Show Node Labels", value=DEFAULT_SETTINGS['show_labels'])
-        show_arrows = st.checkbox("Show Directional Arrows", value=DEFAULT_SETTINGS['show_arrows'])
         edge_width = st.slider("Edge Width", min_value=1, max_value=5, value=DEFAULT_SETTINGS['edge_width'])
     
-    return show_labels, show_arrows, edge_width
+    return show_labels, edge_width
 
 
 def render_display_options():
@@ -250,13 +249,17 @@ def render_about_section():
     - Use breadcrumb navigation to go back
     - Grey dotted nodes are navigation breadcrumbs
     
-    **Relationship Types:**
-    - 🔴 Main word
-    - 🟣 Word senses
-    - 🔵 Hypernyms (↑) - more general concepts
-    - 🔵 Hyponyms (↓) - more specific concepts
-    - 🟢 Meronyms (⊂) - part-of relationships
-    - 🟡 Holonyms (⊃) - whole-of relationships
+    **Node Types:**
+    - 🔴 Main word - your input word
+    - 🟣 Word senses - different meanings/synsets
+    - 🔵 Related words - connected through relationships
+    
+    **Edge Colors (Directed Graph):**
+    - Red arrows: Hypernyms ("is a type of")
+    - Blue arrows: Hyponyms ("type includes")
+    - Green arrows: Meronyms ("has part")
+    - Orange arrows: Holonyms ("part of")
+    - Grey arrows: Sense connections
     """)
 
 
@@ -290,7 +293,7 @@ def render_sidebar():
         enable_physics, spring_strength, central_gravity = render_physics_simulation()
         
         # Visual options
-        show_labels, show_arrows, edge_width = render_visual_options()
+        show_labels, edge_width = render_visual_options()
         
         # Display options
         show_info, show_graph = render_display_options()
@@ -315,7 +318,6 @@ def render_sidebar():
             'spring_strength': spring_strength,
             'central_gravity': central_gravity,
             'show_labels': show_labels,
-            'show_arrows': show_arrows,
             'edge_width': edge_width,
             'show_info': show_info,
             'show_graph': show_graph,

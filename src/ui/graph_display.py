@@ -28,23 +28,22 @@ def render_color_legend(color_scheme):
         </div>
         <div class="legend-item">
             <div style="width: 20px; height: 20px; background-color: {colors['synset']}; border-radius: 50%; margin-right: 10px;"></div>
-            <strong>Word Senses</strong> - Different meanings of the word
+            <strong>Word Senses</strong> - Different meanings/synsets of the word
         </div>
         <div class="legend-item">
-            <div style="width: 20px; height: 20px; background-color: {colors['hyper']}; border-radius: 50%; margin-right: 10px;"></div>
-            <strong>Hypernyms ↑</strong> - More general concepts
+            <div style="width: 20px; height: 20px; background-color: {colors['word']}; border-radius: 50%; margin-right: 10px;"></div>
+            <strong>Related Words</strong> - Connected through semantic relationships
         </div>
-        <div class="legend-item">
-            <div style="width: 20px; height: 20px; background-color: {colors['hypo']}; border-radius: 50%; margin-right: 10px;"></div>
-            <strong>Hyponyms ↓</strong> - More specific concepts
-        </div>
-        <div class="legend-item">
-            <div style="width: 20px; height: 20px; background-color: {colors['mero']}; border-radius: 50%; margin-right: 10px;"></div>
-            <strong>Meronyms ⊂</strong> - Part-of relationships
-        </div>
-        <div class="legend-item">
-            <div style="width: 20px; height: 20px; background-color: {colors['holo']}; border-radius: 50%; margin-right: 10px;"></div>
-            <strong>Holonyms ⊃</strong> - Whole-of relationships
+    </div>
+    
+    <div style="margin-top: 15px;">
+        <strong>Edge Colors & Relationships:</strong>
+        <div style="margin-left: 10px; margin-top: 5px;">
+            <div style="margin: 3px 0;"><span style="color: #FF4444; font-weight: bold;">→</span> <strong>Hypernym</strong> - "is a type of" (more general)</div>
+            <div style="margin: 3px 0;"><span style="color: #4488FF; font-weight: bold;">→</span> <strong>Hyponym</strong> - "type includes" (more specific)</div>
+            <div style="margin: 3px 0;"><span style="color: #44AA44; font-weight: bold;">→</span> <strong>Meronym</strong> - "has part"</div>
+            <div style="margin: 3px 0;"><span style="color: #FFAA00; font-weight: bold;">→</span> <strong>Holonym</strong> - "part of"</div>
+            <div style="margin: 3px 0;"><span style="color: #666666; font-weight: bold;">→</span> <strong>Sense</strong> - connects word to its meanings</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -164,7 +163,6 @@ def render_graph_visualization(word, settings):
                 spring_strength=settings['spring_strength'],
                 central_gravity=settings['central_gravity'],
                 show_labels=settings['show_labels'],
-                show_arrows=settings['show_arrows'],
                 edge_width=settings['edge_width'],
                 color_scheme=settings['color_scheme']
             )
