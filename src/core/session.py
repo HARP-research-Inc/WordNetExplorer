@@ -129,16 +129,12 @@ class SessionManager:
     
     def handle_url_navigation(self):
         """Handle navigation from URL parameters."""
-        # Use experimental_get_query_params for older Streamlit versions
+        # Use only the new st.query_params API
         try:
-            query_params = st.experimental_get_query_params()
-            navigate_to_word = query_params.get("navigate_to", [None])[0]
+            navigate_to_word = st.query_params.get("navigate_to")
         except AttributeError:
-            # For newer Streamlit versions
-            try:
-                navigate_to_word = st.query_params.get("navigate_to")
-            except AttributeError:
-                navigate_to_word = None
+            # Fallback for very old Streamlit versions
+            navigate_to_word = None
         
         if navigate_to_word and navigate_to_word != st.session_state.get('current_word'):
             # Set session state for navigation
@@ -156,12 +152,9 @@ class SessionManager:
             
             # Clear the URL parameters to prevent repeated navigation
             try:
-                st.experimental_set_query_params()
+                st.query_params.clear()
             except AttributeError:
-                try:
-                    st.query_params.clear()
-                except AttributeError:
-                    pass
+                pass
             
             if self.is_debug_mode():
                 st.write(f"🔍 LOG: [URL_NAVIGATION] Navigated from URL to: {navigate_to_word}")

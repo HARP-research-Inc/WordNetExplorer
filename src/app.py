@@ -83,8 +83,8 @@ def main():
     # Display debug information if enabled
     session_manager.log_debug_info()
     
-    # Add debug panel for testing navigation
-    render_full_debug_panel()
+    # Add debug panel for testing navigation (temporarily disabled to fix API conflict)
+    # render_full_debug_panel()
 
 
 if __name__ == "__main__":

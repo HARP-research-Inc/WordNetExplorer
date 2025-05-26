@@ -19,16 +19,9 @@ def render_navigation_debug_panel():
         
         # Show current URL parameters
         try:
-            query_params = st.experimental_get_query_params()
-            st.write(f"**Current URL params (old API):** {query_params}")
+            st.write(f"**Current URL params:** {dict(st.query_params)}")
         except:
-            pass
-            
-        try:
-            if hasattr(st, 'query_params'):
-                st.write(f"**Current URL params (new API):** {dict(st.query_params)}")
-        except:
-            pass
+            st.write("**Current URL params:** Unable to access")
         
         # Manual URL parameter test
         col1, col2 = st.columns(2)
@@ -127,7 +120,10 @@ def render_navigation_debug_panel():
         # Step 5: Test URL Construction
         st.markdown("#### 5️⃣ URL Construction Test")
         
-        current_url = st.query_params.get("debug_current_url", "http://localhost:8514")
+        try:
+            current_url = st.query_params.get("debug_current_url", "http://localhost:8515")
+        except:
+            current_url = "http://localhost:8515"
         st.write(f"**Current URL:** `{current_url}`")
         
         test_nav_word = st.text_input("Test navigation word:", "sheep", key="debug_url_word")
