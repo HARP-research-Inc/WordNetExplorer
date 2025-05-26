@@ -336,27 +336,13 @@ class GraphVisualizer:
                             console.log('Target Word for Navigation:', targetWord);
                             console.groupEnd();
                             
-                            // Navigate in the SAME window by setting URL parameter
+                            // Navigate by setting URL parameter and forcing page reload
+                            // Use a more direct approach that works with Streamlit's URL handling
                             const currentUrl = window.location.href.split('?')[0];
                             const newUrl = currentUrl + '?navigate_to=' + encodeURIComponent(targetWord) + '&clicked_node=' + encodeURIComponent(nodeId) + '&t=' + Date.now();
                             
-                            console.log('🔄 Navigating in same window to:', newUrl);
-                            
-                            // Ensure same-window navigation with multiple fallback methods
-                            try {
-                                // Method 1: Direct assignment (most reliable)
-                                window.location.href = newUrl;
-                            } catch (e) {
-                                console.error('Navigation method 1 failed:', e);
-                                try {
-                                    // Method 2: Using location.assign
-                                    window.location.assign(newUrl);
-                                } catch (e2) {
-                                    console.error('Navigation method 2 failed:', e2);
-                                    // Method 3: Using location.replace (last resort)
-                                    window.location.replace(newUrl);
-                                }
-                            }
+                            console.log('🔄 Navigating to:', newUrl);
+                            window.location.href = newUrl;
                         } else {
                             console.log('🖱️ Double-click detected but no nodes selected');
                         }

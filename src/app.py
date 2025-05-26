@@ -25,7 +25,6 @@ from src.ui.sidebar import render_sidebar
 from src.ui.word_info import render_word_information
 from src.ui.graph_display import render_graph_visualization
 from src.ui.welcome import render_welcome_screen
-from src.ui.debug_panel import render_full_debug_panel
 
 
 def main():
@@ -82,9 +81,6 @@ def main():
     
     # Display debug information if enabled
     session_manager.log_debug_info()
-    
-    # Add debug panel for testing navigation (temporarily disabled to fix API conflict)
-    # render_full_debug_panel()
 
 
 if __name__ == "__main__":
