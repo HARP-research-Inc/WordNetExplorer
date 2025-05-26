@@ -47,7 +47,7 @@ def main():
     session_manager.handle_url_navigation()
     
     # Render sidebar and get settings
-    settings = render_sidebar()
+    settings = render_sidebar(session_manager)
     
     # Determine the current word to display
     current_display_word = settings.get('word') or session_manager.get_current_word()

@@ -4,8 +4,9 @@ Session Manager Module
 Handles Streamlit session state management for the WordNet Explorer application.
 """
 
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict
 import streamlit as st
+from urllib.parse import urlencode
 
 
 class SessionManager:
@@ -127,18 +128,124 @@ class SessionManager:
             if self.is_debug_mode():
                 st.write(f"🔍 LOG: [WIDGET_SYNC] Synced widget to: {current_word}")
     
+    def get_query_params(self) -> Dict[str, Any]:
+        """Get query parameters from URL, handling different Streamlit versions."""
+        try:
+            # Try newer Streamlit API first
+            return dict(st.query_params)
+        except AttributeError:
+            try:
+                # Fall back to experimental API
+                params = st.experimental_get_query_params()
+                # Convert list values to single values for consistency
+                return {k: v[0] if isinstance(v, list) and v else v for k, v in params.items()}
+            except AttributeError:
+                return {}
+    
+    def set_query_params(self, params: Dict[str, Any]):
+        """Set query parameters in URL, handling different Streamlit versions."""
+        try:
+            # Try newer Streamlit API first
+            st.query_params.update(params)
+        except AttributeError:
+            try:
+                # Fall back to experimental API
+                # Convert single values to lists for experimental API
+                list_params = {k: [str(v)] if not isinstance(v, list) else v for k, v in params.items()}
+                st.experimental_set_query_params(**list_params)
+            except AttributeError:
+                # If neither API is available, just log in debug mode
+                if self.is_debug_mode():
+                    st.write(f"🔍 LOG: [URL_PARAMS] Would set params: {params}")
+    
+    def get_settings_from_url(self) -> Dict[str, Any]:
+        """Get search settings from URL parameters."""
+        query_params = self.get_query_params()
+        settings = {}
+        
+        # Define parameter mappings with type conversions
+        param_mappings = {
+            'word': ('word', str),
+            'depth': ('depth', int),
+            'sense': ('sense_number', int),
+            'hypernyms': ('show_hypernyms', lambda x: x.lower() == 'true'),
+            'hyponyms': ('show_hyponyms', lambda x: x.lower() == 'true'),
+            'meronyms': ('show_meronyms', lambda x: x.lower() == 'true'),
+            'holonyms': ('show_holonyms', lambda x: x.lower() == 'true'),
+            'layout': ('layout_type', str),
+            'node_size': ('node_size_multiplier', float),
+            'color': ('color_scheme', str),
+            'physics': ('enable_physics', lambda x: x.lower() == 'true'),
+            'spring': ('spring_strength', float),
+            'gravity': ('central_gravity', float),
+            'labels': ('show_labels', lambda x: x.lower() == 'true'),
+            'edge_width': ('edge_width', int),
+            'show_info': ('show_info', lambda x: x.lower() == 'true'),
+            'show_graph': ('show_graph', lambda x: x.lower() == 'true'),
+        }
+        
+        for url_param, (setting_key, converter) in param_mappings.items():
+            if url_param in query_params:
+                try:
+                    value = query_params[url_param]
+                    if value is not None and value != '':
+                        settings[setting_key] = converter(value)
+                except (ValueError, TypeError) as e:
+                    if self.is_debug_mode():
+                        st.write(f"🔍 LOG: [URL_PARAMS] Error converting {url_param}={value}: {e}")
+        
+        return settings
+    
+    def update_url_with_settings(self, settings: Dict[str, Any], force_update: bool = False):
+        """Update URL parameters with current search settings."""
+        # Only update URL if forced (Apply button or Enter pressed)
+        if not force_update:
+            return
+            
+        # Define reverse parameter mappings
+        reverse_mappings = {
+            'word': 'word',
+            'depth': 'depth',
+            'parsed_sense_number': 'sense',
+            'show_hypernyms': 'hypernyms',
+            'show_hyponyms': 'hyponyms',
+            'show_meronyms': 'meronyms',
+            'show_holonyms': 'holonyms',
+            'layout_type': 'layout',
+            'node_size_multiplier': 'node_size',
+            'color_scheme': 'color',
+            'enable_physics': 'physics',
+            'spring_strength': 'spring',
+            'central_gravity': 'gravity',
+            'show_labels': 'labels',
+            'edge_width': 'edge_width',
+            'show_info': 'show_info',
+            'show_graph': 'show_graph',
+        }
+        
+        url_params = {}
+        for setting_key, url_param in reverse_mappings.items():
+            if setting_key in settings and settings[setting_key] is not None:
+                value = settings[setting_key]
+                # Convert boolean values to lowercase strings
+                if isinstance(value, bool):
+                    url_params[url_param] = str(value).lower()
+                else:
+                    url_params[url_param] = str(value)
+        
+        # Only update if we have parameters to set
+        if url_params:
+            self.set_query_params(url_params)
+            
+            if self.is_debug_mode():
+                st.write(f"🔍 LOG: [URL_PARAMS] Updated URL with: {url_params}")
+    
     def handle_url_navigation(self):
         """Handle navigation from URL parameters."""
-        # Use experimental_get_query_params for older Streamlit versions
-        try:
-            query_params = st.experimental_get_query_params()
-            navigate_to_word = query_params.get("navigate_to", [None])[0]
-        except AttributeError:
-            # For newer Streamlit versions
-            try:
-                navigate_to_word = st.query_params.get("navigate_to")
-            except AttributeError:
-                navigate_to_word = None
+        query_params = self.get_query_params()
+        
+        # Handle word navigation
+        navigate_to_word = query_params.get("word") or query_params.get("navigate_to")
         
         if navigate_to_word:
             # Set session state without modifying widgets
@@ -157,6 +264,11 @@ class SessionManager:
             st.sidebar.write(f"**Word Input:** {self.get_word_input()}")
             st.sidebar.write(f"**Last Searched:** {st.session_state.get('last_searched_word')}")
             st.sidebar.write(f"**History:** {self.get_search_history()}")
+            
+            # Show URL parameters
+            url_params = self.get_query_params()
+            if url_params:
+                st.sidebar.write(f"**URL Params:** {url_params}")
             
             # Show all session state for debugging
             with st.sidebar.expander("Full Session State"):

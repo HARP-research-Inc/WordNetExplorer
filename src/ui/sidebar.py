@@ -10,7 +10,13 @@ from ..utils.debug_logger import log_word_input_event, log_session_state
 from ..wordnet_explorer import get_synsets_for_word
 
 
-def render_word_input():
+def get_url_default(session_manager, setting_key: str, default_value):
+    """Get default value from URL parameters or fall back to default."""
+    url_settings = session_manager.get_settings_from_url()
+    return url_settings.get(setting_key, default_value)
+
+
+def render_word_input(session_manager):
     """Render the word input field with search history."""
     log_session_state("FUNCTION_START")
     log_word_input_event("FUNCTION_ENTRY", function="render_word_input")
@@ -19,8 +25,11 @@ def render_word_input():
     selected_word = st.session_state.get('selected_history_word', None)
     log_word_input_event("SELECTED_WORD_CHECK", selected_word=selected_word)
     
-    # Word input field - only set value if a history word was selected
-    input_value = selected_word if selected_word else ""
+    # Get word from URL if available
+    url_word = get_url_default(session_manager, 'word', None)
+    
+    # Word input field - prioritize selected word, then URL word, then empty
+    input_value = selected_word or url_word or ""
     log_word_input_event("INPUT_VALUE_CALCULATION", input_value=input_value, selected_word=selected_word, current_word=st.session_state.get('current_word', 'None'))
     
     word = st.text_input(
@@ -30,10 +39,14 @@ def render_word_input():
         help="Press Enter to add the word to your search history"
     ).strip().lower()
     
+    # Get sense number from URL if available
+    url_sense = get_url_default(session_manager, 'sense_number', None)
+    sense_input_value = str(url_sense) if url_sense is not None else ""
+    
     # Sense number input field
     sense_number = st.text_input(
         "Sense number (optional)",
-        value="",
+        value=sense_input_value,
         key="sense_number_input",
         help="Enter a specific sense number (1, 2, 3, etc.) to show only that sense. Leave blank to show all senses."
     ).strip()
@@ -84,7 +97,7 @@ def render_word_input():
         
         # Return the selected word to ensure it's processed
         log_word_input_event("RETURNING_SELECTED_WORD", selected_word=selected_word)
-        return selected_word, parsed_sense_number
+        return selected_word, parsed_sense_number, True  # Word changed when selected from history
     
     # Use a more robust tracking mechanism that handles multiple function calls
     # Track the actual widget value instead of relying on previous_input
@@ -114,7 +127,11 @@ def render_word_input():
     
     log_session_state("FUNCTION_END")
     log_word_input_event("FUNCTION_EXIT", returning_word=word)
-    return word, parsed_sense_number
+    
+    # Determine if word changed (Enter was pressed)
+    word_changed = bool(word and word != last_processed_value)
+    
+    return word, parsed_sense_number, word_changed
 
 
 def render_search_history():
@@ -148,37 +165,43 @@ def render_search_history():
         log_word_input_event("NO_SEARCH_HISTORY_TO_RENDER")
 
 
-def render_basic_settings():
+def render_basic_settings(session_manager):
     """Render basic exploration settings."""
     depth = st.slider(
         "Exploration depth", 
         min_value=1, 
         max_value=3, 
-        value=DEFAULT_SETTINGS['depth'], 
+        value=get_url_default(session_manager, 'depth', DEFAULT_SETTINGS['depth']), 
         help="How deep to explore relationships (higher values create larger graphs)"
     )
     return depth
 
 
-def render_relationship_types():
+def render_relationship_types(session_manager):
     """Render relationship type checkboxes."""
     with st.expander("🔗 Relationship Types", expanded=True):
-        show_hypernyms = st.checkbox("Include Hypernyms (↑)", value=DEFAULT_SETTINGS['show_hypernyms'])
-        show_hyponyms = st.checkbox("Include Hyponyms (↓)", value=DEFAULT_SETTINGS['show_hyponyms'])
-        show_meronyms = st.checkbox("Include Meronyms (⊂)", value=DEFAULT_SETTINGS['show_meronyms'])
-        show_holonyms = st.checkbox("Include Holonyms (⊃)", value=DEFAULT_SETTINGS['show_holonyms'])
+        show_hypernyms = st.checkbox("Include Hypernyms (↑)", value=get_url_default(session_manager, 'show_hypernyms', DEFAULT_SETTINGS['show_hypernyms']))
+        show_hyponyms = st.checkbox("Include Hyponyms (↓)", value=get_url_default(session_manager, 'show_hyponyms', DEFAULT_SETTINGS['show_hyponyms']))
+        show_meronyms = st.checkbox("Include Meronyms (⊂)", value=get_url_default(session_manager, 'show_meronyms', DEFAULT_SETTINGS['show_meronyms']))
+        show_holonyms = st.checkbox("Include Holonyms (⊃)", value=get_url_default(session_manager, 'show_holonyms', DEFAULT_SETTINGS['show_holonyms']))
     
     return show_hypernyms, show_hyponyms, show_meronyms, show_holonyms
 
 
-def render_graph_appearance():
+def render_graph_appearance(session_manager):
     """Render graph appearance settings."""
     with st.expander("🎨 Graph Appearance"):
         # Layout options
+        default_layout = get_url_default(session_manager, 'layout_type', DEFAULT_SETTINGS['layout_type'])
+        try:
+            layout_index = LAYOUT_OPTIONS.index(default_layout)
+        except ValueError:
+            layout_index = LAYOUT_OPTIONS.index(DEFAULT_SETTINGS['layout_type'])
+        
         layout_type = st.selectbox(
             "Graph Layout",
             LAYOUT_OPTIONS,
-            index=LAYOUT_OPTIONS.index(DEFAULT_SETTINGS['layout_type']),
+            index=layout_index,
             help="Choose how nodes are arranged in the graph"
         )
         
@@ -187,28 +210,35 @@ def render_graph_appearance():
             "Node Size", 
             min_value=0.5, 
             max_value=2.0, 
-            value=DEFAULT_SETTINGS['node_size_multiplier'], 
+            value=get_url_default(session_manager, 'node_size_multiplier', DEFAULT_SETTINGS['node_size_multiplier']), 
             step=0.1,
             help="Adjust the size of nodes in the graph"
         )
         
         # Color scheme
+        color_options = ["Default", "Pastel", "Vibrant", "Monochrome"]
+        default_color = get_url_default(session_manager, 'color_scheme', DEFAULT_SETTINGS['color_scheme'])
+        try:
+            color_index = color_options.index(default_color)
+        except ValueError:
+            color_index = color_options.index(DEFAULT_SETTINGS['color_scheme'])
+        
         color_scheme = st.selectbox(
             "Color Scheme",
-            ["Default", "Pastel", "Vibrant", "Monochrome"],
-            index=["Default", "Pastel", "Vibrant", "Monochrome"].index(DEFAULT_SETTINGS['color_scheme']),
+            color_options,
+            index=color_index,
             help="Choose a color scheme for the graph"
         )
     
     return layout_type, node_size_multiplier, color_scheme
 
 
-def render_physics_simulation():
+def render_physics_simulation(session_manager):
     """Render physics simulation settings."""
     with st.expander("⚙️ Physics Simulation"):
         enable_physics = st.checkbox(
             "Enable Physics", 
-            value=DEFAULT_SETTINGS['enable_physics'], 
+            value=get_url_default(session_manager, 'enable_physics', DEFAULT_SETTINGS['enable_physics']), 
             help="Allow nodes to move and settle automatically"
         )
         
@@ -217,7 +247,7 @@ def render_physics_simulation():
                 "Spring Strength", 
                 min_value=0.01, 
                 max_value=0.1, 
-                value=DEFAULT_SETTINGS['spring_strength'], 
+                value=get_url_default(session_manager, 'spring_strength', DEFAULT_SETTINGS['spring_strength']), 
                 step=0.01,
                 help="How strongly nodes are pulled together"
             )
@@ -226,7 +256,7 @@ def render_physics_simulation():
                 "Central Gravity", 
                 min_value=0.1, 
                 max_value=1.0, 
-                value=DEFAULT_SETTINGS['central_gravity'], 
+                value=get_url_default(session_manager, 'central_gravity', DEFAULT_SETTINGS['central_gravity']), 
                 step=0.1,
                 help="How strongly nodes are pulled to the center"
             )
@@ -237,20 +267,20 @@ def render_physics_simulation():
     return enable_physics, spring_strength, central_gravity
 
 
-def render_visual_options():
+def render_visual_options(session_manager):
     """Render visual options settings."""
     with st.expander("👁️ Visual Options"):
-        show_labels = st.checkbox("Show Node Labels", value=DEFAULT_SETTINGS['show_labels'])
-        edge_width = st.slider("Edge Width", min_value=1, max_value=5, value=DEFAULT_SETTINGS['edge_width'])
+        show_labels = st.checkbox("Show Node Labels", value=get_url_default(session_manager, 'show_labels', DEFAULT_SETTINGS['show_labels']))
+        edge_width = st.slider("Edge Width", min_value=1, max_value=5, value=get_url_default(session_manager, 'edge_width', DEFAULT_SETTINGS['edge_width']))
     
     return show_labels, edge_width
 
 
-def render_display_options():
+def render_display_options(session_manager):
     """Render display options settings."""
     with st.expander("📋 Display Options", expanded=True):
-        show_info = st.checkbox("Show word information", value=DEFAULT_SETTINGS['show_info'])
-        show_graph = st.checkbox("Show relationship graph", value=DEFAULT_SETTINGS['show_graph'])
+        show_info = st.checkbox("Show word information", value=get_url_default(session_manager, 'show_info', DEFAULT_SETTINGS['show_info']))
+        show_graph = st.checkbox("Show relationship graph", value=get_url_default(session_manager, 'show_graph', DEFAULT_SETTINGS['show_graph']))
     
     return show_info, show_graph
 
@@ -306,34 +336,41 @@ def render_about_section():
     """)
 
 
-def render_sidebar():
+def render_sidebar(session_manager):
     """Render the complete sidebar with all components."""
     with st.sidebar:
         st.markdown("### Settings")
         
+        # Apply button at the top
+        apply_clicked = st.button("🔄 Apply Settings", 
+                                 help="Update the URL with current settings for sharing",
+                                 use_container_width=True)
+        
+        st.markdown("---")
+        
         # Word input
-        word, parsed_sense_number = render_word_input()
+        word, parsed_sense_number, word_changed = render_word_input(session_manager)
         
         # Search history
         render_search_history()
         
         # Basic settings
-        depth = render_basic_settings()
+        depth = render_basic_settings(session_manager)
         
         # Relationship types
-        show_hypernyms, show_hyponyms, show_meronyms, show_holonyms = render_relationship_types()
+        show_hypernyms, show_hyponyms, show_meronyms, show_holonyms = render_relationship_types(session_manager)
         
         # Graph appearance
-        layout_type, node_size_multiplier, color_scheme = render_graph_appearance()
+        layout_type, node_size_multiplier, color_scheme = render_graph_appearance(session_manager)
         
         # Physics simulation
-        enable_physics, spring_strength, central_gravity = render_physics_simulation()
+        enable_physics, spring_strength, central_gravity = render_physics_simulation(session_manager)
         
         # Visual options
-        show_labels, edge_width = render_visual_options()
+        show_labels, edge_width = render_visual_options(session_manager)
         
         # Display options
-        show_info, show_graph = render_display_options()
+        show_info, show_graph = render_display_options(session_manager)
         
         # Save options
         save_graph, filename = render_save_options()
@@ -341,7 +378,8 @@ def render_sidebar():
         # About section
         render_about_section()
         
-        return {
+        # Collect all settings
+        settings = {
             'word': word,
             'depth': depth,
             'show_hypernyms': show_hypernyms,
@@ -361,4 +399,10 @@ def render_sidebar():
             'save_graph': save_graph,
             'filename': filename,
             'parsed_sense_number': parsed_sense_number
-        } 
+        }
+        
+        # Update URL with current settings only when Apply is clicked or word changed (Enter pressed)
+        should_update_url = apply_clicked or word_changed
+        session_manager.update_url_with_settings(settings, force_update=should_update_url)
+        
+        return settings 
