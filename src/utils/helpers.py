@@ -19,21 +19,24 @@ def capture_function_output(func, *args, **kwargs):
     Returns:
         str: The captured output
     """
-    with tempfile.TemporaryFile(mode='w+') as temp:
-        # Redirect stdout to our temporary file
-        original_stdout = sys.stdout
-        sys.stdout = temp
-        
-        try:
-            # Call the function
-            func(*args, **kwargs)
-        finally:
-            # Reset stdout
-            sys.stdout = original_stdout
-        
-        # Get the output
-        temp.seek(0)
-        return temp.read()
+    import io
+    
+    # Use StringIO instead of TemporaryFile for better compatibility
+    temp = io.StringIO()
+    
+    # Redirect stdout to our StringIO object
+    original_stdout = sys.stdout
+    sys.stdout = temp
+    
+    try:
+        # Call the function
+        func(*args, **kwargs)
+    finally:
+        # Reset stdout
+        sys.stdout = original_stdout
+    
+    # Get the output
+    return temp.getvalue()
 
 
 def ensure_downloads_directory():

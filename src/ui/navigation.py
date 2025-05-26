@@ -58,9 +58,9 @@ def render_navigation_controls():
 
 def handle_url_navigation():
     """Handle navigation from URL parameters."""
-    query_params = st.experimental_get_query_params()
+    query_params = st.query_params
     if 'navigate_to' in query_params:
-        navigate_to_word = query_params['navigate_to'][0]  # Get first value
+        navigate_to_word = query_params['navigate_to']  # Get value directly
         
         if navigate_to_word and navigate_to_word != st.session_state.current_word:
             # Add current word to history before navigating (if not already there)
@@ -71,5 +71,5 @@ def handle_url_navigation():
             st.session_state.current_word = navigate_to_word
             
             # Clear the URL parameters and rerun
-            st.experimental_set_query_params()
+            st.query_params.clear()
             st.rerun() 

@@ -5,15 +5,50 @@ Sidebar components for WordNet Explorer.
 import streamlit as st
 from ..config.settings import DEFAULT_SETTINGS, LAYOUT_OPTIONS
 from .navigation import render_navigation_history, render_navigation_controls
+from ..utils.session_state import add_to_search_history, clear_search_history
 
 
 def render_word_input():
-    """Render the word input field."""
+    """Render the word input field with search history."""
+    # Check if a history word was selected
+    selected_word = st.session_state.get('selected_history_word', None)
+    
+    # Word input field
     word = st.text_input(
         "Enter a word to explore", 
-        value=st.session_state.current_word if st.session_state.current_word else "",
-        key="word_input"
+        value=selected_word if selected_word else (st.session_state.current_word if st.session_state.current_word else ""),
+        key="word_input",
+        help="Press Enter to add the word to your search history"
     ).strip().lower()
+    
+    # Clear the selected history word after using it
+    if selected_word:
+        st.session_state.selected_history_word = None
+    
+    # Add word to search history when entered
+    if word and word != st.session_state.get('last_searched_word', ''):
+        add_to_search_history(word)
+        st.session_state.last_searched_word = word
+    
+    # Display search history
+    if st.session_state.search_history:
+        st.markdown("**Recent Searches:**")
+        
+        # Create columns for history items and clear button
+        col1, col2 = st.columns([4, 1])
+        
+        with col1:
+            # Display search history as clickable buttons
+            for i, hist_word in enumerate(st.session_state.search_history):
+                if st.button(f"🔍 {hist_word}", key=f"history_{i}", help=f"Click to explore '{hist_word}'"):
+                    st.session_state.selected_history_word = hist_word
+                    st.rerun()
+        
+        with col2:
+            if st.button("🗑️", help="Clear search history", key="clear_history"):
+                clear_search_history()
+                st.rerun()
+    
     return word
 
 
