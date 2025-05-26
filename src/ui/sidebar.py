@@ -18,23 +18,15 @@ def render_word_input():
     # Check for node navigation from double-click (treat exactly like history button)
     node_nav_word = None
     try:
-        # Use the newer query params API if available
-        if hasattr(st, 'query_params') and 'node_nav' in st.query_params:
+        # Use only the new query params API to avoid mixing APIs
+        if 'node_nav' in st.query_params:
             node_nav_word = st.query_params['node_nav']
             # Clear the parameter immediately to prevent repeated processing
             st.query_params.clear()
             log_word_input_event("NODE_NAVIGATION_DETECTED", node_nav_word=node_nav_word)
-    except:
-        # Fallback to experimental API
-        try:
-            query_params = st.experimental_get_query_params()
-            if 'node_nav' in query_params:
-                node_nav_word = query_params['node_nav'][0]
-                # Clear the parameters
-                st.experimental_set_query_params()
-                log_word_input_event("NODE_NAVIGATION_DETECTED_EXPERIMENTAL", node_nav_word=node_nav_word)
-        except:
-            pass
+    except Exception as e:
+        # If there's any issue with query params, just skip node navigation
+        log_word_input_event("NODE_NAVIGATION_ERROR", error=str(e))
     
     # Check if a history word was selected
     selected_word = st.session_state.get('selected_history_word', None)
