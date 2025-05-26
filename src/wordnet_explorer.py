@@ -78,11 +78,6 @@ def build_wordnet_graph(word: str, depth: int = 1,
             print(f"Sense number {sense_number} not found for '{word}' (only {len(synsets)} senses available)")
             return G, node_labels
     
-    # Start with the main word node
-    main_node = f"{word}_main"
-    G.add_node(main_node, node_type='main', word=word)
-    node_labels[main_node] = word.upper()
-    
     def add_synset_connections(synset, current_depth, parent_word_node=None):
         """Add connections for a synset and its relationships."""
         if current_depth > depth or synset in visited_synsets:
@@ -220,7 +215,7 @@ def build_wordnet_graph(word: str, depth: int = 1,
     for synset in synsets:
         synset_node = f"{synset.name()}"
         # The main word connection will be created in add_synset_connections
-        add_synset_connections(synset, 0, main_node)
+        add_synset_connections(synset, 0)
     
     # After processing all synsets, ensure all synsets have root connections
     # This is a second pass to catch any synsets that were added but not processed
