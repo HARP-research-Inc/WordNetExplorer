@@ -83,21 +83,6 @@ def build_wordnet_graph(word: str, depth: int = 1,
     G.add_node(main_node, node_type='main', word=word)
     node_labels[main_node] = word.upper()
     
-    def add_word_node(synset, node_type='word'):
-        """Add a word node for a synset if it doesn't exist."""
-        word_lemma = synset.lemma_names()[0].replace('_', ' ')
-        word_node = f"{word_lemma}_word"
-        
-        if word_node not in G.nodes():
-            G.add_node(word_node, 
-                      node_type=node_type, 
-                      word=word_lemma,
-                      synset_name=synset.name(),
-                      definition=synset.definition())
-            node_labels[word_node] = word_lemma
-        
-        return word_node
-    
     def add_synset_connections(synset, current_depth, parent_word_node=None):
         """Add connections for a synset and its relationships."""
         if current_depth > depth or synset in visited_synsets:
@@ -119,47 +104,103 @@ def build_wordnet_graph(word: str, depth: int = 1,
         sense_num = synset.name().split('.')[-1]
         node_labels[synset_node] = f"{synset.lemma_names()[0].replace('_', ' ')} ({pos_label}.{sense_num})"
         
-        # Connect synset to parent word node
+        # Connect synset to parent word node (only for root connections)
         if parent_word_node:
             G.add_edge(parent_word_node, synset_node, relation='sense')
         
-        # Add relationship connections as labeled edges
+        # Add relationship connections directly to other synsets (no intermediate nodes)
         if include_hypernyms:
             for hypernym in synset.hypernyms():
-                hyper_word_node = add_word_node(hypernym, 'word')
-                G.add_edge(synset_node, hyper_word_node, 
+                # Create the target synset node directly
+                hyper_synset_node = f"{hypernym.name()}"
+                if hyper_synset_node not in G.nodes():
+                    G.add_node(hyper_synset_node, 
+                              node_type='synset',
+                              synset_name=hypernym.name(),
+                              definition=hypernym.definition(),
+                              pos=hypernym.pos())
+                    
+                    # Create label for the hypernym synset
+                    hyper_pos_label = pos_map.get(hypernym.pos(), hypernym.pos())
+                    hyper_sense_num = hypernym.name().split('.')[-1]
+                    node_labels[hyper_synset_node] = f"{hypernym.lemma_names()[0].replace('_', ' ')} ({hyper_pos_label}.{hyper_sense_num})"
+                
+                # Connect synsets directly with colored edge
+                G.add_edge(synset_node, hyper_synset_node, 
                           relation='hypernym', 
-                          label='↑',
+                          color='#FF4444',  # Red for hypernyms
                           arrow_direction='to')
                 
                 if current_depth < depth:
-                    add_synset_connections(hypernym, current_depth + 1, hyper_word_node)
+                    add_synset_connections(hypernym, current_depth + 1)
         
         if include_hyponyms:
             for hyponym in synset.hyponyms():
-                hypo_word_node = add_word_node(hyponym, 'word')
-                G.add_edge(synset_node, hypo_word_node, 
+                # Create the target synset node directly
+                hypo_synset_node = f"{hyponym.name()}"
+                if hypo_synset_node not in G.nodes():
+                    G.add_node(hypo_synset_node, 
+                              node_type='synset',
+                              synset_name=hyponym.name(),
+                              definition=hyponym.definition(),
+                              pos=hyponym.pos())
+                    
+                    # Create label for the hyponym synset
+                    hypo_pos_label = pos_map.get(hyponym.pos(), hyponym.pos())
+                    hypo_sense_num = hyponym.name().split('.')[-1]
+                    node_labels[hypo_synset_node] = f"{hyponym.lemma_names()[0].replace('_', ' ')} ({hypo_pos_label}.{hypo_sense_num})"
+                
+                # Connect synsets directly with colored edge
+                G.add_edge(synset_node, hypo_synset_node, 
                           relation='hyponym', 
-                          label='↓',
+                          color='#4488FF',  # Blue for hyponyms
                           arrow_direction='to')
                 
                 if current_depth < depth:
-                    add_synset_connections(hyponym, current_depth + 1, hypo_word_node)
+                    add_synset_connections(hyponym, current_depth + 1)
         
         if include_meronyms:
             for meronym in synset.part_meronyms():
-                mero_word_node = add_word_node(meronym, 'word')
-                G.add_edge(synset_node, mero_word_node, 
+                # Create the target synset node directly
+                mero_synset_node = f"{meronym.name()}"
+                if mero_synset_node not in G.nodes():
+                    G.add_node(mero_synset_node, 
+                              node_type='synset',
+                              synset_name=meronym.name(),
+                              definition=meronym.definition(),
+                              pos=meronym.pos())
+                    
+                    # Create label for the meronym synset
+                    mero_pos_label = pos_map.get(meronym.pos(), meronym.pos())
+                    mero_sense_num = meronym.name().split('.')[-1]
+                    node_labels[mero_synset_node] = f"{meronym.lemma_names()[0].replace('_', ' ')} ({mero_pos_label}.{mero_sense_num})"
+                
+                # Connect synsets directly with colored edge
+                G.add_edge(synset_node, mero_synset_node, 
                           relation='meronym', 
-                          label='⊂',
+                          color='#44AA44',  # Green for meronyms
                           arrow_direction='to')
         
         if include_holonyms:
             for holonym in synset.part_holonyms():
-                holo_word_node = add_word_node(holonym, 'word')
-                G.add_edge(synset_node, holo_word_node, 
+                # Create the target synset node directly
+                holo_synset_node = f"{holonym.name()}"
+                if holo_synset_node not in G.nodes():
+                    G.add_node(holo_synset_node, 
+                              node_type='synset',
+                              synset_name=holonym.name(),
+                              definition=holonym.definition(),
+                              pos=holonym.pos())
+                    
+                    # Create label for the holonym synset
+                    holo_pos_label = pos_map.get(holonym.pos(), holonym.pos())
+                    holo_sense_num = holonym.name().split('.')[-1]
+                    node_labels[holo_synset_node] = f"{holonym.lemma_names()[0].replace('_', ' ')} ({holo_pos_label}.{holo_sense_num})"
+                
+                # Connect synsets directly with colored edge
+                G.add_edge(synset_node, holo_synset_node, 
                           relation='holonym', 
-                          label='⊃',
+                          color='#FFAA00',  # Orange for holonyms
                           arrow_direction='to')
     
     # Process each synset of the main word
@@ -219,19 +260,19 @@ def visualize_graph(G: nx.Graph, node_labels: Dict, word: str, save_path: str = 
     
     net.set_options(physics_options)
     
-    # Define color schemes - simplified for new structure
+    # Define color schemes - simplified for new structure (only main and synset)
     color_schemes = {
         "Default": {
-            "main": "#FF6B6B", "synset": "#DDA0DD", "word": "#4ECDC4"
+            "main": "#FF6B6B", "synset": "#DDA0DD"
         },
         "Pastel": {
-            "main": "#FFB3BA", "synset": "#BFBFFF", "word": "#BAFFCA"
+            "main": "#FFB3BA", "synset": "#BFBFFF"
         },
         "Vibrant": {
-            "main": "#FF0000", "synset": "#9932CC", "word": "#00CED1"
+            "main": "#FF0000", "synset": "#9932CC"
         },
         "Monochrome": {
-            "main": "#2C2C2C", "synset": "#5A5A5A", "word": "#777777"
+            "main": "#2C2C2C", "synset": "#5A5A5A"
         }
     }
     
@@ -256,7 +297,7 @@ def visualize_graph(G: nx.Graph, node_labels: Dict, word: str, save_path: str = 
             }
         else:
             node_style = {}
-            # Determine node color and size based on new node types
+            # Determine node color and size based on node types (only main and synset)
             if node_type == 'main':
                 color = colors["main"]
                 size = int(30 * node_size_multiplier)
@@ -267,15 +308,9 @@ def visualize_graph(G: nx.Graph, node_labels: Dict, word: str, save_path: str = 
                 synset_name = node_data.get('synset_name', node)
                 definition = node_data.get('definition', 'No definition')
                 title = f"Word sense: {node_labels.get(node, node)}\nSynset: {synset_name}\nDefinition: {definition}"
-            elif node_type == 'word':
-                color = colors["word"]
-                size = int(22 * node_size_multiplier)
-                word_name = node_data.get('word', node_labels.get(node, node))
-                definition = node_data.get('definition', 'No definition')
-                title = f"Related word: {word_name}\nDefinition: {definition}"
             else:
                 # Fallback for any unrecognized node types
-                color = colors.get("word", "#CCCCCC")
+                color = colors.get("synset", "#CCCCCC")
                 size = int(20 * node_size_multiplier)
                 title = f"Node: {node_labels.get(node, node)}"
         
@@ -298,33 +333,34 @@ def visualize_graph(G: nx.Graph, node_labels: Dict, word: str, save_path: str = 
         # Add the node with ID as first argument
         net.add_node(node, **node_config)
     
-    # Add edges with colored relationships (no labels)
-    edge_color = '#888888' if color_scheme != "Monochrome" else '#333333'
-    
-    # Define edge colors by relationship type - more distinct colors
-    edge_colors = {
-        'sense': '#666666',      # Dark grey for sense connections
-        'hypernym': '#FF4444',   # Bright red for "is a type of"
-        'hyponym': '#4488FF',    # Bright blue for "type includes"
-        'meronym': '#44AA44',    # Green for "has part"
-        'holonym': '#FFAA00'     # Orange for "part of"
-    }
-    
-    # Define relationship descriptions for tooltips
-    relation_descriptions = {
-        'sense': 'Word sense connection',
-        'hypernym': 'Is a type of (more general)',
-        'hyponym': 'Type includes (more specific)',
-        'meronym': 'Has part',
-        'holonym': 'Part of'
-    }
-    
+    # Add edges with colored relationships (using colors from edge data)
     for edge in G.edges(data=True):
         source, target, edge_data = edge
         relation = edge_data.get('relation', 'unknown')
         
-        # Choose edge color based on relationship
-        color = edge_colors.get(relation, edge_color)
+        # Use color from edge data if available, otherwise use default colors by relationship
+        if 'color' in edge_data:
+            color = edge_data['color']
+        else:
+            # Fallback colors if not set in edge data
+            edge_colors = {
+                'sense': '#666666',      # Dark grey for sense connections
+                'hypernym': '#FF4444',   # Bright red for "is a type of"
+                'hyponym': '#4488FF',    # Bright blue for "type includes"
+                'meronym': '#44AA44',    # Green for "has part"
+                'holonym': '#FFAA00'     # Orange for "part of"
+            }
+            color = edge_colors.get(relation, '#888888')
+        
+        # Define relationship descriptions for tooltips
+        relation_descriptions = {
+            'sense': 'Word sense connection',
+            'hypernym': 'Is a type of (more general)',
+            'hyponym': 'Type includes (more specific)',
+            'meronym': 'Has part',
+            'holonym': 'Part of'
+        }
+        
         description = relation_descriptions.get(relation, relation)
         
         # Configure edge properties

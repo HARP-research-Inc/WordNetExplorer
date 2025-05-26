@@ -7,6 +7,7 @@ from ..config.settings import DEFAULT_SETTINGS, LAYOUT_OPTIONS
 from .navigation import render_navigation_history, render_navigation_controls
 from ..utils.session_state import add_to_search_history, clear_search_history
 from ..utils.debug_logger import log_word_input_event, log_session_state
+from ..wordnet_explorer import get_synsets_for_word
 
 
 def render_word_input():
@@ -37,6 +38,14 @@ def render_word_input():
         help="Enter a specific sense number (1, 2, 3, etc.) to show only that sense. Leave blank to show all senses."
     ).strip()
     
+    # Show available senses if word is provided
+    if word:
+        synsets = get_synsets_for_word(word)
+        if synsets:
+            st.info(f"💡 '{word}' has {len(synsets)} sense(s) available (1-{len(synsets)})")
+        else:
+            st.warning(f"⚠️ No WordNet entries found for '{word}'")
+    
     # Convert sense number to integer if provided
     parsed_sense_number = None
     if sense_number:
@@ -45,6 +54,11 @@ def render_word_input():
             if parsed_sense_number < 1:
                 st.warning("Sense number must be 1 or greater")
                 parsed_sense_number = None
+            elif word:  # Only validate if we have a word
+                synsets = get_synsets_for_word(word)
+                if synsets and parsed_sense_number > len(synsets):
+                    st.warning(f"Sense number {parsed_sense_number} is too high. '{word}' only has {len(synsets)} sense(s)")
+                    parsed_sense_number = None
         except ValueError:
             st.warning("Please enter a valid number for sense number")
     
@@ -263,6 +277,11 @@ def render_about_section():
     st.markdown("""
     This tool uses NLTK's WordNet to explore semantic relationships between words.
     
+    **Word Input:**
+    - Enter any English word to explore its meanings
+    - Use the sense number field to focus on a specific meaning (1, 2, 3, etc.)
+    - Leave sense number blank to see all meanings
+    
     **Navigation:**
     - Double-click any node to explore that concept
     - Use breadcrumb navigation to go back
@@ -270,15 +289,19 @@ def render_about_section():
     
     **Node Types:**
     - 🔴 Main word - your input word
-    - 🟣 Word senses - different meanings/synsets
-    - 🔵 Related words - connected through relationships
+    - 🟣 Word senses - different meanings/synsets of words
     
     **Edge Colors (Directed Graph):**
     - Red arrows: Hypernyms ("is a type of")
     - Blue arrows: Hyponyms ("type includes")
     - Green arrows: Meronyms ("has part")
     - Orange arrows: Holonyms ("part of")
-    - Grey arrows: Sense connections
+    - Grey arrows: Sense connections (root word to its senses)
+    
+    **Graph Structure:**
+    - Root word connects to its word senses
+    - Word senses connect directly to other word senses
+    - No intermediate nodes - clean sense-to-sense relationships
     """)
 
 
