@@ -4,7 +4,7 @@ Sidebar components for WordNet Explorer.
 
 import streamlit as st
 from ..config.settings import DEFAULT_SETTINGS, LAYOUT_OPTIONS
-from .navigation import render_navigation_history, render_navigation_controls
+
 from ..utils.session_state import add_to_search_history, clear_search_history
 from ..utils.debug_logger import log_word_input_event, log_session_state
 from ..wordnet_explorer import get_synsets_for_word
@@ -122,7 +122,7 @@ def render_search_history():
     log_word_input_event("SEARCH_HISTORY_RENDER_START", history_length=len(st.session_state.get('search_history', [])))
     
     if st.session_state.search_history:
-        with st.expander("🔍 Search History", expanded=False):
+        with st.expander("🔍 Search & Navigation History", expanded=False):
             st.markdown("Click any word to explore it again:")
             
             # Create columns for history items and clear button
@@ -284,8 +284,8 @@ def render_about_section():
     
     **Navigation:**
     - Double-click any node to explore that concept
-    - Use breadcrumb navigation to go back
-    - Grey dotted nodes are navigation breadcrumbs
+    - Use search history to revisit previous words
+    - All searched and navigated words appear in history
     
     **Node Types:**
     - 🔴 Root words - uppercase word forms (e.g., SHEEP, BOVINE)
@@ -316,12 +316,6 @@ def render_sidebar():
         
         # Search history
         render_search_history()
-        
-        # Navigation history
-        render_navigation_history()
-        
-        # Navigation controls
-        render_navigation_controls()
         
         # Basic settings
         depth = render_basic_settings()

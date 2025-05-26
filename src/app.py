@@ -17,7 +17,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 from src.config.settings import PAGE_CONFIG
 
 # Import utilities
-from src.utils.session_state import initialize_session_state, navigate_to_word
+from src.utils.session_state import initialize_session_state, add_to_search_history
 from src.wordnet_explorer import download_nltk_data
 
 # Import UI components
@@ -55,7 +55,8 @@ def main():
     
     # Update session state if this is a new word from input
     if settings['word'] and settings['word'] != st.session_state.current_word:
-        navigate_to_word(settings['word'])
+        add_to_search_history(settings['word'])
+        st.session_state.current_word = settings['word']
         current_display_word = settings['word']
     
     # Main content area
