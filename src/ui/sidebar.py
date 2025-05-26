@@ -346,6 +346,14 @@ def render_sidebar(session_manager):
                                  help="Update the URL with current settings for sharing",
                                  use_container_width=True)
         
+        # If apply was clicked, ensure the word input reflects the current word
+        if apply_clicked and session_manager.get_current_word():
+            st.session_state.word_input = session_manager.get_current_word()
+            # Also update sense number if it exists in URL
+            url_settings = session_manager.get_settings_from_url()
+            if 'sense_number' in url_settings:
+                st.session_state.sense_number_input = str(url_settings['sense_number'])
+        
         st.markdown("---")
         
         # Word input

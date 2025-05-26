@@ -23,8 +23,9 @@ The URL is **NOT** updated when:
 This prevents the URL from changing constantly as users explore different settings.
 
 ### 3. Apply Button
-- Added a prominent "Apply Settings" button at the top of the sidebar
+- Added a prominent "🔄 Apply Settings" button at the top of the sidebar
 - Allows users to manually update the URL with current settings
+- Updates the text input fields to reflect the current word and sense
 - Useful for sharing specific configurations
 
 ## Supported URL Parameters
