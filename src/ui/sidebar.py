@@ -19,9 +19,21 @@ def render_word_input():
     selected_word = st.session_state.get('selected_history_word', None)
     log_word_input_event("SELECTED_WORD_CHECK", selected_word=selected_word)
     
-    # Word input field - only set value if a history word was selected
-    input_value = selected_word if selected_word else ""
-    log_word_input_event("INPUT_VALUE_CALCULATION", input_value=input_value, selected_word=selected_word, current_word=st.session_state.get('current_word', 'None'))
+    # Word input field - set value from selected word, current word, or widget state
+    current_word = st.session_state.get('current_word')
+    widget_value = st.session_state.get('word_input', '')
+    
+    if selected_word:
+        # Priority 1: History word was selected
+        input_value = selected_word
+    elif current_word and current_word != widget_value:
+        # Priority 2: Current word from URL navigation (if different from widget)
+        input_value = current_word
+    else:
+        # Priority 3: Keep existing widget value or empty
+        input_value = widget_value
+    
+    log_word_input_event("INPUT_VALUE_CALCULATION", input_value=input_value, selected_word=selected_word, current_word=current_word, widget_value=widget_value)
     
     word = st.text_input(
         "Enter a word to explore", 

@@ -167,8 +167,8 @@ class SessionManager:
                 st.write(f"🔍 LOG: [URL_NAVIGATION] Navigated from URL to: {navigate_to_word}")
                 st.write(f"🔍 LOG: [WIDGET_SYNC] Set word_input to: {navigate_to_word}")
             
-            # Trigger rerun to update the UI
-            st.rerun()
+            # DON'T call st.rerun() here - let the natural flow handle the update
+            # The widget will be created with the updated session state values
     
     def log_debug_info(self):
         """Display debug information if debug mode is enabled."""

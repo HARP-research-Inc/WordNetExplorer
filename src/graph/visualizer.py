@@ -336,11 +336,13 @@ class GraphVisualizer:
                             console.log('Target Word for Navigation:', targetWord);
                             console.groupEnd();
                             
-                            // Navigate by setting URL parameter
-                            const url = new URL(window.location);
-                            url.searchParams.set('navigate_to', targetWord);
-                            url.searchParams.set('clicked_node', nodeId);
-                            window.location.href = url.toString();
+                            // Navigate by setting URL parameter and forcing page reload
+                            // Use a more direct approach that works with Streamlit's URL handling
+                            const currentUrl = window.location.href.split('?')[0];
+                            const newUrl = currentUrl + '?navigate_to=' + encodeURIComponent(targetWord) + '&clicked_node=' + encodeURIComponent(nodeId) + '&t=' + Date.now();
+                            
+                            console.log('🔄 Navigating to:', newUrl);
+                            window.location.href = newUrl;
                         } else {
                             console.log('🖱️ Double-click detected but no nodes selected');
                         }
