@@ -129,46 +129,12 @@ class SessionManager:
     
     def handle_url_navigation(self):
         """Handle navigation from URL parameters."""
-        # Use experimental_get_query_params for older Streamlit versions
-        try:
-            query_params = st.experimental_get_query_params()
-            navigate_to_word = query_params.get("navigate_to", [None])[0]
-        except AttributeError:
-            # For newer Streamlit versions
-            try:
-                navigate_to_word = st.query_params.get("navigate_to")
-            except AttributeError:
-                navigate_to_word = None
+        # NOTE: Node navigation is now handled directly in render_word_input()
+        # using the same pattern as history buttons for guaranteed compatibility.
+        # This method is kept for any other URL-based navigation needs.
         
-        if navigate_to_word and navigate_to_word != st.session_state.get('current_word'):
-            # Set session state for navigation
-            st.session_state.current_word = navigate_to_word
-            st.session_state.last_searched_word = navigate_to_word
-            self.add_to_history(navigate_to_word)
-            
-            # CRITICAL FIX: Set the widget input to show the new word
-            # This ensures the text input field displays the navigated word
-            st.session_state.word_input = navigate_to_word
-            
-            # Also update the tracking variables for consistency
-            st.session_state.previous_word_input = navigate_to_word
-            st.session_state.last_processed_word_input = navigate_to_word
-            
-            # Clear the URL parameters to prevent repeated navigation
-            try:
-                st.experimental_set_query_params()
-            except AttributeError:
-                try:
-                    st.query_params.clear()
-                except AttributeError:
-                    pass
-            
-            if self.is_debug_mode():
-                st.write(f"🔍 LOG: [URL_NAVIGATION] Navigated from URL to: {navigate_to_word}")
-                st.write(f"🔍 LOG: [WIDGET_SYNC] Set word_input to: {navigate_to_word}")
-            
-            # DON'T call st.rerun() here - let the natural flow handle the update
-            # The widget will be created with the updated session state values
+        if self.is_debug_mode():
+            st.write("🔍 LOG: [URL_NAVIGATION] Node navigation now uses history button pattern")
     
     def log_debug_info(self):
         """Display debug information if debug mode is enabled."""

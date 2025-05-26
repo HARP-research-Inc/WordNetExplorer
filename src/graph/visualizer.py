@@ -336,12 +336,13 @@ class GraphVisualizer:
                             console.log('Target Word for Navigation:', targetWord);
                             console.groupEnd();
                             
-                            // Navigate by setting URL parameter and forcing page reload
-                            // Use a more direct approach that works with Streamlit's URL handling
-                            const currentUrl = window.location.href.split('?')[0];
-                            const newUrl = currentUrl + '?navigate_to=' + encodeURIComponent(targetWord) + '&clicked_node=' + encodeURIComponent(nodeId) + '&t=' + Date.now();
+                            // Use URL navigation but with a special parameter that triggers history button logic
+                            console.log('🔄 Navigating using history button pattern...');
                             
-                            console.log('🔄 Navigating to:', newUrl);
+                            const currentUrl = window.location.href.split('?')[0];
+                            const newUrl = currentUrl + '?node_nav=' + encodeURIComponent(targetWord) + '&t=' + Date.now();
+                            
+                            console.log('📤 Navigating to:', newUrl);
                             window.location.href = newUrl;
                         } else {
                             console.log('🖱️ Double-click detected but no nodes selected');
