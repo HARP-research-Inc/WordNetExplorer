@@ -20,6 +20,14 @@ def handle_url_navigation():
             st.session_state.current_word = navigate_to_word
             st.session_state.last_searched_word = navigate_to_word
             
+            # CRITICAL FIX: Set the widget input to show the new word
+            # This ensures the text input field displays the navigated word
+            st.session_state.word_input = navigate_to_word
+            
+            # Also update the tracking variables for consistency
+            st.session_state.previous_word_input = navigate_to_word
+            st.session_state.last_processed_word_input = navigate_to_word
+            
             # Clear the URL parameters and rerun
             st.query_params.clear()
             st.rerun() 

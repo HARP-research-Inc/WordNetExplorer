@@ -140,14 +140,35 @@ class SessionManager:
             except AttributeError:
                 navigate_to_word = None
         
-        if navigate_to_word:
-            # Set session state without modifying widgets
+        if navigate_to_word and navigate_to_word != st.session_state.get('current_word'):
+            # Set session state for navigation
             st.session_state.current_word = navigate_to_word
             st.session_state.last_searched_word = navigate_to_word
             self.add_to_history(navigate_to_word)
             
+            # CRITICAL FIX: Set the widget input to show the new word
+            # This ensures the text input field displays the navigated word
+            st.session_state.word_input = navigate_to_word
+            
+            # Also update the tracking variables for consistency
+            st.session_state.previous_word_input = navigate_to_word
+            st.session_state.last_processed_word_input = navigate_to_word
+            
+            # Clear the URL parameters to prevent repeated navigation
+            try:
+                st.experimental_set_query_params()
+            except AttributeError:
+                try:
+                    st.query_params.clear()
+                except AttributeError:
+                    pass
+            
             if self.is_debug_mode():
                 st.write(f"🔍 LOG: [URL_NAVIGATION] Navigated from URL to: {navigate_to_word}")
+                st.write(f"🔍 LOG: [WIDGET_SYNC] Set word_input to: {navigate_to_word}")
+            
+            # Trigger rerun to update the UI
+            st.rerun()
     
     def log_debug_info(self):
         """Display debug information if debug mode is enabled."""
