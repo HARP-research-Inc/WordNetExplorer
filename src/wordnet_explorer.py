@@ -104,9 +104,22 @@ def build_wordnet_graph(word: str, depth: int = 1,
         sense_num = synset.name().split('.')[-1]
         node_labels[synset_node] = f"{synset.lemma_names()[0].replace('_', ' ')} ({pos_label}.{sense_num})"
         
-        # Connect synset to parent word node (only for root connections)
-        if parent_word_node:
-            G.add_edge(parent_word_node, synset_node, relation='sense')
+        # Create root word node for this synset and connect it
+        root_word = synset.lemma_names()[0].replace('_', ' ').upper()
+        root_node = f"ROOT_{root_word}"
+        
+        # Add root node if it doesn't exist
+        if root_node not in G.nodes():
+            G.add_node(root_node, 
+                      node_type='main',
+                      word=root_word.lower())
+            node_labels[root_node] = root_word
+        
+        # Connect synset to its root word node
+        G.add_edge(root_node, synset_node, 
+                  relation='sense', 
+                  color='#666666',  # Grey for sense connections
+                  arrow_direction='to')
         
         # Add relationship connections directly to other synsets (no intermediate nodes)
         if include_hypernyms:
@@ -206,8 +219,38 @@ def build_wordnet_graph(word: str, depth: int = 1,
     # Process each synset of the main word
     for synset in synsets:
         synset_node = f"{synset.name()}"
-        G.add_edge(main_node, synset_node, relation='sense')
+        # The main word connection will be created in add_synset_connections
         add_synset_connections(synset, 0, main_node)
+    
+    # After processing all synsets, ensure all synsets have root connections
+    # This is a second pass to catch any synsets that were added but not processed
+    for node in list(G.nodes()):
+        node_data = G.nodes[node]
+        if node_data.get('node_type') == 'synset':
+            synset_name = node_data.get('synset_name')
+            if synset_name:
+                # Extract the root word from the synset
+                try:
+                    synset_obj = wn.synset(synset_name)
+                    root_word = synset_obj.lemma_names()[0].replace('_', ' ').upper()
+                    root_node = f"ROOT_{root_word}"
+                    
+                    # Add root node if it doesn't exist
+                    if root_node not in G.nodes():
+                        G.add_node(root_node, 
+                                  node_type='main',
+                                  word=root_word.lower())
+                        node_labels[root_node] = root_word
+                    
+                    # Add connection if it doesn't exist
+                    if not G.has_edge(root_node, node):
+                        G.add_edge(root_node, node, 
+                                  relation='sense', 
+                                  color='#666666',  # Grey for sense connections
+                                  arrow_direction='to')
+                except:
+                    # Skip if synset can't be loaded
+                    pass
     
     return G, node_labels
 

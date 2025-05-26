@@ -288,8 +288,8 @@ def render_about_section():
     - Grey dotted nodes are navigation breadcrumbs
     
     **Node Types:**
-    - 🔴 Main word - your input word
-    - 🟣 Word senses - different meanings/synsets of words
+    - 🔴 Root words - uppercase word forms (e.g., SHEEP, BOVINE)
+    - 🟣 Word senses - specific meanings/synsets (e.g., sheep.n.01, bovine.n.01)
     
     **Edge Colors (Directed Graph):**
     - Red arrows: Hypernyms ("is a type of")
@@ -299,9 +299,10 @@ def render_about_section():
     - Grey arrows: Sense connections (root word to its senses)
     
     **Graph Structure:**
-    - Root word connects to its word senses
-    - Word senses connect directly to other word senses
-    - No intermediate nodes - clean sense-to-sense relationships
+    - Every word sense connects to its root word (e.g., sheep.n.01 → SHEEP)
+    - Word senses connect directly to other word senses via relationships
+    - Each related word also gets its own root node and sense connections
+    - Clean sense-to-sense relationships with comprehensive root connections
     """)
 
 
