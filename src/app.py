@@ -10,6 +10,7 @@ import streamlit as st
 import sys
 import os
 import importlib
+import time
 
 # Add parent directory to path to allow imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -34,6 +35,67 @@ if 'src.ui.graph_display' in sys.modules:
     importlib.reload(sys.modules['src.ui.graph_display'])
 
 
+
+
+
+def add_main_window_navigation_listener():
+    """Add JavaScript listener in the main window to handle navigation messages from iframes."""
+    cache_buster = int(time.time())
+    
+    # Simplified, more reliable navigation listener
+    navigation_listener_script = f"""
+    <script>
+        (function() {{
+            var timestamp = {cache_buster};
+            console.log('🔧 MainWindow: Installing navigation listener v' + timestamp + '...');
+            
+            // Prevent multiple installations
+            if (window.mainWindowListenerInstalled) {{
+                console.log('⚠️ MainWindow: Listener already installed, skipping...');
+                return;
+            }}
+            
+            function handleNavigationMessage(event) {{
+                console.log('📨 MainWindow: Received message v' + timestamp + ':', event.data);
+                console.log('📨 MainWindow: Message origin:', event.origin);
+                
+                // Filter out Streamlit internal messages
+                if (event.data && event.data.stCommVersion) {{
+                    console.log('🔄 MainWindow: Ignoring Streamlit internal message');
+                    return;
+                }}
+                
+                // Handle navigation requests
+                if (event.data && event.data.type === 'streamlit-navigate') {{
+                    console.log('🎯 MainWindow: Processing navigation to:', event.data.targetWord);
+                    
+                    try {{
+                        var url = new URL(window.location.href);
+                        url.searchParams.set('word', event.data.targetWord);
+                        url.searchParams.set('clicked_node', event.data.clickedNode);
+                        
+                        console.log('🔗 MainWindow: Navigating to:', url.toString());
+                        window.location.href = url.toString();
+                    }} catch (e) {{
+                        console.error('❌ MainWindow: Navigation failed:', e);
+                    }}
+                }} else {{
+                    console.log('🔍 MainWindow: Message type mismatch. Expected: streamlit-navigate, Got:', 
+                               event.data ? event.data.type : 'undefined');
+                }}
+            }}
+            
+            // Install the message listener
+            window.addEventListener('message', handleNavigationMessage, false);
+            window.mainWindowListenerInstalled = true;
+            
+            console.log('✅ MainWindow: Navigation listener installed successfully v' + timestamp);
+        }})();
+    </script>
+    """
+    st.markdown(navigation_listener_script, unsafe_allow_html=True)
+
+
 def main():
     """Main application function."""
     # Set page configuration
@@ -56,32 +118,27 @@ def main():
     
     with col1:
         if st.button("🐕 Navigate to 'dog'"):
-            st.query_params.word = "dog"
-            st.query_params.clicked_node = "test_button"
-            st.rerun()
+            st.markdown('<script>window.location.href = "?word=dog&clicked_node=test_button";</script>', unsafe_allow_html=True)
     
     with col2:
         if st.button("🐱 Navigate to 'cat'"):
-            st.query_params.word = "cat"
-            st.query_params.clicked_node = "test_button"
-            st.rerun()
+            st.markdown('<script>window.location.href = "?word=cat&clicked_node=test_button";</script>', unsafe_allow_html=True)
     
     with col3:
         if st.button("🐑 Navigate to 'sheep'"):
-            st.query_params.word = "sheep"
-            st.query_params.clicked_node = "test_button"
-            st.rerun()
+            st.markdown('<script>window.location.href = "?word=sheep&clicked_node=test_button";</script>', unsafe_allow_html=True)
     
     with col4:
         if st.button("🐄 Navigate to 'bovine'"):
-            st.query_params.word = "bovine"
-            st.query_params.clicked_node = "test_button"
-            st.rerun()
+            st.markdown('<script>window.location.href = "?word=bovine&clicked_node=test_button";</script>', unsafe_allow_html=True)
     
     st.markdown("---")
     
     # Handle URL navigation
     session_manager.handle_url_navigation()
+    
+    # Add main window navigation listener for iframe messages
+    add_main_window_navigation_listener()
     
     # Render sidebar and get settings
     settings = render_sidebar(session_manager)

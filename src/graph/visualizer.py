@@ -363,57 +363,65 @@ class GraphVisualizer:
                             console.log('  - Target Word for Navigation:', targetWord);
                             console.groupEnd();
                             
-                            // Send message to parent page to handle navigation
+                            // Create navigation data with correct message type
                             const navigationData = {{
-                                type: 'navigate',
+                                type: 'streamlit-navigate',  // Fixed: match the listener type
                                 targetWord: targetWord,
                                 clickedNode: nodeId,
                                 timestamp: new Date().toISOString(),
                                 jsVersion: '{timestamp}'
                             }};
                             
-                            console.log('📤 Sending navigation message to parent v{timestamp}:', navigationData);
+                            console.log('📤 Preparing navigation v{timestamp}:', navigationData);
                             
-                            // Enhanced parent detection and messaging
+                            // Primary approach: postMessage to parent
+                            let messageSent = false;
+                            
                             console.log('🔍 Parent Window Analysis v{timestamp}:');
                             console.log('  - window.parent exists:', !!window.parent);
                             console.log('  - window.parent !== window:', window.parent !== window);
                             console.log('  - window.top exists:', !!window.top);
                             console.log('  - window.top !== window:', window.top !== window);
                             
-                            // Try multiple approaches to send message to parent
-                            let messageSent = false;
-                            
+                            // Try sending to parent first (most common case for Streamlit iframes)
                             if (window.parent && window.parent !== window) {{
                                 try {{
+                                    // For Streamlit, we can use '*' since it's same-origin in most cases
+                                    // In production, you might want to specify the exact origin
                                     window.parent.postMessage(navigationData, '*');
-                                    console.log('✅ Message sent to window.parent v{timestamp}');
+                                    console.log('✅ Graph: Message sent to window.parent v{timestamp}');
                                     messageSent = true;
                                 }} catch (e) {{
-                                    console.log('❌ Failed to send to window.parent v{timestamp}:', e);
+                                    console.log('❌ Graph: Failed to send to window.parent v{timestamp}:', e);
                                 }}
                             }}
                             
+                            // Try sending to top window as backup
                             if (!messageSent && window.top && window.top !== window) {{
                                 try {{
                                     window.top.postMessage(navigationData, '*');
-                                    console.log('✅ Message sent to window.top v{timestamp}');
+                                    console.log('✅ Graph: Message sent to window.top v{timestamp}');
                                     messageSent = true;
                                 }} catch (e) {{
-                                    console.log('❌ Failed to send to window.top v{timestamp}:', e);
+                                    console.log('❌ Graph: Failed to send to window.top v{timestamp}:', e);
                                 }}
                             }}
                             
+                            // Fallback for standalone HTML files (direct navigation)
                             if (!messageSent) {{
-                                // Fallback for standalone HTML files
-                                console.log('🔄 Using fallback direct navigation v{timestamp}');
-                                const url = new URL(window.location);
-                                url.searchParams.set('word', targetWord);
-                                url.searchParams.set('clicked_node', nodeId);
-                                url.searchParams.delete('navigate_to');
-                                console.log('🔗 Direct navigation (standalone) v{timestamp}:', url.toString());
-                                window.location.href = url.toString();
+                                console.log('🔄 Graph: Using fallback direct navigation v{timestamp}');
+                                try {{
+                                    const url = new URL(window.location);
+                                    url.searchParams.set('word', targetWord);
+                                    url.searchParams.set('clicked_node', nodeId);
+                                    console.log('🔗 Graph: Direct navigation (standalone) v{timestamp}:', url.toString());
+                                    window.location.href = url.toString();
+                                }} catch (e) {{
+                                    console.error('❌ Graph: Direct navigation failed v{timestamp}:', e);
+                                }}
                             }}
+                            
+                            console.log('🎯 Graph: Navigation request completed v{timestamp}')
                         }} else {{
                             console.log('🖱️ Double-click detected but no nodes selected v{timestamp}');
                         }}

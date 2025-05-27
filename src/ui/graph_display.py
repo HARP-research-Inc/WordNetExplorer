@@ -175,51 +175,6 @@ def render_graph_visualization(word, settings, explorer=None):
             )
             
             if html_content:
-                # Add navigation listener using st.markdown to ensure it runs in the top-level context
-                cache_buster = int(time.time())
-                
-                # Intermediate Relay Iframe (receives messages from graph, navigates top window directly)
-                relay_iframe_script = f"""
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>Navigation Relay</title>
-                    <script type="text/javascript">
-                        // Relay Iframe Script v{cache_buster} - Direct Navigation
-                        console.log('🔧 RelayIframe: Initializing DIRECT navigation v{cache_buster}...');
-                        window.addEventListener('message', function(event) {{
-                            console.log('📨 RelayIframe: Message received from graph v{cache_buster}:', event.data);
-                            if (event.data && event.data.type === 'navigate') {{
-                                console.log('🚀 RelayIframe: Performing DIRECT navigation v{cache_buster}');
-                                const targetWord = event.data.targetWord;
-                                const clickedNode = event.data.clickedNode;
-                                if (targetWord) {{
-                                    console.log('🔍 RelayIframe: Processing navigation v{cache_buster}:', targetWord);
-                                    try {{
-                                        const url = new URL(window.top.location.href);
-                                        url.searchParams.set('word', targetWord);
-                                        url.searchParams.set('clicked_node', clickedNode);
-                                        url.searchParams.delete('navigate_to');
-                                        console.log('🔗 RelayIframe: Navigating top window to v{cache_buster}:', url.toString());
-                                        window.top.location.href = url.toString();
-                                    }} catch (error) {{
-                                        console.error('❌ RelayIframe: Navigation failed v{cache_buster}:', error);
-                                    }}
-                                }} else {{
-                                    console.log('❌ RelayIframe: No targetWord in message v{cache_buster}');
-                                }}
-                            }}
-                        }}, false);
-                        console.log('✅ RelayIframe: DIRECT navigation listener installed v{cache_buster}. Ready for graph messages.');
-                    </script>
-                </head>
-                <body>
-                    <p>Navigation Relay Iframe - Direct Navigation Mode</p>
-                </body>
-                </html>
-                """
-                components.html(relay_iframe_script, height=0) 
-
                 # Display the HTML content (graph) in its iframe
                 components.html(html_content, height=600)
                 
