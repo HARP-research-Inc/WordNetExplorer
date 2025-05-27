@@ -6,7 +6,7 @@ A web-based interface for exploring WordNet semantic relationships
 using Streamlit with a clean, modular architecture.
 """
 
-import streamlit as st
+import streamlit as st 
 import sys
 import os
 import warnings
@@ -31,7 +31,7 @@ from src.ui.sidebar import render_sidebar
 from src.ui.word_info import render_word_information
 from src.ui.graph_display import render_graph_visualization
 from src.ui.welcome import render_welcome_screen
-
+"Version 1.0.0"
 
 def render_header():
     """Render the header with title."""
