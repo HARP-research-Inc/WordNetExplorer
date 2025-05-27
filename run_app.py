@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
 """
-Run the WordNet Explorer Streamlit app
+Streamlit App Entry Point for Deployment
 """
 
-import os
 import sys
-import subprocess
+import os
 
-def main():
-    """Run the Streamlit app."""
-    # Add src directory to Python path
-    sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
-    
-    # Get the path to the app.py file
-    app_path = os.path.join(os.path.dirname(__file__), 'src', 'app.py')
-    
-    # Run the Streamlit app
-    subprocess.run(['streamlit', 'run', app_path])
+# Add src directory to Python path
+current_dir = os.path.dirname(os.path.abspath(__file__))
+src_dir = os.path.join(current_dir, 'src')
+if src_dir not in sys.path:
+    sys.path.insert(0, current_dir)
+
+# Import and run the main app
+from src.app import main
 
 if __name__ == "__main__":
+    main()
+else:
+    # For deployment environments that import this module
     main() 
