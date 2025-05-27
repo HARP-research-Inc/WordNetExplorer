@@ -31,6 +31,59 @@ from src.ui.graph_display import render_graph_visualization
 from src.ui.welcome import render_welcome_screen
 
 
+def render_header():
+    """Render the header with title."""
+    # App title and description
+    st.markdown('<h1 class="main-header">WordNet Explorer</h1>', unsafe_allow_html=True)
+    st.markdown("Explore semantic relationships between words using WordNet")
+
+
+def render_footer():
+    """Render the footer with logo, copyright and link."""
+    st.markdown("---")
+    
+    # Display logo using HTML for full control
+    try:
+        logo_path = os.path.join(os.path.dirname(__file__), "T-Shirt Logo.png")
+        if os.path.exists(logo_path):
+            import base64
+            
+            # Read and encode the image
+            with open(logo_path, "rb") as img_file:
+                img_bytes = img_file.read()
+                img_base64 = base64.b64encode(img_bytes).decode()
+            
+            # Display using HTML with full control
+            st.markdown(
+                f"""
+                <div style="text-align: center; padding: 20px 0;">
+                    <img src="data:image/png;base64,{img_base64}" 
+                         style="width: 300px; 
+                                border-radius: 0px !important; 
+                                border: none !important;
+                                box-shadow: none !important;
+                                display: block;
+                                margin: 0 auto;" 
+                         alt="HARP Research Logo">
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+    except Exception as e:
+        # If logo fails to load, just continue without it
+        st.markdown('<div style="text-align: center; padding: 20px 0;"></div>', unsafe_allow_html=True)
+    
+    # Copyright and link
+    st.markdown(
+        """
+        <div style="text-align: center; padding: 10px 0; color: #666; font-size: 14px;">
+            <p>© 2025 HARP Research, Inc. | <a href="https://harpresearch.ai" target="_blank" style="color: #1f77b4; text-decoration: none;">https://harpresearch.ai</a></p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
+
 def main():
     """Main application function."""
     # Set page configuration
@@ -43,9 +96,8 @@ def main():
     # Load custom CSS
     load_custom_css()
     
-    # App title and description
-    st.markdown('<h1 class="main-header">WordNet Explorer</h1>', unsafe_allow_html=True)
-    st.markdown("Explore semantic relationships between words using WordNet")
+    # Render header with logo
+    render_header()
     
     # Handle URL navigation
     session_manager.handle_url_navigation()
@@ -104,6 +156,9 @@ def main():
     
     # Display debug information if enabled
     session_manager.log_debug_info()
+    
+    # Render footer
+    render_footer()
 
 
 if __name__ == "__main__":
