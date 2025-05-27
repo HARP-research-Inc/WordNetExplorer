@@ -7,7 +7,7 @@ Main interface for exploring WordNet relationships using the modularized compone
 from typing import Tuple, Dict, Optional
 import networkx as nx
 
-from src.wordnet import download_nltk_data, get_synsets_for_word
+from src.wordnet import initialize_wordnet, get_synsets_for_word
 from src.wordnet.relationships import RelationshipConfig
 from src.graph import GraphBuilder, GraphConfig, GraphVisualizer, VisualizationConfig
 
@@ -17,8 +17,9 @@ class WordNetExplorer:
     
     def __init__(self):
         """Initialize the WordNet Explorer."""
-        # Ensure NLTK data is available
-        download_nltk_data()
+        # Ensure NLTK data is available with robust initialization
+        if not initialize_wordnet():
+            raise RuntimeError("Failed to initialize WordNet. Please check your internet connection and try again.")
         
         # Initialize default configurations
         self.graph_config = GraphConfig()

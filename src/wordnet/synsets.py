@@ -5,12 +5,30 @@ Handles synset operations and information extraction.
 """
 
 from typing import List, Dict, Any
+import nltk
 from nltk.corpus import wordnet as wn
+from .data_access import initialize_wordnet
+
+
+def _ensure_wordnet_loaded():
+    """Ensure WordNet is properly loaded and initialized."""
+    try:
+        # Try to access WordNet to trigger loading
+        wn.synsets('test')
+    except (AttributeError, LookupError):
+        # If there's an error, use the robust initialization
+        if not initialize_wordnet():
+            raise RuntimeError("Could not initialize WordNet")
 
 
 def get_synsets_for_word(word: str) -> List:
     """Get all synsets (word senses) for a given word."""
-    return wn.synsets(word)
+    try:
+        return wn.synsets(word)
+    except AttributeError:
+        # Handle the lazy loading race condition
+        _ensure_wordnet_loaded()
+        return wn.synsets(word)
 
 
 def get_synset_info(synset) -> Dict[str, Any]:
@@ -45,4 +63,12 @@ def create_synset_label(synset) -> str:
     synset_parts = synset.name().split('.')
     pos_part = synset_parts[1] if len(synset_parts) > 1 else 'n'
     index_part = synset_parts[2] if len(synset_parts) > 2 else '01'
-    return f"{primary_lemma}\n{pos_part}.{index_part}" 
+    return f"{primary_lemma}\n{pos_part}.{index_part}"
+
+
+# Initialize WordNet on module import
+try:
+    _ensure_wordnet_loaded()
+except Exception:
+    # If initialization fails, it will be retried when functions are called
+    pass 
