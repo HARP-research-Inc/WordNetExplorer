@@ -173,6 +173,90 @@ def render_graph_visualization(word, settings, explorer=None):
             )
             
             if html_content:
+                # Add navigation listener using components.html to ensure it runs in the right context
+                navigation_listener = """
+                <script>
+                // Enhanced navigation message listener with detailed debugging
+                if (!window.navigationListenerInstalled) {
+                    console.log('🔧 Installing navigation message listener...');
+                    
+                    // Listen for navigation messages from the graph iframe
+                    window.addEventListener('message', function(event) {
+                        console.log('📨 Raw message received:', event);
+                        console.log('  - event.origin:', event.origin);
+                        console.log('  - event.source:', event.source);
+                        console.log('  - event.data:', event.data);
+                        
+                        if (event.data && event.data.type === 'navigate') {
+                            console.log('📨 Navigation message received:', event.data);
+                            
+                            const targetWord = event.data.targetWord;
+                            const clickedNode = event.data.clickedNode;
+                            
+                            if (targetWord) {
+                                console.log('🔍 Processing navigation:');
+                                console.log('  - targetWord:', targetWord);
+                                console.log('  - clickedNode:', clickedNode);
+                                console.log('  - current location:', window.location.href);
+                                
+                                // Get current URL and preserve all parameters
+                                const url = new URL(window.location);
+                                console.log('  - original URL:', url.toString());
+                                
+                                // Update only the word parameter
+                                url.searchParams.set('word', targetWord);
+                                url.searchParams.set('clicked_node', clickedNode);
+                                
+                                // Remove old navigate_to parameter if it exists
+                                url.searchParams.delete('navigate_to');
+                                
+                                console.log('🔗 Navigating to:', url.toString());
+                                
+                                // Navigate to the new URL
+                                window.location.href = url.toString();
+                            } else {
+                                console.log('❌ No targetWord in navigation message');
+                            }
+                        } else {
+                            console.log('📨 Non-navigation message received (ignoring)');
+                        }
+                    }, false);
+                    
+                    // Also try listening on window.parent in case we're in an iframe
+                    if (window.parent && window.parent !== window) {
+                        window.parent.addEventListener('message', function(event) {
+                            console.log('📨 Message received on parent window:', event);
+                            if (event.data && event.data.type === 'navigate') {
+                                console.log('📨 Navigation message received on parent:', event.data);
+                                // Handle the same way as above
+                                const targetWord = event.data.targetWord;
+                                const clickedNode = event.data.clickedNode;
+                                
+                                if (targetWord) {
+                                    const url = new URL(window.parent.location);
+                                    url.searchParams.set('word', targetWord);
+                                    url.searchParams.set('clicked_node', clickedNode);
+                                    url.searchParams.delete('navigate_to');
+                                    console.log('🔗 Parent navigating to:', url.toString());
+                                    window.parent.location.href = url.toString();
+                                }
+                            }
+                        }, false);
+                        console.log('✅ Also listening on parent window');
+                    }
+                    
+                    window.navigationListenerInstalled = true;
+                    console.log('✅ Navigation message listener installed');
+                    console.log('💡 Ready to receive navigation messages from graph iframe');
+                } else {
+                    console.log('ℹ️ Navigation listener already installed');
+                }
+                </script>
+                """
+                
+                # Display the navigation listener first
+                components.html(navigation_listener, height=0)
+                
                 # Display the HTML content directly
                 components.html(html_content, height=600)
                 

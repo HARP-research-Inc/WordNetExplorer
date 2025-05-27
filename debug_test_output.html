@@ -1,0 +1,368 @@
+<html>
+    <head>
+        <meta charset="utf-8">
+        
+            <script src="lib/bindings/utils.js"></script>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/dist/vis-network.min.css" integrity="sha512-WgxfT5LWjfszlPHXRmBWHkV2eceiWTOBvrKCNbdgDYTHrT2AeLCGbF4sZlZw3UMN3WtL0tGUoIAKsu8mllg/XA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js" integrity="sha512-LnvoEWDFrqGHlHmDD2101OrLcbsfkrzoSpvtSQtxK3RMnRV0eOkhhBN2dXHKRrUU8p2DGRTk35n4O8nWSVe1mQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+            
+        
+<center>
+<h1></h1>
+</center>
+
+<!-- <link rel="stylesheet" href="../node_modules/vis/dist/vis.min.css" type="text/css" />
+<script type="text/javascript" src="../node_modules/vis/dist/vis.js"> </script>-->
+        <link
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/css/bootstrap.min.css"
+          rel="stylesheet"
+          integrity="sha384-eOJMYsd53ii+scO/bJGFsiCZc+5NDVN2yr8+0RDqr0Ql0h+rP48ckxlpbzKgwra6"
+          crossorigin="anonymous"
+        />
+        <script
+          src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/js/bootstrap.bundle.min.js"
+          integrity="sha384-JEW9xMcG8R+pH31jmWH6WWP0WintQrMb4s7ZOdauHnUtxwoG2vI5DkLtS3qm9Ekf"
+          crossorigin="anonymous"
+        ></script>
+
+
+        <center>
+          <h1></h1>
+        </center>
+        <style type="text/css">
+
+             #mynetwork {
+                 width: 100%;
+                 height: 600px;
+                 background-color: #ffffff;
+                 border: 1px solid lightgray;
+                 position: relative;
+                 float: left;
+             }
+
+             
+             #loadingBar {
+                 position:absolute;
+                 top:0px;
+                 left:0px;
+                 width: 100%;
+                 height: 600px;
+                 background-color:rgba(200,200,200,0.8);
+                 -webkit-transition: all 0.5s ease;
+                 -moz-transition: all 0.5s ease;
+                 -ms-transition: all 0.5s ease;
+                 -o-transition: all 0.5s ease;
+                 transition: all 0.5s ease;
+                 opacity:1;
+             }
+
+             #bar {
+                 position:absolute;
+                 top:0px;
+                 left:0px;
+                 width:20px;
+                 height:20px;
+                 margin:auto auto auto auto;
+                 border-radius:11px;
+                 border:2px solid rgba(30,30,30,0.05);
+                 background: rgb(0, 173, 246); /* Old browsers */
+                 box-shadow: 2px 0px 4px rgba(0,0,0,0.4);
+             }
+
+             #border {
+                 position:absolute;
+                 top:10px;
+                 left:10px;
+                 width:500px;
+                 height:23px;
+                 margin:auto auto auto auto;
+                 box-shadow: 0px 0px 4px rgba(0,0,0,0.2);
+                 border-radius:10px;
+             }
+
+             #text {
+                 position:absolute;
+                 top:8px;
+                 left:530px;
+                 width:30px;
+                 height:50px;
+                 margin:auto auto auto auto;
+                 font-size:22px;
+                 color: #000000;
+             }
+
+             div.outerBorder {
+                 position:relative;
+                 top:400px;
+                 width:600px;
+                 height:44px;
+                 margin:auto auto auto auto;
+                 border:8px solid rgba(0,0,0,0.1);
+                 background: rgb(252,252,252); /* Old browsers */
+                 background: -moz-linear-gradient(top,  rgba(252,252,252,1) 0%, rgba(237,237,237,1) 100%); /* FF3.6+ */
+                 background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,rgba(252,252,252,1)), color-stop(100%,rgba(237,237,237,1))); /* Chrome,Safari4+ */
+                 background: -webkit-linear-gradient(top,  rgba(252,252,252,1) 0%,rgba(237,237,237,1) 100%); /* Chrome10+,Safari5.1+ */
+                 background: -o-linear-gradient(top,  rgba(252,252,252,1) 0%,rgba(237,237,237,1) 100%); /* Opera 11.10+ */
+                 background: -ms-linear-gradient(top,  rgba(252,252,252,1) 0%,rgba(237,237,237,1) 100%); /* IE10+ */
+                 background: linear-gradient(to bottom,  rgba(252,252,252,1) 0%,rgba(237,237,237,1) 100%); /* W3C */
+                 filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#fcfcfc', endColorstr='#ededed',GradientType=0 ); /* IE6-9 */
+                 border-radius:72px;
+                 box-shadow: 0px 0px 10px rgba(0,0,0,0.2);
+             }
+             
+
+             
+
+             
+        </style>
+    </head>
+
+
+    <body>
+        <div class="card" style="width: 100%">
+            
+            
+            <div id="mynetwork" class="card-body"></div>
+        </div>
+
+        
+            <div id="loadingBar">
+              <div class="outerBorder">
+                <div id="text">0%</div>
+                <div id="border">
+                  <div id="bar"></div>
+                </div>
+              </div>
+            </div>
+        
+        
+
+        <script type="text/javascript">
+
+              // initialize global variables.
+              var edges;
+              var nodes;
+              var allNodes;
+              var allEdges;
+              var nodeColors;
+              var originalNodes;
+              var network;
+              var container;
+              var options, data;
+              var filter = {
+                  item : '',
+                  property : '',
+                  value : []
+              };
+
+              
+
+              
+
+              // This method is responsible for drawing the graph, returns the drawn network
+              function drawGraph() {
+                  var container = document.getElementById('mynetwork');
+
+                  
+
+                  // parsing and collecting nodes and edges from the python
+                  nodes = new vis.DataSet([{"color": "#DDA0DD", "font": {"color": "black"}, "id": "sheep.n.01", "label": "sheep (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: sheep (noun.01)\\nSynset: sheep.n.01\\nDefinition: woolly usually horned ruminant mammal related to the goat"}, {"color": "#FF6B6B", "font": {"color": "black"}, "id": "ROOT_SHEEP", "label": "SHEEP", "shape": "dot", "size": 30, "title": "Main word: SHEEP"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "bovid.n.01", "label": "bovid (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: bovid (noun.01)\\nSynset: bovid.n.01\\nDefinition: hollow-horned ruminants"}, {"color": "#FF6B6B", "font": {"color": "black"}, "id": "ROOT_BOVID", "label": "BOVID", "shape": "dot", "size": 30, "title": "Main word: BOVID"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "ruminant.n.01", "label": "ruminant (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: ruminant (noun.01)\\nSynset: ruminant.n.01\\nDefinition: any of various cud-chewing hoofed mammals having a stomach divided into four (occasionally three) compartments"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "antelope.n.01", "label": "antelope (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: antelope (noun.01)\\nSynset: antelope.n.01\\nDefinition: graceful Old World ruminant with long legs and horns directed upward and backward; includes gazelles; springboks; impalas; addax; gerenuks; blackbucks; dik-diks"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "bison.n.01", "label": "bison (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: bison (noun.01)\\nSynset: bison.n.01\\nDefinition: any of several large humped bovids having shaggy manes and large heads and short horns"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "bovine.n.01", "label": "bovine (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: bovine (noun.01)\\nSynset: bovine.n.01\\nDefinition: any of various members of the genus Bos"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "forest_goat.n.01", "label": "forest goat (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: forest goat (noun.01)\\nSynset: forest_goat.n.01\\nDefinition: cow-like creature with the glossy coat of a horse and the agility of a goat and the long horns of an antelope; characterized as a cow that lives the life of a goat"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "goat.n.01", "label": "goat (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: goat (noun.01)\\nSynset: goat.n.01\\nDefinition: any of numerous agile ruminants related to sheep but having a beard and straight horns"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "goat_antelope.n.01", "label": "goat antelope (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: goat antelope (noun.01)\\nSynset: goat_antelope.n.01\\nDefinition: bovid related to goats but having antelope-like features: mountain goats; gorals; serows; chamois; gnu goats"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "musk_ox.n.01", "label": "musk ox (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: musk ox (noun.01)\\nSynset: musk_ox.n.01\\nDefinition: large shaggy-coated bovid mammal of Canada and Greenland; intermediate in size and anatomy between an ox and a sheep"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "old_world_buffalo.n.01", "label": "Old World buffalo (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: Old World buffalo (noun.01)\\nSynset: old_world_buffalo.n.01\\nDefinition: any of several Old World animals resembling oxen including, e.g., water buffalo; Cape buffalo"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "wild_sheep.n.01", "label": "wild sheep (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: wild sheep (noun.01)\\nSynset: wild_sheep.n.01\\nDefinition: undomesticated sheep"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "black_sheep.n.02", "label": "black sheep (noun.02)", "shape": "dot", "size": 25, "title": "Word sense: black sheep (noun.02)\\nSynset: black_sheep.n.02\\nDefinition: sheep with a black coat"}, {"color": "#FF6B6B", "font": {"color": "black"}, "id": "ROOT_BLACK SHEEP", "label": "BLACK SHEEP", "shape": "dot", "size": 30, "title": "Main word: BLACK SHEEP"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "domestic_sheep.n.01", "label": "domestic sheep (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: domestic sheep (noun.01)\\nSynset: domestic_sheep.n.01\\nDefinition: any of various breeds raised for wool or edible meat or skin"}, {"color": "#FF6B6B", "font": {"color": "black"}, "id": "ROOT_DOMESTIC SHEEP", "label": "DOMESTIC SHEEP", "shape": "dot", "size": 30, "title": "Main word: DOMESTIC SHEEP"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "broadtail.n.02", "label": "broadtail (noun.02)", "shape": "dot", "size": 25, "title": "Word sense: broadtail (noun.02)\\nSynset: broadtail.n.02\\nDefinition: hardy coarse-haired sheep of central Asia; lambs are valued for their soft curly black fur"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "cheviot.n.01", "label": "Cheviot (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: Cheviot (noun.01)\\nSynset: cheviot.n.01\\nDefinition: hardy hornless sheep of the Cheviot Hills noted for its short thick wool"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "cotswold.n.01", "label": "Cotswold (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: Cotswold (noun.01)\\nSynset: cotswold.n.01\\nDefinition: sheep with long wool originating in the Cotswold Hills"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "exmoor.n.01", "label": "Exmoor (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: Exmoor (noun.01)\\nSynset: exmoor.n.01\\nDefinition: horned sheep of Devon; valued for mutton"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "hampshire.n.02", "label": "Hampshire (noun.02)", "shape": "dot", "size": 25, "title": "Word sense: Hampshire (noun.02)\\nSynset: hampshire.n.02\\nDefinition: British breed of hornless dark-faced domestic sheep"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "lincoln.n.03", "label": "Lincoln (noun.03)", "shape": "dot", "size": 25, "title": "Word sense: Lincoln (noun.03)\\nSynset: lincoln.n.03\\nDefinition: long-wooled mutton sheep originally from Lincolnshire"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "longwool.n.01", "label": "longwool (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: longwool (noun.01)\\nSynset: longwool.n.01\\nDefinition: a domestic long-wool sheep"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "merino.n.01", "label": "merino (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: merino (noun.01)\\nSynset: merino.n.01\\nDefinition: white sheep originating in Spain and producing a heavy fleece of exceptional quality"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "rambouillet.n.01", "label": "Rambouillet (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: Rambouillet (noun.01)\\nSynset: rambouillet.n.01\\nDefinition: hardy sheep developed from the merino producing both good mutton and fine wool"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "lamb.n.05", "label": "lamb (noun.05)", "shape": "dot", "size": 25, "title": "Word sense: lamb (noun.05)\\nSynset: lamb.n.05\\nDefinition: the flesh of a young domestic sheep eaten as food"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "mouton.n.01", "label": "mouton (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: mouton (noun.01)\\nSynset: mouton.n.01\\nDefinition: meat from a mature domestic sheep"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "ewe.n.03", "label": "ewe (noun.03)", "shape": "dot", "size": 25, "title": "Word sense: ewe (noun.03)\\nSynset: ewe.n.03\\nDefinition: female sheep"}, {"color": "#FF6B6B", "font": {"color": "black"}, "id": "ROOT_EWE", "label": "EWE", "shape": "dot", "size": 30, "title": "Main word: EWE"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "udder.n.01", "label": "udder (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: udder (noun.01)\\nSynset: udder.n.01\\nDefinition: mammary gland of bovids (cows and sheep and goats)"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "ram.n.05", "label": "ram (noun.05)", "shape": "dot", "size": 25, "title": "Word sense: ram (noun.05)\\nSynset: ram.n.05\\nDefinition: uncastrated adult male sheep"}, {"color": "#FF6B6B", "font": {"color": "black"}, "id": "ROOT_RAM", "label": "RAM", "shape": "dot", "size": 30, "title": "Main word: RAM"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "horn.n.02", "label": "horn (noun.02)", "shape": "dot", "size": 25, "title": "Word sense: horn (noun.02)\\nSynset: horn.n.02\\nDefinition: one of the bony outgrowths on the heads of certain ungulates"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "wether.n.01", "label": "wether (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: wether (noun.01)\\nSynset: wether.n.01\\nDefinition: male sheep especially a castrated one"}, {"color": "#FF6B6B", "font": {"color": "black"}, "id": "ROOT_WETHER", "label": "WETHER", "shape": "dot", "size": 30, "title": "Main word: WETHER"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "bellwether.n.02", "label": "bellwether (noun.02)", "shape": "dot", "size": 25, "title": "Word sense: bellwether (noun.02)\\nSynset: bellwether.n.02\\nDefinition: sheep that leads the herd often wearing a bell"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "trotter.n.01", "label": "trotter (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: trotter (noun.01)\\nSynset: trotter.n.01\\nDefinition: foot of a pig or sheep especially one used as food"}, {"color": "#FF6B6B", "font": {"color": "black"}, "id": "ROOT_TROTTER", "label": "TROTTER", "shape": "dot", "size": 30, "title": "Main word: TROTTER"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "animal_foot.n.01", "label": "animal foot (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: animal foot (noun.01)\\nSynset: animal_foot.n.01\\nDefinition: the pedal extremity of vertebrates other than human beings"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "hog.n.03", "label": "hog (noun.03)", "shape": "dot", "size": 25, "title": "Word sense: hog (noun.03)\\nSynset: hog.n.03\\nDefinition: domestic swine"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "withers.n.01", "label": "withers (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: withers (noun.01)\\nSynset: withers.n.01\\nDefinition: the highest part of the back at the base of the neck of various animals especially draft animals"}, {"color": "#FF6B6B", "font": {"color": "black"}, "id": "ROOT_WITHERS", "label": "WITHERS", "shape": "dot", "size": 30, "title": "Main word: WITHERS"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "body_part.n.01", "label": "body part (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: body part (noun.01)\\nSynset: body_part.n.01\\nDefinition: any part of an organism such as an organ or extremity"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "deer.n.01", "label": "deer (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: deer (noun.01)\\nSynset: deer.n.01\\nDefinition: distinguished from Bovidae by the male\u0027s having solid deciduous antlers"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "horse.n.01", "label": "horse (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: horse (noun.01)\\nSynset: horse.n.01\\nDefinition: solid-hoofed herbivorous quadruped domesticated since prehistoric times"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "ox.n.01", "label": "ox (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: ox (noun.01)\\nSynset: ox.n.01\\nDefinition: an adult castrated bull of the genus Bos; especially Bos taurus"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "sheep.n.02", "label": "sheep (noun.02)", "shape": "dot", "size": 25, "title": "Word sense: sheep (noun.02)\\nSynset: sheep.n.02\\nDefinition: a timid defenseless simpleton who is readily preyed upon"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "simpleton.n.01", "label": "simpleton (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: simpleton (noun.01)\\nSynset: simpleton.n.01\\nDefinition: a person lacking intelligence or common sense"}, {"color": "#FF6B6B", "font": {"color": "black"}, "id": "ROOT_SIMPLETON", "label": "SIMPLETON", "shape": "dot", "size": 30, "title": "Main word: SIMPLETON"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "person.n.01", "label": "person (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: person (noun.01)\\nSynset: person.n.01\\nDefinition: a human being"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "airhead.n.01", "label": "airhead (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: airhead (noun.01)\\nSynset: airhead.n.01\\nDefinition: a flighty scatterbrained simpleton"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "dimwit.n.01", "label": "dimwit (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: dimwit (noun.01)\\nSynset: dimwit.n.01\\nDefinition: a stupid incompetent person"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "dingbat.n.01", "label": "dingbat (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: dingbat (noun.01)\\nSynset: dingbat.n.01\\nDefinition: a silly empty-headed person"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "dumbbell.n.02", "label": "dumbbell (noun.02)", "shape": "dot", "size": 25, "title": "Word sense: dumbbell (noun.02)\\nSynset: dumbbell.n.02\\nDefinition: an ignorant or foolish person"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "fool.n.01", "label": "fool (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: fool (noun.01)\\nSynset: fool.n.01\\nDefinition: a person who lacks good judgment"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "idiot.n.01", "label": "idiot (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: idiot (noun.01)\\nSynset: idiot.n.01\\nDefinition: a person of subnormal intelligence"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "idiot_savant.n.01", "label": "idiot savant (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: idiot savant (noun.01)\\nSynset: idiot_savant.n.01\\nDefinition: person who is mentally retarded in general but who displays remarkable aptitude in some limited field (usually involving memory)"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "nebbish.n.01", "label": "nebbish (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: nebbish (noun.01)\\nSynset: nebbish.n.01\\nDefinition: (Yiddish) a timid unfortunate simpleton"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "nincompoop.n.01", "label": "nincompoop (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: nincompoop (noun.01)\\nSynset: nincompoop.n.01\\nDefinition: a stupid foolish person"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "scatterbrain.n.01", "label": "scatterbrain (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: scatterbrain (noun.01)\\nSynset: scatterbrain.n.01\\nDefinition: a flighty and disorganized person"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "schlemiel.n.01", "label": "schlemiel (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: schlemiel (noun.01)\\nSynset: schlemiel.n.01\\nDefinition: (Yiddish) a dolt who is a habitual bungler"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "schlepper.n.01", "label": "schlepper (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: schlepper (noun.01)\\nSynset: schlepper.n.01\\nDefinition: (Yiddish) an awkward and stupid person"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "schnook.n.01", "label": "schnook (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: schnook (noun.01)\\nSynset: schnook.n.01\\nDefinition: (Yiddish) a gullible simpleton more to be pitied than despised"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "space_cadet.n.01", "label": "space cadet (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: space cadet (noun.01)\\nSynset: space_cadet.n.01\\nDefinition: someone who seems unable to respond appropriately to reality (as if under the influence of some narcotic drug)"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "square.n.05", "label": "square (noun.05)", "shape": "dot", "size": 25, "title": "Word sense: square (noun.05)\\nSynset: square.n.05\\nDefinition: someone who doesn\u0027t understand what is going on"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "stupid.n.01", "label": "stupid (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: stupid (noun.01)\\nSynset: stupid.n.01\\nDefinition: a person who is not very bright"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "subnormal.n.01", "label": "subnormal (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: subnormal (noun.01)\\nSynset: subnormal.n.01\\nDefinition: a person of less than normal intelligence"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "twerp.n.01", "label": "twerp (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: twerp (noun.01)\\nSynset: twerp.n.01\\nDefinition: someone who is regarded as contemptible"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "sheep.n.03", "label": "sheep (noun.03)", "shape": "dot", "size": 25, "title": "Word sense: sheep (noun.03)\\nSynset: sheep.n.03\\nDefinition: a docile and vulnerable person who would rather follow than make an independent decision"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "follower.n.01", "label": "follower (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: follower (noun.01)\\nSynset: follower.n.01\\nDefinition: a person who accepts the leadership of another"}, {"color": "#FF6B6B", "font": {"color": "black"}, "id": "ROOT_FOLLOWER", "label": "FOLLOWER", "shape": "dot", "size": 30, "title": "Main word: FOLLOWER"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "camp_follower.n.02", "label": "camp follower (noun.02)", "shape": "dot", "size": 25, "title": "Word sense: camp follower (noun.02)\\nSynset: camp_follower.n.02\\nDefinition: a follower who is not a member of an ingroup"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "cartesian.n.01", "label": "Cartesian (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: Cartesian (noun.01)\\nSynset: cartesian.n.01\\nDefinition: a follower of Cartesian thought"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "cultist.n.01", "label": "cultist (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: cultist (noun.01)\\nSynset: cultist.n.01\\nDefinition: a member of a religious cult"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "cultist.n.02", "label": "cultist (noun.02)", "shape": "dot", "size": 25, "title": "Word sense: cultist (noun.02)\\nSynset: cultist.n.02\\nDefinition: a member of an unorthodox cult who generally lives outside of conventional society under the direction of a charismatic leader"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "disciple.n.01", "label": "disciple (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: disciple (noun.01)\\nSynset: disciple.n.01\\nDefinition: someone who believes and helps to spread the doctrine of another"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "fan.n.03", "label": "fan (noun.03)", "shape": "dot", "size": 25, "title": "Word sense: fan (noun.03)\\nSynset: fan.n.03\\nDefinition: an ardent follower and admirer"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "flatterer.n.01", "label": "flatterer (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: flatterer (noun.01)\\nSynset: flatterer.n.01\\nDefinition: a person who uses flattery"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "flunky.n.02", "label": "flunky (noun.02)", "shape": "dot", "size": 25, "title": "Word sense: flunky (noun.02)\\nSynset: flunky.n.02\\nDefinition: a person of unquestioning obedience"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "freudian.n.01", "label": "Freudian (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: Freudian (noun.01)\\nSynset: freudian.n.01\\nDefinition: a person who follows the basic theories or practices of Sigmund Freud"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "hegelian.n.01", "label": "Hegelian (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: Hegelian (noun.01)\\nSynset: hegelian.n.01\\nDefinition: a follower of the thought of Hegel"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "inferior.n.01", "label": "inferior (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: inferior (noun.01)\\nSynset: inferior.n.01\\nDefinition: one of lesser rank or station or quality"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "jacksonian.n.01", "label": "Jacksonian (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: Jacksonian (noun.01)\\nSynset: jacksonian.n.01\\nDefinition: a follower of Andrew Jackson or his ideas"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "janissary.n.01", "label": "janissary (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: janissary (noun.01)\\nSynset: janissary.n.01\\nDefinition: a loyal supporter"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "jeffersonian.n.01", "label": "Jeffersonian (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: Jeffersonian (noun.01)\\nSynset: jeffersonian.n.01\\nDefinition: a follower of Thomas Jefferson or his ideas and principles"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "jungian.n.01", "label": "Jungian (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: Jungian (noun.01)\\nSynset: jungian.n.01\\nDefinition: a follower or advocate of Carl Jung\u0027s theories"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "keynesian.n.01", "label": "Keynesian (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: Keynesian (noun.01)\\nSynset: keynesian.n.01\\nDefinition: a follower of the economic theories of John Maynard Keynes"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "lamarckian.n.01", "label": "Lamarckian (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: Lamarckian (noun.01)\\nSynset: lamarckian.n.01\\nDefinition: a believer in Lamarckism"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "leech.n.02", "label": "leech (noun.02)", "shape": "dot", "size": 25, "title": "Word sense: leech (noun.02)\\nSynset: leech.n.02\\nDefinition: a follower who hangs around a host (without benefit to the host) in hope of gain or advantage"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "machiavellian.n.01", "label": "Machiavellian (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: Machiavellian (noun.01)\\nSynset: machiavellian.n.01\\nDefinition: a follower of Machiavelli\u0027s principles"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "mendelian.n.01", "label": "Mendelian (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: Mendelian (noun.01)\\nSynset: mendelian.n.01\\nDefinition: a follower of Mendelism"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "mohammedan.n.01", "label": "Mohammedan (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: Mohammedan (noun.01)\\nSynset: mohammedan.n.01\\nDefinition: a follower of Mohammed"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "myrmidon.n.01", "label": "myrmidon (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: myrmidon (noun.01)\\nSynset: myrmidon.n.01\\nDefinition: a follower who carries out orders without question"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "nestorian.n.01", "label": "Nestorian (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: Nestorian (noun.01)\\nSynset: nestorian.n.01\\nDefinition: a follower of Nestorius"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "newtonian.n.01", "label": "Newtonian (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: Newtonian (noun.01)\\nSynset: newtonian.n.01\\nDefinition: a follower of Isaac Newton"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "regular.n.03", "label": "regular (noun.03)", "shape": "dot", "size": 25, "title": "Word sense: regular (noun.03)\\nSynset: regular.n.03\\nDefinition: a dependable follower (especially in party politics)"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "respecter.n.01", "label": "respecter (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: respecter (noun.01)\\nSynset: respecter.n.01\\nDefinition: a person who respects someone or something; usually used in the negative"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "satellite.n.02", "label": "satellite (noun.02)", "shape": "dot", "size": 25, "title": "Word sense: satellite (noun.02)\\nSynset: satellite.n.02\\nDefinition: a person who follows or serves another"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "skinnerian.n.01", "label": "Skinnerian (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: Skinnerian (noun.01)\\nSynset: skinnerian.n.01\\nDefinition: a follower of the theories or methods of B. F. Skinner"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "stalinist.n.01", "label": "Stalinist (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: Stalinist (noun.01)\\nSynset: stalinist.n.01\\nDefinition: a follower of Stalin and Stalinism"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "submitter.n.01", "label": "submitter (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: submitter (noun.01)\\nSynset: submitter.n.01\\nDefinition: someone who yields to the will of another person or force"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "tagalong.n.01", "label": "tagalong (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: tagalong (noun.01)\\nSynset: tagalong.n.01\\nDefinition: someone who persistently (and annoyingly) follows along"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "vassal.n.01", "label": "vassal (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: vassal (noun.01)\\nSynset: vassal.n.01\\nDefinition: a person holding a fief; a person who owes allegiance and service to a feudal lord"}, {"color": "#DDA0DD", "font": {"color": "black"}, "id": "wagnerian.n.01", "label": "Wagnerian (noun.01)", "shape": "dot", "size": 25, "title": "Word sense: Wagnerian (noun.01)\\nSynset: wagnerian.n.01\\nDefinition: a follower of the theories or an admirer of the music of Richard Wagner"}]);
+                  edges = new vis.DataSet([{"arrows": "to", "color": "#666666", "from": "sheep.n.01", "title": "Word sense connection", "to": "ROOT_SHEEP", "width": 2}, {"arrows": "to", "color": "#4488FF", "from": "sheep.n.01", "title": "Type includes (more specific)", "to": "bovid.n.01", "width": 3}, {"arrows": "to", "color": "#FF4444", "from": "sheep.n.01", "title": "Is a type of (more general)", "to": "black_sheep.n.02", "width": 3}, {"arrows": "to", "color": "#FF4444", "from": "sheep.n.01", "title": "Is a type of (more general)", "to": "domestic_sheep.n.01", "width": 3}, {"arrows": "to", "color": "#FF4444", "from": "sheep.n.01", "title": "Is a type of (more general)", "to": "ewe.n.03", "width": 3}, {"arrows": "to", "color": "#FF4444", "from": "sheep.n.01", "title": "Is a type of (more general)", "to": "ram.n.05", "width": 3}, {"arrows": "to", "color": "#FF4444", "from": "sheep.n.01", "title": "Is a type of (more general)", "to": "wether.n.01", "width": 3}, {"arrows": "to", "color": "#AA44AA", "from": "sheep.n.01", "title": "Part of", "to": "trotter.n.01", "width": 3}, {"arrows": "to", "color": "#AA44AA", "from": "sheep.n.01", "title": "Part of", "to": "withers.n.01", "width": 3}, {"arrows": "to", "color": "#666666", "from": "ROOT_SHEEP", "title": "Word sense connection", "to": "sheep.n.02", "width": 2}, {"arrows": "to", "color": "#666666", "from": "ROOT_SHEEP", "title": "Word sense connection", "to": "sheep.n.03", "width": 2}, {"arrows": "to", "color": "#666666", "from": "bovid.n.01", "title": "Word sense connection", "to": "ROOT_BOVID", "width": 2}, {"arrows": "to", "color": "#FF4444", "from": "bovid.n.01", "title": "Is a type of (more general)", "to": "ruminant.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "bovid.n.01", "title": "Type includes (more specific)", "to": "antelope.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "bovid.n.01", "title": "Type includes (more specific)", "to": "bison.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "bovid.n.01", "title": "Type includes (more specific)", "to": "bovine.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "bovid.n.01", "title": "Type includes (more specific)", "to": "forest_goat.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "bovid.n.01", "title": "Type includes (more specific)", "to": "goat.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "bovid.n.01", "title": "Type includes (more specific)", "to": "goat_antelope.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "bovid.n.01", "title": "Type includes (more specific)", "to": "musk_ox.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "bovid.n.01", "title": "Type includes (more specific)", "to": "old_world_buffalo.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "bovid.n.01", "title": "Type includes (more specific)", "to": "wild_sheep.n.01", "width": 3}, {"arrows": "to", "color": "#666666", "from": "black_sheep.n.02", "title": "Word sense connection", "to": "ROOT_BLACK SHEEP", "width": 2}, {"arrows": "to", "color": "#666666", "from": "domestic_sheep.n.01", "title": "Word sense connection", "to": "ROOT_DOMESTIC SHEEP", "width": 2}, {"arrows": "to", "color": "#4488FF", "from": "domestic_sheep.n.01", "title": "Type includes (more specific)", "to": "broadtail.n.02", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "domestic_sheep.n.01", "title": "Type includes (more specific)", "to": "cheviot.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "domestic_sheep.n.01", "title": "Type includes (more specific)", "to": "cotswold.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "domestic_sheep.n.01", "title": "Type includes (more specific)", "to": "exmoor.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "domestic_sheep.n.01", "title": "Type includes (more specific)", "to": "hampshire.n.02", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "domestic_sheep.n.01", "title": "Type includes (more specific)", "to": "lincoln.n.03", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "domestic_sheep.n.01", "title": "Type includes (more specific)", "to": "longwool.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "domestic_sheep.n.01", "title": "Type includes (more specific)", "to": "merino.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "domestic_sheep.n.01", "title": "Type includes (more specific)", "to": "rambouillet.n.01", "width": 3}, {"arrows": "to", "color": "#44AA44", "from": "domestic_sheep.n.01", "title": "Has part", "to": "lamb.n.05", "width": 3}, {"arrows": "to", "color": "#44AA44", "from": "domestic_sheep.n.01", "title": "Has part", "to": "mouton.n.01", "width": 3}, {"arrows": "to", "color": "#666666", "from": "ewe.n.03", "title": "Word sense connection", "to": "ROOT_EWE", "width": 2}, {"arrows": "to", "color": "#44AA44", "from": "ewe.n.03", "title": "Has part", "to": "udder.n.01", "width": 3}, {"arrows": "to", "color": "#666666", "from": "ram.n.05", "title": "Word sense connection", "to": "ROOT_RAM", "width": 2}, {"arrows": "to", "color": "#44AA44", "from": "ram.n.05", "title": "Has part", "to": "horn.n.02", "width": 3}, {"arrows": "to", "color": "#666666", "from": "wether.n.01", "title": "Word sense connection", "to": "ROOT_WETHER", "width": 2}, {"arrows": "to", "color": "#4488FF", "from": "wether.n.01", "title": "Type includes (more specific)", "to": "bellwether.n.02", "width": 3}, {"arrows": "to", "color": "#666666", "from": "trotter.n.01", "title": "Word sense connection", "to": "ROOT_TROTTER", "width": 2}, {"arrows": "to", "color": "#FF4444", "from": "trotter.n.01", "title": "Is a type of (more general)", "to": "animal_foot.n.01", "width": 3}, {"arrows": "to", "color": "#AA44AA", "from": "trotter.n.01", "title": "Part of", "to": "hog.n.03", "width": 3}, {"arrows": "to", "color": "#666666", "from": "withers.n.01", "title": "Word sense connection", "to": "ROOT_WITHERS", "width": 2}, {"arrows": "to", "color": "#FF4444", "from": "withers.n.01", "title": "Is a type of (more general)", "to": "body_part.n.01", "width": 3}, {"arrows": "to", "color": "#AA44AA", "from": "withers.n.01", "title": "Part of", "to": "deer.n.01", "width": 3}, {"arrows": "to", "color": "#AA44AA", "from": "withers.n.01", "title": "Part of", "to": "horse.n.01", "width": 3}, {"arrows": "to", "color": "#AA44AA", "from": "withers.n.01", "title": "Part of", "to": "ox.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "sheep.n.02", "title": "Type includes (more specific)", "to": "simpleton.n.01", "width": 3}, {"arrows": "to", "color": "#666666", "from": "simpleton.n.01", "title": "Word sense connection", "to": "ROOT_SIMPLETON", "width": 2}, {"arrows": "to", "color": "#FF4444", "from": "simpleton.n.01", "title": "Is a type of (more general)", "to": "person.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "simpleton.n.01", "title": "Type includes (more specific)", "to": "airhead.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "simpleton.n.01", "title": "Type includes (more specific)", "to": "dimwit.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "simpleton.n.01", "title": "Type includes (more specific)", "to": "dingbat.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "simpleton.n.01", "title": "Type includes (more specific)", "to": "dumbbell.n.02", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "simpleton.n.01", "title": "Type includes (more specific)", "to": "fool.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "simpleton.n.01", "title": "Type includes (more specific)", "to": "idiot.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "simpleton.n.01", "title": "Type includes (more specific)", "to": "idiot_savant.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "simpleton.n.01", "title": "Type includes (more specific)", "to": "nebbish.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "simpleton.n.01", "title": "Type includes (more specific)", "to": "nincompoop.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "simpleton.n.01", "title": "Type includes (more specific)", "to": "scatterbrain.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "simpleton.n.01", "title": "Type includes (more specific)", "to": "schlemiel.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "simpleton.n.01", "title": "Type includes (more specific)", "to": "schlepper.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "simpleton.n.01", "title": "Type includes (more specific)", "to": "schnook.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "simpleton.n.01", "title": "Type includes (more specific)", "to": "space_cadet.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "simpleton.n.01", "title": "Type includes (more specific)", "to": "square.n.05", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "simpleton.n.01", "title": "Type includes (more specific)", "to": "stupid.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "simpleton.n.01", "title": "Type includes (more specific)", "to": "subnormal.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "simpleton.n.01", "title": "Type includes (more specific)", "to": "twerp.n.01", "width": 3}, {"arrows": "to", "color": "#FF4444", "from": "person.n.01", "title": "Is a type of (more general)", "to": "follower.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "sheep.n.03", "title": "Type includes (more specific)", "to": "follower.n.01", "width": 3}, {"arrows": "to", "color": "#666666", "from": "follower.n.01", "title": "Word sense connection", "to": "ROOT_FOLLOWER", "width": 2}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "camp_follower.n.02", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "cartesian.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "cultist.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "cultist.n.02", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "disciple.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "fan.n.03", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "flatterer.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "flunky.n.02", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "freudian.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "hegelian.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "inferior.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "jacksonian.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "janissary.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "jeffersonian.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "jungian.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "keynesian.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "lamarckian.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "leech.n.02", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "machiavellian.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "mendelian.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "mohammedan.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "myrmidon.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "nestorian.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "newtonian.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "regular.n.03", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "respecter.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "satellite.n.02", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "skinnerian.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "stalinist.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "submitter.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "tagalong.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "vassal.n.01", "width": 3}, {"arrows": "to", "color": "#4488FF", "from": "follower.n.01", "title": "Type includes (more specific)", "to": "wagnerian.n.01", "width": 3}]);
+
+                  nodeColors = {};
+                  allNodes = nodes.get({ returnType: "Object" });
+                  for (nodeId in allNodes) {
+                    nodeColors[nodeId] = allNodes[nodeId].color;
+                  }
+                  allEdges = edges.get({ returnType: "Object" });
+                  // adding nodes and edges to the graph
+                  data = {nodes: nodes, edges: edges};
+
+                  var options = {"physics": {"enabled": true, "stabilization": {"iterations": 100}, "barnesHut": {"gravitationalConstant": -8000, "centralGravity": 0.3, "springLength": 95, "springConstant": 0.04, "damping": 0.09}}};
+
+                  
+
+
+                  
+
+                  network = new vis.Network(container, data, options);
+
+                  
+
+                  
+
+                  
+
+
+                  
+                      network.on("stabilizationProgress", function(params) {
+                          document.getElementById('loadingBar').removeAttribute("style");
+                          var maxWidth = 496;
+                          var minWidth = 20;
+                          var widthFactor = params.iterations/params.total;
+                          var width = Math.max(minWidth,maxWidth * widthFactor);
+                          document.getElementById('bar').style.width = width + 'px';
+                          document.getElementById('text').innerHTML = Math.round(widthFactor*100) + '%';
+                      });
+                      network.once("stabilizationIterationsDone", function() {
+                          document.getElementById('text').innerHTML = '100%';
+                          document.getElementById('bar').style.width = '496px';
+                          document.getElementById('loadingBar').style.opacity = 0;
+                          // really clean the dom element
+                          setTimeout(function () {document.getElementById('loadingBar').style.display = 'none';}, 500);
+                      });
+                  
+
+                  return network;
+
+              }
+              drawGraph();
+        </script>
+    
+        <script type="text/javascript">
+        window.addEventListener('load', function() {
+            setTimeout(function() {
+                if (window.network) {
+                    // Enhanced console logging for double-click events
+                    window.network.on("doubleClick", function (params) {
+                        if (params.nodes.length > 0) {
+                            const nodeId = params.nodes[0];
+                            
+                            // Get node data from the network
+                            const nodeData = window.network.body.data.nodes.get(nodeId);
+                            
+                            // Enhanced console logging with detailed information
+                            console.group('🖱️ Node Double-Click Event');
+                            console.log('Node ID:', nodeId);
+                            console.log('Node Label:', nodeData ? nodeData.label : 'Unknown');
+                            console.log('Node Title:', nodeData ? nodeData.title : 'Unknown');
+                            console.log('Node Color:', nodeData ? nodeData.color : 'Unknown');
+                            console.log('Node Size:', nodeData ? nodeData.size : 'Unknown');
+                            console.log('Click Position:', params.pointer.DOM);
+                            console.log('Canvas Position:', params.pointer.canvas);
+                            console.log('Timestamp:', new Date().toISOString());
+                            
+                            // Enhanced node type detection with detailed logging
+                            let nodeType = 'unknown';
+                            let targetWord = nodeId;
+                            
+                            console.log('🔍 Node ID Analysis:');
+                            console.log('  - nodeId:', nodeId);
+                            console.log('  - nodeId.startsWith("ROOT_"):', nodeId.startsWith('ROOT_'));
+                            console.log('  - nodeId.includes("_main"):', nodeId.includes('_main'));
+                            console.log('  - nodeId.includes("_breadcrumb"):', nodeId.includes('_breadcrumb'));
+                            console.log('  - nodeId.includes("_word"):', nodeId.includes('_word'));
+                            console.log('  - nodeId.includes("."):', nodeId.includes('.'));
+                            
+                            if (nodeId.startsWith('ROOT_')) {
+                                nodeType = 'main word (ROOT)';
+                                targetWord = nodeId.replace('ROOT_', '').toLowerCase();
+                                console.log('✅ Detected ROOT_ prefix');
+                            } else if (nodeId.includes('_main')) {
+                                nodeType = 'main word';
+                                targetWord = nodeId.replace('_main', '');
+                                console.log('✅ Detected _main suffix');
+                            } else if (nodeId.includes('_breadcrumb')) {
+                                nodeType = 'breadcrumb';
+                                targetWord = nodeId.replace('_breadcrumb', '');
+                                console.log('✅ Detected _breadcrumb suffix');
+                            } else if (nodeId.includes('_word')) {
+                                nodeType = 'related word';
+                                targetWord = nodeId.replace('_word', '');
+                                console.log('✅ Detected _word suffix');
+                            } else if (nodeId.includes('.')) {
+                                nodeType = 'synset';
+                                targetWord = nodeId.split('.')[0];
+                                console.log('✅ Detected synset format');
+                            } else {
+                                console.log('❌ No pattern matched - using nodeId as targetWord');
+                            }
+                            
+                            console.log('🎯 Final Detection Results:');
+                            console.log('  - Detected Node Type:', nodeType);
+                            console.log('  - Target Word for Navigation:', targetWord);
+                            console.groupEnd();
+                            
+                            // Send message to parent page to handle navigation
+                            const navigationData = {
+                                type: 'navigate',
+                                targetWord: targetWord,
+                                clickedNode: nodeId,
+                                timestamp: new Date().toISOString()
+                            };
+                            
+                            console.log('📤 Sending navigation message to parent:', navigationData);
+                            
+                            // Enhanced parent detection and messaging
+                            console.log('🔍 Parent Window Analysis:');
+                            console.log('  - window.parent exists:', !!window.parent);
+                            console.log('  - window.parent !== window:', window.parent !== window);
+                            console.log('  - window.top exists:', !!window.top);
+                            console.log('  - window.top !== window:', window.top !== window);
+                            
+                            // Try multiple approaches to send message to parent
+                            let messageSent = false;
+                            
+                            if (window.parent && window.parent !== window) {
+                                try {
+                                    window.parent.postMessage(navigationData, '*');
+                                    console.log('✅ Message sent to window.parent');
+                                    messageSent = true;
+                                } catch (e) {
+                                    console.log('❌ Failed to send to window.parent:', e);
+                                }
+                            }
+                            
+                            if (!messageSent && window.top && window.top !== window) {
+                                try {
+                                    window.top.postMessage(navigationData, '*');
+                                    console.log('✅ Message sent to window.top');
+                                    messageSent = true;
+                                } catch (e) {
+                                    console.log('❌ Failed to send to window.top:', e);
+                                }
+                            }
+                            
+                            if (!messageSent) {
+                                // Fallback for standalone HTML files
+                                console.log('🔄 Using fallback direct navigation');
+                                const url = new URL(window.location);
+                                url.searchParams.set('word', targetWord);
+                                url.searchParams.set('clicked_node', nodeId);
+                                url.searchParams.delete('navigate_to');
+                                console.log('🔗 Direct navigation (standalone):', url.toString());
+                                window.location.href = url.toString();
+                            }
+                        } else {
+                            console.log('🖱️ Double-click detected but no nodes selected');
+                        }
+                    });
+                    
+                    // Also log single clicks for additional debugging
+                    window.network.on("click", function (params) {
+                        if (params.nodes.length > 0) {
+                            const nodeId = params.nodes[0];
+                            const nodeData = window.network.body.data.nodes.get(nodeId);
+                            console.log('🖱️ Single-click on node:', nodeId, '| Label:', nodeData ? nodeData.label : 'Unknown');
+                        }
+                    });
+                    
+                    // Log when hovering over nodes
+                    window.network.on("hoverNode", function (params) {
+                        const nodeId = params.node;
+                        const nodeData = window.network.body.data.nodes.get(nodeId);
+                        console.log('🖱️ Hovering over node:', nodeId, '| Label:', nodeData ? nodeData.label : 'Unknown');
+                    });
+                    
+                    console.log('✅ Enhanced double-click navigation and logging enabled');
+                    console.log('💡 Double-click any node to see detailed logging information');
+                } else {
+                    console.log('⚠️ Network not found, retrying...');
+                    // Retry after a longer delay
+                    setTimeout(arguments.callee, 1000);
+                }
+            }, 500);
+        });
+        </script>
+        </body>
+</html>

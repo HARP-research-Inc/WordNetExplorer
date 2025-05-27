@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from pyvis.network import Network
 from typing import Dict, Optional
 from dataclasses import dataclass
+import time
 
 
 @dataclass
@@ -290,21 +291,28 @@ class GraphVisualizer:
     
     def _add_navigation_js(self, net: Network):
         """Add JavaScript for double-click navigation with enhanced console logging."""
-        navigation_js = """
+        timestamp = int(time.time())  # Cache-busting timestamp
+        
+        navigation_js = f"""
         <script type="text/javascript">
-        window.addEventListener('load', function() {
-            setTimeout(function() {
-                if (window.network) {
+        // Cache-busting timestamp: {timestamp}
+        console.log('🔧 Loading navigation JavaScript v{timestamp}');
+        
+        window.addEventListener('load', function() {{
+            setTimeout(function() {{
+                if (window.network) {{
+                    console.log('✅ Network found, setting up enhanced double-click navigation v{timestamp}');
+                    
                     // Enhanced console logging for double-click events
-                    window.network.on("doubleClick", function (params) {
-                        if (params.nodes.length > 0) {
+                    window.network.on("doubleClick", function (params) {{
+                        if (params.nodes.length > 0) {{
                             const nodeId = params.nodes[0];
                             
                             // Get node data from the network
                             const nodeData = window.network.body.data.nodes.get(nodeId);
                             
                             // Enhanced console logging with detailed information
-                            console.group('🖱️ Node Double-Click Event');
+                            console.group('🖱️ Node Double-Click Event v{timestamp}');
                             console.log('Node ID:', nodeId);
                             console.log('Node Label:', nodeData ? nodeData.label : 'Unknown');
                             console.log('Node Title:', nodeData ? nodeData.title : 'Unknown');
@@ -314,63 +322,128 @@ class GraphVisualizer:
                             console.log('Canvas Position:', params.pointer.canvas);
                             console.log('Timestamp:', new Date().toISOString());
                             
-                            // Log node type detection
+                            // Enhanced node type detection with detailed logging
                             let nodeType = 'unknown';
                             let targetWord = nodeId;
                             
-                            if (nodeId.includes('_main')) {
+                            console.log('🔍 Node ID Analysis v{timestamp}:');
+                            console.log('  - nodeId:', nodeId);
+                            console.log('  - nodeId.startsWith("ROOT_"):', nodeId.startsWith('ROOT_'));
+                            console.log('  - nodeId.includes("_main"):', nodeId.includes('_main'));
+                            console.log('  - nodeId.includes("_breadcrumb"):', nodeId.includes('_breadcrumb'));
+                            console.log('  - nodeId.includes("_word"):', nodeId.includes('_word'));
+                            console.log('  - nodeId.includes("."):', nodeId.includes('.'));
+                            
+                            if (nodeId.startsWith('ROOT_')) {{
+                                nodeType = 'main word (ROOT)';
+                                targetWord = nodeId.replace('ROOT_', '').toLowerCase();
+                                console.log('✅ Detected ROOT_ prefix v{timestamp}');
+                            }} else if (nodeId.includes('_main')) {{
                                 nodeType = 'main word';
                                 targetWord = nodeId.replace('_main', '');
-                            } else if (nodeId.includes('_breadcrumb')) {
+                                console.log('✅ Detected _main suffix v{timestamp}');
+                            }} else if (nodeId.includes('_breadcrumb')) {{
                                 nodeType = 'breadcrumb';
                                 targetWord = nodeId.replace('_breadcrumb', '');
-                            } else if (nodeId.includes('_word')) {
+                                console.log('✅ Detected _breadcrumb suffix v{timestamp}');
+                            }} else if (nodeId.includes('_word')) {{
                                 nodeType = 'related word';
                                 targetWord = nodeId.replace('_word', '');
-                            } else if (nodeId.includes('.')) {
+                                console.log('✅ Detected _word suffix v{timestamp}');
+                            }} else if (nodeId.includes('.')) {{
                                 nodeType = 'synset';
                                 targetWord = nodeId.split('.')[0];
-                            }
+                                console.log('✅ Detected synset format v{timestamp}');
+                            }} else {{
+                                console.log('❌ No pattern matched - using nodeId as targetWord v{timestamp}');
+                            }}
                             
-                            console.log('Detected Node Type:', nodeType);
-                            console.log('Target Word for Navigation:', targetWord);
+                            console.log('🎯 Final Detection Results v{timestamp}:');
+                            console.log('  - Detected Node Type:', nodeType);
+                            console.log('  - Target Word for Navigation:', targetWord);
                             console.groupEnd();
                             
-                            // Navigate by setting URL parameter
-                            const url = new URL(window.location);
-                            url.searchParams.set('navigate_to', targetWord);
-                            url.searchParams.set('clicked_node', nodeId);
-                            window.location.href = url.toString();
-                        } else {
-                            console.log('🖱️ Double-click detected but no nodes selected');
-                        }
-                    });
+                            // Send message to parent page to handle navigation
+                            const navigationData = {{
+                                type: 'navigate',
+                                targetWord: targetWord,
+                                clickedNode: nodeId,
+                                timestamp: new Date().toISOString(),
+                                jsVersion: '{timestamp}'
+                            }};
+                            
+                            console.log('📤 Sending navigation message to parent v{timestamp}:', navigationData);
+                            
+                            // Enhanced parent detection and messaging
+                            console.log('🔍 Parent Window Analysis v{timestamp}:');
+                            console.log('  - window.parent exists:', !!window.parent);
+                            console.log('  - window.parent !== window:', window.parent !== window);
+                            console.log('  - window.top exists:', !!window.top);
+                            console.log('  - window.top !== window:', window.top !== window);
+                            
+                            // Try multiple approaches to send message to parent
+                            let messageSent = false;
+                            
+                            if (window.parent && window.parent !== window) {{
+                                try {{
+                                    window.parent.postMessage(navigationData, '*');
+                                    console.log('✅ Message sent to window.parent v{timestamp}');
+                                    messageSent = true;
+                                }} catch (e) {{
+                                    console.log('❌ Failed to send to window.parent v{timestamp}:', e);
+                                }}
+                            }}
+                            
+                            if (!messageSent && window.top && window.top !== window) {{
+                                try {{
+                                    window.top.postMessage(navigationData, '*');
+                                    console.log('✅ Message sent to window.top v{timestamp}');
+                                    messageSent = true;
+                                }} catch (e) {{
+                                    console.log('❌ Failed to send to window.top v{timestamp}:', e);
+                                }}
+                            }}
+                            
+                            if (!messageSent) {{
+                                // Fallback for standalone HTML files
+                                console.log('🔄 Using fallback direct navigation v{timestamp}');
+                                const url = new URL(window.location);
+                                url.searchParams.set('word', targetWord);
+                                url.searchParams.set('clicked_node', nodeId);
+                                url.searchParams.delete('navigate_to');
+                                console.log('🔗 Direct navigation (standalone) v{timestamp}:', url.toString());
+                                window.location.href = url.toString();
+                            }}
+                        }} else {{
+                            console.log('🖱️ Double-click detected but no nodes selected v{timestamp}');
+                        }}
+                    }});
                     
                     // Also log single clicks for additional debugging
-                    window.network.on("click", function (params) {
-                        if (params.nodes.length > 0) {
+                    window.network.on("click", function (params) {{
+                        if (params.nodes.length > 0) {{
                             const nodeId = params.nodes[0];
                             const nodeData = window.network.body.data.nodes.get(nodeId);
-                            console.log('🖱️ Single-click on node:', nodeId, '| Label:', nodeData ? nodeData.label : 'Unknown');
-                        }
-                    });
+                            console.log('🖱️ Single-click on node v{timestamp}:', nodeId, '| Label:', nodeData ? nodeData.label : 'Unknown');
+                        }}
+                    }});
                     
                     // Log when hovering over nodes
-                    window.network.on("hoverNode", function (params) {
+                    window.network.on("hoverNode", function (params) {{
                         const nodeId = params.node;
                         const nodeData = window.network.body.data.nodes.get(nodeId);
-                        console.log('🖱️ Hovering over node:', nodeId, '| Label:', nodeData ? nodeData.label : 'Unknown');
-                    });
+                        console.log('🖱️ Hovering over node v{timestamp}:', nodeId, '| Label:', nodeData ? nodeData.label : 'Unknown');
+                    }});
                     
-                    console.log('✅ Enhanced double-click navigation and logging enabled');
-                    console.log('💡 Double-click any node to see detailed logging information');
-                } else {
-                    console.log('⚠️ Network not found, retrying...');
+                    console.log('✅ Enhanced double-click navigation and logging enabled v{timestamp}');
+                    console.log('💡 Double-click any node to see detailed logging information v{timestamp}');
+                }} else {{
+                    console.log('⚠️ Network not found, retrying... v{timestamp}');
                     // Retry after a longer delay
                     setTimeout(arguments.callee, 1000);
-                }
-            }, 500);
-        });
+                }}
+            }}, 500);
+        }});
         </script>
         """
         return navigation_js

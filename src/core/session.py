@@ -246,6 +246,7 @@ class SessionManager:
         
         # Handle word navigation
         navigate_to_word = query_params.get("word") or query_params.get("navigate_to")
+        clicked_node = query_params.get("clicked_node")
         
         if navigate_to_word:
             # Set session state without modifying widgets
@@ -254,7 +255,10 @@ class SessionManager:
             self.add_to_history(navigate_to_word)
             
             if self.is_debug_mode():
-                st.write(f"🔍 LOG: [URL_NAVIGATION] Navigated from URL to: {navigate_to_word}")
+                navigation_source = "double-click" if clicked_node else "URL"
+                st.write(f"🔍 LOG: [URL_NAVIGATION] Navigated from {navigation_source} to: {navigate_to_word}")
+                if clicked_node:
+                    st.write(f"🔍 LOG: [DOUBLE_CLICK] Clicked node: {clicked_node}")
     
     def log_debug_info(self):
         """Display debug information if debug mode is enabled."""

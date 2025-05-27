@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Navigation Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        button { margin: 5px; padding: 10px; }
+        .console-output { background: #f0f0f0; padding: 10px; margin: 10px 0; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Double-Click Navigation Test</h1>
+    
+    <div class="test-section">
+        <h2>Node Type Detection Test</h2>
+        <button onclick="testNodeDetection('ROOT_WETHER')">Test ROOT_WETHER</button>
+        <button onclick="testNodeDetection('ROOT_RAM')">Test ROOT_RAM</button>
+        <button onclick="testNodeDetection('dog_main')">Test dog_main</button>
+        <button onclick="testNodeDetection('canine.n.02')">Test canine.n.02</button>
+        <button onclick="testNodeDetection('random_node')">Test random_node</button>
+        <div id="detection-output" class="console-output"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>PostMessage Test</h2>
+        <button onclick="testPostMessage('ROOT_WETHER')">Send ROOT_WETHER Message</button>
+        <button onclick="testPostMessage('ROOT_RAM')">Send ROOT_RAM Message</button>
+        <div id="message-output" class="console-output"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Iframe Test</h2>
+        <iframe id="test-iframe" src="about:blank" width="100%" height="200" style="border: 1px solid #ccc;"></iframe>
+        <button onclick="setupIframeTest()">Setup Iframe Test</button>
+        <button onclick="sendFromIframe('ROOT_WETHER')">Send from Iframe</button>
+        <div id="iframe-output" class="console-output"></div>
+    </div>
+
+    <script>
+        // Enhanced node detection function (same as in visualizer.py)
+        function testNodeDetection(nodeId) {
+            let nodeType = 'unknown';
+            let targetWord = nodeId;
+            
+            console.log('🔍 Node ID Analysis:');
+            console.log('  - nodeId:', nodeId);
+            console.log('  - nodeId.startsWith("ROOT_"):', nodeId.startsWith('ROOT_'));
+            console.log('  - nodeId.includes("_main"):', nodeId.includes('_main'));
+            console.log('  - nodeId.includes("_breadcrumb"):', nodeId.includes('_breadcrumb'));
+            console.log('  - nodeId.includes("_word"):', nodeId.includes('_word'));
+            console.log('  - nodeId.includes("."):', nodeId.includes('.'));
+            
+            if (nodeId.startsWith('ROOT_')) {
+                nodeType = 'main word (ROOT)';
+                targetWord = nodeId.replace('ROOT_', '').toLowerCase();
+                console.log('✅ Detected ROOT_ prefix');
+            } else if (nodeId.includes('_main')) {
+                nodeType = 'main word';
+                targetWord = nodeId.replace('_main', '');
+                console.log('✅ Detected _main suffix');
+            } else if (nodeId.includes('_breadcrumb')) {
+                nodeType = 'breadcrumb';
+                targetWord = nodeId.replace('_breadcrumb', '');
+                console.log('✅ Detected _breadcrumb suffix');
+            } else if (nodeId.includes('_word')) {
+                nodeType = 'related word';
+                targetWord = nodeId.replace('_word', '');
+                console.log('✅ Detected _word suffix');
+            } else if (nodeId.includes('.')) {
+                nodeType = 'synset';
+                targetWord = nodeId.split('.')[0];
+                console.log('✅ Detected synset format');
+            } else {
+                console.log('❌ No pattern matched - using nodeId as targetWord');
+            }
+            
+            const result = `${nodeId} -> ${nodeType} -> ${targetWord}`;
+            console.log('🎯 Final Detection Results:', result);
+            
+            document.getElementById('detection-output').innerHTML += result + '<br>';
+            
+            return {nodeType, targetWord};
+        }
+        
+        // Test postMessage functionality
+        function testPostMessage(nodeId) {
+            const detection = testNodeDetection(nodeId);
+            
+            const navigationData = {
+                type: 'navigate',
+                targetWord: detection.targetWord,
+                clickedNode: nodeId,
+                timestamp: new Date().toISOString()
+            };
+            
+            console.log('📤 Sending navigation message:', navigationData);
+            
+            // Test different postMessage targets
+            try {
+                window.postMessage(navigationData, '*');
+                console.log('✅ Message sent to window');
+            } catch (e) {
+                console.log('❌ Failed to send to window:', e);
+            }
+            
+            if (window.parent && window.parent !== window) {
+                try {
+                    window.parent.postMessage(navigationData, '*');
+                    console.log('✅ Message sent to window.parent');
+                } catch (e) {
+                    console.log('❌ Failed to send to window.parent:', e);
+                }
+            }
+            
+            document.getElementById('message-output').innerHTML += 
+                `Sent: ${JSON.stringify(navigationData)}<br>`;
+        }
+        
+        // Setup iframe test
+        function setupIframeTest() {
+            const iframe = document.getElementById('test-iframe');
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+            
+            iframeDoc.open();
+            iframeDoc.write(`
+                <html>
+                <body>
+                    <h3>Iframe Content</h3>
+                    <button onclick="parent.sendFromIframe('ROOT_WETHER')">Send Message to Parent</button>
+                    <script>
+                        function sendToParent(nodeId) {
+                            const navigationData = {
+                                type: 'navigate',
+                                targetWord: nodeId.replace('ROOT_', '').toLowerCase(),
+                                clickedNode: nodeId,
+                                timestamp: new Date().toISOString()
+                            };
+                            
+                            console.log('📤 Iframe sending message:', navigationData);
+                            
+                            if (window.parent && window.parent !== window) {
+                                window.parent.postMessage(navigationData, '*');
+                                console.log('✅ Message sent from iframe to parent');
+                            }
+                        }
+                    </script>
+                </body>
+                </html>
+            `);
+            iframeDoc.close();
+            
+            document.getElementById('iframe-output').innerHTML = 'Iframe setup complete<br>';
+        }
+        
+        // Send message from iframe
+        function sendFromIframe(nodeId) {
+            const iframe = document.getElementById('test-iframe');
+            if (iframe.contentWindow && iframe.contentWindow.sendToParent) {
+                iframe.contentWindow.sendToParent(nodeId);
+            } else {
+                document.getElementById('iframe-output').innerHTML += 'Iframe not ready<br>';
+            }
+        }
+        
+        // Listen for messages
+        window.addEventListener('message', function(event) {
+            console.log('📨 Message received:', event);
+            
+            if (event.data && event.data.type === 'navigate') {
+                console.log('📨 Navigation message received:', event.data);
+                
+                const output = `Received: ${JSON.stringify(event.data)}<br>`;
+                document.getElementById('message-output').innerHTML += output;
+                document.getElementById('iframe-output').innerHTML += output;
+                
+                // Simulate URL update
+                const url = new URL(window.location);
+                url.searchParams.set('word', event.data.targetWord);
+                url.searchParams.set('clicked_node', event.data.clickedNode);
+                
+                console.log('🔗 Would navigate to:', url.toString());
+                document.getElementById('iframe-output').innerHTML += 
+                    `Would navigate to: ${url.toString()}<br>`;
+            }
+        });
+        
+        console.log('✅ Navigation test page loaded');
+        console.log('💡 Open browser console to see detailed logs');
+    </script>
+</body>
+</html> 

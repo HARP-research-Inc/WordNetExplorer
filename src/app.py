@@ -9,6 +9,7 @@ using Streamlit with a clean, modular architecture.
 import streamlit as st
 import sys
 import os
+import importlib
 
 # Add parent directory to path to allow imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
@@ -25,6 +26,12 @@ from src.ui.sidebar import render_sidebar
 from src.ui.word_info import render_word_information
 from src.ui.graph_display import render_graph_visualization
 from src.ui.welcome import render_welcome_screen
+
+# Force reload of modules to ensure we get the latest code
+if 'src.graph.visualizer' in sys.modules:
+    importlib.reload(sys.modules['src.graph.visualizer'])
+if 'src.ui.graph_display' in sys.modules:
+    importlib.reload(sys.modules['src.ui.graph_display'])
 
 
 def main():
