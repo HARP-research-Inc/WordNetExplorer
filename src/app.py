@@ -73,11 +73,42 @@ def render_footer():
         # If logo fails to load, just continue without it
         st.markdown('<div style="text-align: center; padding: 20px 0;"></div>', unsafe_allow_html=True)
     
-    # Copyright and link
+    # Get WordNet version information
+    try:
+        from nltk.corpus import wordnet as wn
+        import nltk
+        
+        # Try to get WordNet version info
+        try:
+            # Check if we can access WordNet info
+            wn.synsets('test')  # Test access
+            wordnet_version = "WordNet 3.0"  # Default assumption for NLTK
+            
+            # Try to get more specific version info if available
+            try:
+                # Some NLTK installations have version info
+                if hasattr(wn, '_LazyCorpusLoader__args'):
+                    wordnet_version = "WordNet 3.0 (NLTK)"
+                else:
+                    wordnet_version = "WordNet 3.0 (NLTK)"
+            except:
+                wordnet_version = "WordNet 3.0"
+                
+        except:
+            wordnet_version = "WordNet (version unavailable)"
+            
+        nltk_version = nltk.__version__
+        version_info = f"Powered by {wordnet_version} via NLTK {nltk_version}"
+        
+    except Exception:
+        version_info = "Powered by WordNet via NLTK"
+    
+    # Copyright, version info, and link
     st.markdown(
-        """
+        f"""
         <div style="text-align: center; padding: 10px 0; color: #666; font-size: 14px;">
-            <p>© 2025 HARP Research, Inc. | <a href="https://harpresearch.ai" target="_blank" style="color: #1f77b4; text-decoration: none;">https://harpresearch.ai</a></p>
+            <p style="margin: 5px 0;">{version_info}</p>
+            <p style="margin: 5px 0;">© 2025 HARP Research, Inc. | <a href="https://harpresearch.ai" target="_blank" style="color: #1f77b4; text-decoration: none;">https://harpresearch.ai</a></p>
         </div>
         """,
         unsafe_allow_html=True
