@@ -146,7 +146,7 @@ def render_exploration_tips():
     
     with tips_col1:
         st.markdown("""
-        <div style="color: #333;">
+        <div style="color: #FFFFFF;">
         <strong>🎯 Focus Your Search:</strong>
         <ul>
         <li>Use relationship filters to see specific connections</li>
@@ -159,7 +159,7 @@ def render_exploration_tips():
     
     with tips_col2:
         st.markdown("""
-        <div style="color: #333;">
+        <div style="color: #FFFFFF;">
         <strong>🔍 Analyze Relationships:</strong>
         <ul>
         <li>Hover over nodes for definitions</li>
@@ -172,7 +172,7 @@ def render_exploration_tips():
     
     with tips_col3:
         st.markdown("""
-        <div style="color: #333;">
+        <div style="color: #FFFFFF;">
         <strong>⚙️ Customize Display:</strong>
         <ul>
         <li>Adjust node sizes for readability</li>
