@@ -9,6 +9,10 @@ using Streamlit with a clean, modular architecture.
 import streamlit as st
 import sys
 import os
+import warnings
+
+# Suppress specific Streamlit warnings
+warnings.filterwarnings("ignore", message=".*was created with a default value but also had its value set via the Session State API.*")
 
 # Add parent directory to path to allow imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
