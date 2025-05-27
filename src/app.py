@@ -42,12 +42,12 @@ def add_main_window_navigation_listener():
     """Add JavaScript listener in the main window to handle navigation messages from iframes."""
     cache_buster = int(time.time())
     
-    # Simplified, more reliable navigation listener
+    # Enhanced, more robust navigation listener
     navigation_listener_script = f"""
     <script>
         (function() {{
             var timestamp = {cache_buster};
-            console.log('🔧 MainWindow: Installing navigation listener v' + timestamp + '...');
+            console.log('🔧 MainWindow: Installing enhanced navigation listener v' + timestamp + '...');
             
             // Prevent multiple installations
             if (window.mainWindowListenerInstalled) {{
@@ -58,6 +58,8 @@ def add_main_window_navigation_listener():
             function handleNavigationMessage(event) {{
                 console.log('📨 MainWindow: Received message v' + timestamp + ':', event.data);
                 console.log('📨 MainWindow: Message origin:', event.origin);
+                console.log('📨 MainWindow: Event source:', event.source);
+                console.log('📨 MainWindow: Current window:', window.location.href);
                 
                 // Filter out Streamlit internal messages
                 if (event.data && event.data.stCommVersion) {{
@@ -68,6 +70,7 @@ def add_main_window_navigation_listener():
                 // Handle navigation requests
                 if (event.data && event.data.type === 'streamlit-navigate') {{
                     console.log('🎯 MainWindow: Processing navigation to:', event.data.targetWord);
+                    console.log('🎯 MainWindow: Clicked node:', event.data.clickedNode);
                     
                     try {{
                         var url = new URL(window.location.href);
@@ -82,6 +85,7 @@ def add_main_window_navigation_listener():
                 }} else {{
                     console.log('🔍 MainWindow: Message type mismatch. Expected: streamlit-navigate, Got:', 
                                event.data ? event.data.type : 'undefined');
+                    console.log('🔍 MainWindow: Full event data:', event.data);
                 }}
             }}
             
@@ -89,7 +93,21 @@ def add_main_window_navigation_listener():
             window.addEventListener('message', handleNavigationMessage, false);
             window.mainWindowListenerInstalled = true;
             
-            console.log('✅ MainWindow: Navigation listener installed successfully v' + timestamp);
+            console.log('✅ MainWindow: Enhanced navigation listener installed successfully v' + timestamp);
+            console.log('🔍 MainWindow: Window context:', {{
+                'location': window.location.href,
+                'parent': window.parent === window ? 'is top window' : 'has parent',
+                'top': window.top === window ? 'is top window' : 'has top'
+            }});
+            
+            // Test the listener immediately
+            setTimeout(function() {{
+                console.log('🧪 MainWindow: Testing listener installation...');
+                window.postMessage({{
+                    type: 'test-message',
+                    test: true
+                }}, '*');
+            }}, 100);
         }})();
     </script>
     """
@@ -132,16 +150,110 @@ def main():
         if st.button("🐄 Navigate to 'bovine'"):
             st.markdown('<script>window.location.href = "?word=bovine&clicked_node=test_button";</script>', unsafe_allow_html=True)
     
+    # TEST: Add postMessage test
+    st.markdown("### 🧪 PostMessage Navigation Test")
+    test_col1, test_col2 = st.columns(2)
+    
+    with test_col1:
+        if st.button("📨 Test PostMessage to 'bovine'"):
+            test_script = """
+            <script>
+                console.log('🧪 TEST: Sending postMessage for bovine...');
+                window.postMessage({
+                    type: 'streamlit-navigate',
+                    targetWord: 'bovine',
+                    clickedNode: 'test_postmessage'
+                }, '*');
+            </script>
+            """
+            st.markdown(test_script, unsafe_allow_html=True)
+    
+    with test_col2:
+        if st.button("📨 Test PostMessage to 'canine'"):
+            test_script = """
+            <script>
+                console.log('🧪 TEST: Sending postMessage for canine...');
+                window.postMessage({
+                    type: 'streamlit-navigate',
+                    targetWord: 'canine',
+                    clickedNode: 'test_postmessage'
+                }, '*');
+            </script>
+            """
+            st.markdown(test_script, unsafe_allow_html=True)
+    
     st.markdown("---")
     
     # Handle URL navigation
     session_manager.handle_url_navigation()
     
+    # DEBUG: Show current URL parameters and session state
+    st.markdown("### 🔍 Debug Information")
+    debug_col1, debug_col2 = st.columns(2)
+    
+    with debug_col1:
+        st.markdown("**URL Parameters:**")
+        query_params = session_manager.get_query_params()
+        if query_params:
+            for key, value in query_params.items():
+                st.write(f"- `{key}`: {value}")
+        else:
+            st.write("No URL parameters")
+    
+    with debug_col2:
+        st.markdown("**Session State:**")
+        st.write(f"- Current Word: `{session_manager.get_current_word()}`")
+        st.write(f"- Word Input: `{session_manager.get_word_input()}`")
+        st.write(f"- Last Searched: `{st.session_state.get('last_searched_word')}`")
+    
+    # DEBUG: Show what handle_url_navigation detected
+    navigate_to_word = query_params.get("word") or query_params.get("navigate_to")
+    clicked_node = query_params.get("clicked_node")
+    if navigate_to_word:
+        st.info(f"🔍 URL Navigation detected: word='{navigate_to_word}', clicked_node='{clicked_node}'")
+    else:
+        st.info("🔍 No URL navigation parameters found")
+    
+    st.markdown("---")
+    
     # Add main window navigation listener for iframe messages
     add_main_window_navigation_listener()
     
+    # TEST: Verify navigation listener is working
+    st.markdown("### 🧪 Navigation Listener Test")
+    if st.button("🔧 Test Navigation Listener"):
+        test_listener_script = """
+        <script>
+            console.log('🧪 TEST: Testing navigation listener...');
+            
+            // Check if listener is installed
+            if (window.mainWindowListenerInstalled) {
+                console.log('✅ Navigation listener is installed');
+                
+                // Send a test message to ourselves
+                window.postMessage({
+                    type: 'streamlit-navigate',
+                    targetWord: 'test',
+                    clickedNode: 'test_listener'
+                }, '*');
+                
+                console.log('📤 Test message sent');
+            } else {
+                console.error('❌ Navigation listener is NOT installed');
+            }
+        </script>
+        """
+        st.markdown(test_listener_script, unsafe_allow_html=True)
+    
+    st.markdown("---")
+    
     # Render sidebar and get settings
     settings = render_sidebar(session_manager)
+    
+    # DEBUG: Show what sidebar returned
+    st.markdown("### 🔍 Sidebar Settings")
+    st.write(f"- Word from sidebar: `{settings.get('word')}`")
+    st.write(f"- Current display word: `{settings.get('word') or session_manager.get_current_word()}`")
     
     # Determine the current word to display
     current_display_word = settings.get('word') or session_manager.get_current_word()
