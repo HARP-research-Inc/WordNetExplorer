@@ -209,26 +209,20 @@ def render_graph_visualization(word, settings, explorer=None, synset_search_mode
     
     if synset_search_mode:
         with st.spinner(f"Building WordNet graph for synset '{word}'..."):
-            # Build synset-focused graph
+            # Build synset-focused graph - pass all relationship settings
             G, node_labels = explorer.explore_synset(
                 synset_name=word, 
                 depth=settings['depth'],
-                include_hypernyms=settings['show_hypernyms'],
-                include_hyponyms=settings['show_hyponyms'],
-                include_meronyms=settings['show_meronyms'],
-                include_holonyms=settings['show_holonyms']
+                **{k: v for k, v in settings.items() if k.startswith('show_')}
             )
     else:
         with st.spinner(f"Building WordNet graph for '{word}'..."):
-            # Build the graph using the new modular explorer
+            # Build the graph using the new modular explorer - pass all relationship settings
             G, node_labels = explorer.explore_word(
                 word=word, 
                 depth=settings['depth'],
                 sense_number=settings.get('parsed_sense_number'),
-                include_hypernyms=settings['show_hypernyms'],
-                include_hyponyms=settings['show_hyponyms'],
-                include_meronyms=settings['show_meronyms'],
-                include_holonyms=settings['show_holonyms']
+                **{k: v for k, v in settings.items() if k.startswith('show_')}
             )
     
     if G.number_of_nodes() > 0:

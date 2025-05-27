@@ -31,10 +31,7 @@ class WordNetExplorer:
     def explore_word(self, word: str, 
                     depth: int = 1,
                     sense_number: int = None,
-                    include_hypernyms: bool = True,
-                    include_hyponyms: bool = True,
-                    include_meronyms: bool = True,
-                    include_holonyms: bool = True) -> Tuple[nx.Graph, Dict]:
+                    **relationship_kwargs) -> Tuple[nx.Graph, Dict]:
         """
         Explore a word and build its relationship graph.
         
@@ -42,21 +39,13 @@ class WordNetExplorer:
             word: The word to explore
             depth: How many levels deep to explore relationships
             sense_number: Specific sense number to display (1-based, None for all)
-            include_hypernyms: Whether to include hypernym relationships
-            include_hyponyms: Whether to include hyponym relationships
-            include_meronyms: Whether to include meronym relationships
-            include_holonyms: Whether to include holonym relationships
+            **relationship_kwargs: All relationship type settings
             
         Returns:
             Tuple of (graph, node_labels)
         """
-        # Update configuration
-        relationship_config = RelationshipConfig(
-            include_hypernyms=include_hypernyms,
-            include_hyponyms=include_hyponyms,
-            include_meronyms=include_meronyms,
-            include_holonyms=include_holonyms
-        )
+        # Update configuration with all relationship settings
+        relationship_config = RelationshipConfig(**relationship_kwargs)
         
         graph_config = GraphConfig(
             depth=depth,
@@ -72,31 +61,20 @@ class WordNetExplorer:
     
     def explore_synset(self, synset_name: str, 
                       depth: int = 1,
-                      include_hypernyms: bool = True,
-                      include_hyponyms: bool = True,
-                      include_meronyms: bool = True,
-                      include_holonyms: bool = True) -> Tuple[nx.Graph, Dict]:
+                      **relationship_kwargs) -> Tuple[nx.Graph, Dict]:
         """
         Explore a synset and build its relationship graph, focusing on the synset node.
         
         Args:
             synset_name: The synset name to explore (e.g., 'dog.n.01')
             depth: How many levels deep to explore relationships
-            include_hypernyms: Whether to include hypernym relationships
-            include_hyponyms: Whether to include hyponym relationships
-            include_meronyms: Whether to include meronym relationships
-            include_holonyms: Whether to include holonym relationships
+            **relationship_kwargs: All relationship type settings
             
         Returns:
             Tuple of (graph, node_labels)
         """
-        # Update configuration
-        relationship_config = RelationshipConfig(
-            include_hypernyms=include_hypernyms,
-            include_hyponyms=include_hyponyms,
-            include_meronyms=include_meronyms,
-            include_holonyms=include_holonyms
-        )
+        # Update configuration with all relationship settings
+        relationship_config = RelationshipConfig(**relationship_kwargs)
         
         graph_config = GraphConfig(
             depth=depth,

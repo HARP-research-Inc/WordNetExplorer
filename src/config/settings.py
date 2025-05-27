@@ -5,10 +5,10 @@ Configuration settings for WordNet Explorer.
 # Default settings
 DEFAULT_SETTINGS = {
     'depth': 1,
-    'show_hypernyms': True,
-    'show_hyponyms': True,
-    'show_meronyms': True,
-    'show_holonyms': True,
+    'show_hypernyms': False,
+    'show_hyponyms': False,
+    'show_meronyms': False,
+    'show_holonyms': False,
     'layout_type': 'Force-directed (default)',
     'node_size_multiplier': 1.0,
     'color_scheme': 'Default',
@@ -17,10 +17,54 @@ DEFAULT_SETTINGS = {
     'central_gravity': 0.3,
     'show_labels': True,
     'edge_width': 2,
-    'show_info': True,
+    'show_info': False,
     'show_graph': True,
     'sense_number': None,  # Specific sense to display (None = all senses)
     'synset_search_mode': False,  # Whether to search by synset instead of word
+    
+    # Comprehensive WordNet relationship types
+    # Taxonomic Relations
+    'show_hypernym': False,
+    'show_hyponym': False,
+    'show_instance_hypernym': False,
+    'show_instance_hyponym': False,
+    
+    # Part-Whole Relations
+    'show_member_holonym': False,
+    'show_substance_holonym': False,
+    'show_part_holonym': False,
+    'show_member_meronym': False,
+    'show_substance_meronym': False,
+    'show_part_meronym': False,
+    
+    # Antonymy & Similarity
+    'show_antonym': False,
+    'show_similar_to': False,
+    
+    # Entailment & Causation
+    'show_entailment': False,
+    'show_cause': False,
+    
+    # Attributes & Cross-References
+    'show_attribute': False,
+    'show_also_see': False,
+    
+    # Verb-Specific Links
+    'show_verb_group': False,
+    'show_participle_of_verb': False,
+    
+    # Morphological / Derivational
+    'show_derivationally_related_form': False,
+    'show_pertainym': False,
+    'show_derived_from': False,
+    
+    # Domain Labels
+    'show_domain_of_synset_topic': False,
+    'show_member_of_domain_topic': False,
+    'show_domain_of_synset_region': False,
+    'show_member_of_domain_region': False,
+    'show_domain_of_synset_usage': False,
+    'show_member_of_domain_usage': False,
 }
 
 # Color schemes for graph visualization - updated for new structure

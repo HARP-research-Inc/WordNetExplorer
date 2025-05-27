@@ -202,14 +202,235 @@ def render_basic_settings(session_manager):
 
 
 def render_relationship_types(session_manager):
-    """Render relationship type checkboxes."""
-    with st.expander("🔗 Relationship Types", expanded=True):
-        show_hypernyms = st.checkbox("Include Hypernyms (↑)", value=get_url_default(session_manager, 'show_hypernyms', DEFAULT_SETTINGS['show_hypernyms']))
-        show_hyponyms = st.checkbox("Include Hyponyms (↓)", value=get_url_default(session_manager, 'show_hyponyms', DEFAULT_SETTINGS['show_hyponyms']))
-        show_meronyms = st.checkbox("Include Meronyms (⊂)", value=get_url_default(session_manager, 'show_meronyms', DEFAULT_SETTINGS['show_meronyms']))
-        show_holonyms = st.checkbox("Include Holonyms (⊃)", value=get_url_default(session_manager, 'show_holonyms', DEFAULT_SETTINGS['show_holonyms']))
+    """Render comprehensive WordNet relationship type checkboxes."""
     
-    return show_hypernyms, show_hyponyms, show_meronyms, show_holonyms
+    with st.expander("🔗 WordNet Edge Types", expanded=False):
+        st.markdown("**Select which semantic relationships to display as edges:**")
+        
+        # Taxonomic Relations
+        st.markdown("### 🏛️ Taxonomic ('is-a') Relations")
+        
+        # Handle "Select All Taxonomic" logic with session state
+        taxonomic_all_key = "taxonomic_all"
+        taxonomic_all = st.checkbox("Select All Taxonomic", key=taxonomic_all_key)
+        
+        # Force child checkboxes when master is toggled
+        if taxonomic_all and not st.session_state.get(f"{taxonomic_all_key}_prev", False):
+            # Master was just checked - set all children to True
+            st.session_state["show_hypernym_forced"] = True
+            st.session_state["show_hyponym_forced"] = True
+            st.session_state["show_instance_hypernym_forced"] = True
+            st.session_state["show_instance_hyponym_forced"] = True
+        elif not taxonomic_all and st.session_state.get(f"{taxonomic_all_key}_prev", False):
+            # Master was just unchecked - set all children to False
+            st.session_state["show_hypernym_forced"] = False
+            st.session_state["show_hyponym_forced"] = False
+            st.session_state["show_instance_hypernym_forced"] = False
+            st.session_state["show_instance_hyponym_forced"] = False
+        
+        st.session_state[f"{taxonomic_all_key}_prev"] = taxonomic_all
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            show_hypernym = st.checkbox("Hypernym (@)", 
+                value=st.session_state.get("show_hypernym_forced", get_url_default(session_manager, 'show_hypernym', DEFAULT_SETTINGS['show_hypernym'])),
+                help="'is a type of' - more general concept")
+            show_instance_hypernym = st.checkbox("Instance-Hypernym (@i)", 
+                value=st.session_state.get("show_instance_hypernym_forced", get_url_default(session_manager, 'show_instance_hypernym', DEFAULT_SETTINGS['show_instance_hypernym'])),
+                help="specific instance of a concept")
+        with col2:
+            show_hyponym = st.checkbox("Hyponym (~)", 
+                value=st.session_state.get("show_hyponym_forced", get_url_default(session_manager, 'show_hyponym', DEFAULT_SETTINGS['show_hyponym'])),
+                help="'type includes' - more specific concept")
+            show_instance_hyponym = st.checkbox("Instance-Hyponym (~i)", 
+                value=st.session_state.get("show_instance_hyponym_forced", get_url_default(session_manager, 'show_instance_hyponym', DEFAULT_SETTINGS['show_instance_hyponym'])),
+                help="has instances")
+        
+        st.markdown("---")
+        
+        # Part-Whole Relations
+        st.markdown("### 🧩 Part–Whole (Meronymy/Holonymy)")
+        
+        parthole_all_key = "parthole_all"
+        parthole_all = st.checkbox("Select All Part-Whole", key=parthole_all_key)
+        
+        # Force child checkboxes when master is toggled
+        if parthole_all and not st.session_state.get(f"{parthole_all_key}_prev", False):
+            st.session_state["show_member_holonym_forced"] = True
+            st.session_state["show_substance_holonym_forced"] = True
+            st.session_state["show_part_holonym_forced"] = True
+            st.session_state["show_member_meronym_forced"] = True
+            st.session_state["show_substance_meronym_forced"] = True
+            st.session_state["show_part_meronym_forced"] = True
+        elif not parthole_all and st.session_state.get(f"{parthole_all_key}_prev", False):
+            st.session_state["show_member_holonym_forced"] = False
+            st.session_state["show_substance_holonym_forced"] = False
+            st.session_state["show_part_holonym_forced"] = False
+            st.session_state["show_member_meronym_forced"] = False
+            st.session_state["show_substance_meronym_forced"] = False
+            st.session_state["show_part_meronym_forced"] = False
+        
+        st.session_state[f"{parthole_all_key}_prev"] = parthole_all
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("**Holonyms (contains):**")
+            show_member_holonym = st.checkbox("Member-Holonym (%m)", 
+                value=st.session_state.get("show_member_holonym_forced", get_url_default(session_manager, 'show_member_holonym', DEFAULT_SETTINGS['show_member_holonym'])),
+                help="has members")
+            show_substance_holonym = st.checkbox("Substance-Holonym (%s)", 
+                value=st.session_state.get("show_substance_holonym_forced", get_url_default(session_manager, 'show_substance_holonym', DEFAULT_SETTINGS['show_substance_holonym'])),
+                help="made of substance")
+            show_part_holonym = st.checkbox("Part-Holonym (%p)", 
+                value=st.session_state.get("show_part_holonym_forced", get_url_default(session_manager, 'show_part_holonym', DEFAULT_SETTINGS['show_part_holonym'])),
+                help="has parts")
+        with col2:
+            st.markdown("**Meronyms (part of):**")
+            show_member_meronym = st.checkbox("Member-Meronym (#m)", 
+                value=st.session_state.get("show_member_meronym_forced", get_url_default(session_manager, 'show_member_meronym', DEFAULT_SETTINGS['show_member_meronym'])),
+                help="member of")
+            show_substance_meronym = st.checkbox("Substance-Meronym (#s)", 
+                value=st.session_state.get("show_substance_meronym_forced", get_url_default(session_manager, 'show_substance_meronym', DEFAULT_SETTINGS['show_substance_meronym'])),
+                help="substance of")
+            show_part_meronym = st.checkbox("Part-Meronym (#p)", 
+                value=st.session_state.get("show_part_meronym_forced", get_url_default(session_manager, 'show_part_meronym', DEFAULT_SETTINGS['show_part_meronym'])),
+                help="part of")
+        
+        st.markdown("---")
+        
+        # Antonymy & Similarity
+        st.markdown("### 🔄 Antonymy & Similarity")
+        antisim_all = st.checkbox("Select All Antonymy & Similarity", key="antisim_all")
+        
+        show_antonym = st.checkbox("Antonym (!)", 
+            value=antisim_all or get_url_default(session_manager, 'show_antonym', DEFAULT_SETTINGS['show_antonym']),
+            help="opposite meaning")
+        show_similar_to = st.checkbox("Similar-To (&)", 
+            value=antisim_all or get_url_default(session_manager, 'show_similar_to', DEFAULT_SETTINGS['show_similar_to']),
+            help="similar meaning")
+        
+        st.markdown("---")
+        
+        # Entailment & Causation
+        st.markdown("### ⚡ Entailment & Causation")
+        entail_all = st.checkbox("Select All Entailment & Causation", key="entail_all")
+        
+        show_entailment = st.checkbox("Entailment (*)", 
+            value=entail_all or get_url_default(session_manager, 'show_entailment', DEFAULT_SETTINGS['show_entailment']),
+            help="logically entails")
+        show_cause = st.checkbox("Cause (>)", 
+            value=entail_all or get_url_default(session_manager, 'show_cause', DEFAULT_SETTINGS['show_cause']),
+            help="causes")
+        
+        st.markdown("---")
+        
+        # Attributes & Cross-References
+        st.markdown("### 🔗 Attributes & Cross-References")
+        attr_all = st.checkbox("Select All Attributes & Cross-References", key="attr_all")
+        
+        show_attribute = st.checkbox("Attribute (=)", 
+            value=attr_all or get_url_default(session_manager, 'show_attribute', DEFAULT_SETTINGS['show_attribute']),
+            help="attribute relationship")
+        show_also_see = st.checkbox("Also-See (^)", 
+            value=attr_all or get_url_default(session_manager, 'show_also_see', DEFAULT_SETTINGS['show_also_see']),
+            help="see also")
+        
+        st.markdown("---")
+        
+        # Verb-Specific Links
+        st.markdown("### 🎯 Verb-Specific Links")
+        verb_all = st.checkbox("Select All Verb-Specific", key="verb_all")
+        
+        show_verb_group = st.checkbox("Verb-Group ($)", 
+            value=verb_all or get_url_default(session_manager, 'show_verb_group', DEFAULT_SETTINGS['show_verb_group']),
+            help="verb group")
+        show_participle_of_verb = st.checkbox("Participle-Of-Verb (<)", 
+            value=verb_all or get_url_default(session_manager, 'show_participle_of_verb', DEFAULT_SETTINGS['show_participle_of_verb']),
+            help="participle form")
+        
+        st.markdown("---")
+        
+        # Morphological / Derivational
+        st.markdown("### 📝 Morphological / Derivational")
+        morph_all = st.checkbox("Select All Morphological", key="morph_all")
+        
+        show_derivationally_related_form = st.checkbox("Derivationally-Related-Form (+)", 
+            value=morph_all or get_url_default(session_manager, 'show_derivationally_related_form', DEFAULT_SETTINGS['show_derivationally_related_form']),
+            help="derivationally related")
+        show_pertainym = st.checkbox("Pertainym (\\)", 
+            value=morph_all or get_url_default(session_manager, 'show_pertainym', DEFAULT_SETTINGS['show_pertainym']),
+            help="pertains to")
+        show_derived_from = st.checkbox("Derived-From (\\)", 
+            value=morph_all or get_url_default(session_manager, 'show_derived_from', DEFAULT_SETTINGS['show_derived_from']),
+            help="derived from (adverbs)")
+        
+        st.markdown("---")
+        
+        # Domain Labels
+        st.markdown("### 🏷️ Domain Labels")
+        domain_all = st.checkbox("Select All Domain Labels", key="domain_all")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("**Domain of Synset:**")
+            show_domain_of_synset_topic = st.checkbox("Topic (;c)", 
+                value=domain_all or get_url_default(session_manager, 'show_domain_of_synset_topic', DEFAULT_SETTINGS['show_domain_of_synset_topic']),
+                help="topic domain")
+            show_domain_of_synset_region = st.checkbox("Region (;r)", 
+                value=domain_all or get_url_default(session_manager, 'show_domain_of_synset_region', DEFAULT_SETTINGS['show_domain_of_synset_region']),
+                help="regional domain")
+            show_domain_of_synset_usage = st.checkbox("Usage (;u)", 
+                value=domain_all or get_url_default(session_manager, 'show_domain_of_synset_usage', DEFAULT_SETTINGS['show_domain_of_synset_usage']),
+                help="usage domain")
+        with col2:
+            st.markdown("**Member of Domain:**")
+            show_member_of_domain_topic = st.checkbox("Topic (–c)", 
+                value=domain_all or get_url_default(session_manager, 'show_member_of_domain_topic', DEFAULT_SETTINGS['show_member_of_domain_topic']),
+                help="member of topic")
+            show_member_of_domain_region = st.checkbox("Region (–r)", 
+                value=domain_all or get_url_default(session_manager, 'show_member_of_domain_region', DEFAULT_SETTINGS['show_member_of_domain_region']),
+                help="member of region")
+            show_member_of_domain_usage = st.checkbox("Usage (–u)", 
+                value=domain_all or get_url_default(session_manager, 'show_member_of_domain_usage', DEFAULT_SETTINGS['show_member_of_domain_usage']),
+                help="member of usage")
+    
+    # Return all the relationship settings
+    return {
+        # Legacy compatibility
+        'show_hypernyms': show_hypernym,
+        'show_hyponyms': show_hyponym,
+        'show_meronyms': show_member_meronym or show_substance_meronym or show_part_meronym,
+        'show_holonyms': show_member_holonym or show_substance_holonym or show_part_holonym,
+        
+        # New comprehensive settings
+        'show_hypernym': show_hypernym,
+        'show_hyponym': show_hyponym,
+        'show_instance_hypernym': show_instance_hypernym,
+        'show_instance_hyponym': show_instance_hyponym,
+        'show_member_holonym': show_member_holonym,
+        'show_substance_holonym': show_substance_holonym,
+        'show_part_holonym': show_part_holonym,
+        'show_member_meronym': show_member_meronym,
+        'show_substance_meronym': show_substance_meronym,
+        'show_part_meronym': show_part_meronym,
+        'show_antonym': show_antonym,
+        'show_similar_to': show_similar_to,
+        'show_entailment': show_entailment,
+        'show_cause': show_cause,
+        'show_attribute': show_attribute,
+        'show_also_see': show_also_see,
+        'show_verb_group': show_verb_group,
+        'show_participle_of_verb': show_participle_of_verb,
+        'show_derivationally_related_form': show_derivationally_related_form,
+        'show_pertainym': show_pertainym,
+        'show_derived_from': show_derived_from,
+        'show_domain_of_synset_topic': show_domain_of_synset_topic,
+        'show_member_of_domain_topic': show_member_of_domain_topic,
+        'show_domain_of_synset_region': show_domain_of_synset_region,
+        'show_member_of_domain_region': show_member_of_domain_region,
+        'show_domain_of_synset_usage': show_domain_of_synset_usage,
+        'show_member_of_domain_usage': show_member_of_domain_usage,
+    }
 
 
 def render_graph_appearance(session_manager):
@@ -392,7 +613,7 @@ def render_sidebar(session_manager):
         depth = render_basic_settings(session_manager)
         
         # Relationship types
-        show_hypernyms, show_hyponyms, show_meronyms, show_holonyms = render_relationship_types(session_manager)
+        relationship_settings = render_relationship_types(session_manager)
         
         # Graph appearance
         layout_type, node_size_multiplier, color_scheme = render_graph_appearance(session_manager)
@@ -416,10 +637,6 @@ def render_sidebar(session_manager):
         settings = {
             'word': word,
             'depth': depth,
-            'show_hypernyms': show_hypernyms,
-            'show_hyponyms': show_hyponyms,
-            'show_meronyms': show_meronyms,
-            'show_holonyms': show_holonyms,
             'layout_type': layout_type,
             'node_size_multiplier': node_size_multiplier,
             'color_scheme': color_scheme,
@@ -435,6 +652,9 @@ def render_sidebar(session_manager):
             'parsed_sense_number': parsed_sense_number,
             'synset_search_mode': synset_search_mode
         }
+        
+        # Add all relationship settings
+        settings.update(relationship_settings)
         
         # Update URL with current settings only when Apply is clicked or word changed (Enter pressed)
         should_update_url = apply_clicked or word_changed
