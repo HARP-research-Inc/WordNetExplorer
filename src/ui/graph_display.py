@@ -6,7 +6,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import os
 import shutil
-from src.config.settings import COLOR_SCHEMES
+from src.config.settings import COLOR_SCHEMES, POS_COLORS
 from src.utils.helpers import ensure_downloads_directory, validate_filename
 def render_color_legend(color_scheme, synset_search_mode=False):
     """
@@ -17,6 +17,7 @@ def render_color_legend(color_scheme, synset_search_mode=False):
         synset_search_mode (bool): Whether we're in synset search mode
     """
     colors = COLOR_SCHEMES.get(color_scheme, COLOR_SCHEMES["Default"])
+    pos_colors = POS_COLORS.get(color_scheme, POS_COLORS["Default"])
     
     if synset_search_mode:
         # Legend for synset-focused mode
@@ -26,9 +27,26 @@ def render_color_legend(color_scheme, synset_search_mode=False):
                 <div style="width: 20px; height: 20px; background-color: {colors.get('word_sense', '#FFB347')}; clip-path: polygon(50% 0%, 0% 100%, 100% 100%); margin-right: 10px;"></div>
                 <strong>Word Senses</strong> - Individual word meanings in the synset
             </div>
-            <div class="legend-item">
-                <div style="width: 20px; height: 20px; background-color: {colors['synset']}; margin-right: 10px;"></div>
-                <strong>Synsets</strong> - Semantic groups of synonymous words (focus and related)
+            <div style="margin-bottom: 10px;">
+                <strong>Synsets by Part of Speech:</strong>
+                <div style="margin-left: 10px; margin-top: 5px;">
+                    <div class="legend-item">
+                        <div style="width: 20px; height: 20px; background-color: {pos_colors['n']}; margin-right: 10px;"></div>
+                        <strong>Nouns</strong> - Things, people, places
+                    </div>
+                    <div class="legend-item">
+                        <div style="width: 20px; height: 20px; background-color: {pos_colors['v']}; margin-right: 10px;"></div>
+                        <strong>Verbs</strong> - Actions, states
+                    </div>
+                    <div class="legend-item">
+                        <div style="width: 20px; height: 20px; background-color: {pos_colors['a']}; margin-right: 10px;"></div>
+                        <strong>Adjectives</strong> - Descriptive words
+                    </div>
+                    <div class="legend-item">
+                        <div style="width: 20px; height: 20px; background-color: {pos_colors['r']}; margin-right: 10px;"></div>
+                        <strong>Adverbs</strong> - Modifying words
+                    </div>
+                </div>
             </div>
             <div class="legend-item">
                 <div style="width: 20px; height: 20px; background-color: {colors['main']}; border-radius: 50%; margin-right: 10px;"></div>
@@ -48,9 +66,26 @@ def render_color_legend(color_scheme, synset_search_mode=False):
                 <div style="width: 20px; height: 20px; background-color: {colors.get('word_sense', '#FFB347')}; clip-path: polygon(50% 0%, 0% 100%, 100% 100%); margin-right: 10px;"></div>
                 <strong>Word Senses</strong> - Different meanings of your word
             </div>
-            <div class="legend-item">
-                <div style="width: 20px; height: 20px; background-color: {colors['synset']}; margin-right: 10px;"></div>
-                <strong>Synsets</strong> - Semantic groups containing related words
+            <div style="margin-bottom: 10px;">
+                <strong>Synsets by Part of Speech:</strong>
+                <div style="margin-left: 10px; margin-top: 5px;">
+                    <div class="legend-item">
+                        <div style="width: 20px; height: 20px; background-color: {pos_colors['n']}; margin-right: 10px;"></div>
+                        <strong>Nouns</strong> - Things, people, places
+                    </div>
+                    <div class="legend-item">
+                        <div style="width: 20px; height: 20px; background-color: {pos_colors['v']}; margin-right: 10px;"></div>
+                        <strong>Verbs</strong> - Actions, states
+                    </div>
+                    <div class="legend-item">
+                        <div style="width: 20px; height: 20px; background-color: {pos_colors['a']}; margin-right: 10px;"></div>
+                        <strong>Adjectives</strong> - Descriptive words
+                    </div>
+                    <div class="legend-item">
+                        <div style="width: 20px; height: 20px; background-color: {pos_colors['r']}; margin-right: 10px;"></div>
+                        <strong>Adverbs</strong> - Modifying words
+                    </div>
+                </div>
             </div>
             <div class="legend-item">
                 <div style="width: 20px; height: 20px; background-color: {colors['word']}; border-radius: 50%; margin-right: 10px;"></div>

@@ -33,16 +33,48 @@ class GraphVisualizer:
         self.config = config or VisualizationConfig()
         self.color_schemes = {
             "Default": {
-                "main": "#FF6B6B", "word_sense": "#FFB347", "synset": "#DDA0DD"
+                "main": "#FF6B6B", "word_sense": "#FFB347"
             },
             "Pastel": {
-                "main": "#FFB3BA", "word_sense": "#FFC985", "synset": "#BFBFFF"
+                "main": "#FFB3BA", "word_sense": "#FFC985"
             },
             "Vibrant": {
-                "main": "#FF0000", "word_sense": "#FF8C00", "synset": "#9932CC"
+                "main": "#FF0000", "word_sense": "#FF8C00"
             },
             "Monochrome": {
-                "main": "#2C2C2C", "word_sense": "#777777", "synset": "#5A5A5A"
+                "main": "#2C2C2C", "word_sense": "#777777"
+            }
+        }
+        
+        # POS-based colors for synsets
+        self.pos_colors = {
+            "Default": {
+                "n": "#FFB6C1",  # Light pink for nouns
+                "v": "#87CEEB",  # Sky blue for verbs
+                "a": "#98FB98",  # Pale green for adjectives
+                "s": "#98FB98",  # Pale green for adjective satellites (same as adjectives)
+                "r": "#DDA0DD"   # Plum purple for adverbs
+            },
+            "Pastel": {
+                "n": "#FFD1DC",  # Pastel pink for nouns
+                "v": "#B0E0E6",  # Powder blue for verbs
+                "a": "#F0FFF0",  # Honeydew for adjectives
+                "s": "#F0FFF0",  # Honeydew for adjective satellites
+                "r": "#E6E6FA"   # Lavender for adverbs
+            },
+            "Vibrant": {
+                "n": "#FF1493",  # Deep pink for nouns
+                "v": "#0000FF",  # Blue for verbs
+                "a": "#00FF00",  # Lime green for adjectives
+                "s": "#00FF00",  # Lime green for adjective satellites
+                "r": "#8A2BE2"   # Blue violet for adverbs
+            },
+            "Monochrome": {
+                "n": "#696969",  # Dim gray for nouns
+                "v": "#808080",  # Gray for verbs
+                "a": "#A9A9A9",  # Dark gray for adjectives
+                "s": "#A9A9A9",  # Dark gray for adjective satellites
+                "r": "#C0C0C0"   # Silver for adverbs
             }
         }
     
@@ -146,19 +178,29 @@ class GraphVisualizer:
         # Draw nodes by type
         colors = self.color_schemes.get(self.config.color_scheme, 
                                        self.color_schemes["Default"])
+        pos_colors = self.pos_colors.get(self.config.color_scheme, self.pos_colors["Default"])
         
         main_nodes = [n for n, d in G.nodes(data=True) if d.get('node_type') == 'main']
-        synset_nodes = [n for n, d in G.nodes(data=True) if d.get('node_type') == 'synset']
         
         if main_nodes:
             nx.draw_networkx_nodes(G, pos, nodelist=main_nodes, 
                                  node_color=colors["main"], 
                                  node_size=800, alpha=0.8)
         
-        if synset_nodes:
-            nx.draw_networkx_nodes(G, pos, nodelist=synset_nodes, 
-                                 node_color=colors["synset"], 
-                                 node_size=600, alpha=0.8)
+        # Draw synset nodes by POS
+        synset_nodes_by_pos = {}
+        for n, d in G.nodes(data=True):
+            if d.get('node_type') == 'synset':
+                pos = d.get('pos', 'n')
+                if pos not in synset_nodes_by_pos:
+                    synset_nodes_by_pos[pos] = []
+                synset_nodes_by_pos[pos].append(n)
+        
+        for pos, nodes in synset_nodes_by_pos.items():
+            color = pos_colors.get(pos, pos_colors.get('n', '#FFB6C1'))
+            nx.draw_networkx_nodes(G, pos, nodelist=nodes, 
+                                 node_color=color, 
+                                 node_size=600, alpha=0.8, node_shape='s')
         
         # Draw edges with colors
         self._draw_colored_edges(G, pos)
@@ -240,11 +282,15 @@ class GraphVisualizer:
                 title = f"Word sense: {word} (sense {sense_num})\nSynset: {synset_name}\nDefinition: {definition}"
                 node_style = {'shape': 'diamond'}
             elif node_type == 'synset':
-                color = colors["synset"]
+                # Get POS for color selection
+                pos = node_data.get('pos', 'n')  # Default to noun if POS not found
+                pos_colors = self.pos_colors.get(self.config.color_scheme, self.pos_colors["Default"])
+                color = pos_colors.get(pos, pos_colors.get('n', '#FFB6C1'))  # Default to noun color
                 size = int(25 * self.config.node_size_multiplier)
                 synset_name = node_data.get('synset_name', node)
                 definition = node_data.get('definition', 'No definition')
-                title = f"Synset: {node_labels.get(node, node)}\nSynset: {synset_name}\nDefinition: {definition}"
+                pos_label = node_data.get('pos_label', 'noun')
+                title = f"Synset: {node_labels.get(node, node)}\nPOS: {pos_label}\nSynset: {synset_name}\nDefinition: {definition}"
                 node_style = {'shape': 'square'}
             else:
                 color = colors.get("synset", "#CCCCCC")
