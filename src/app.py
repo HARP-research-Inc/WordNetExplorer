@@ -11,8 +11,10 @@ import sys
 import os
 import warnings
 
-# Suppress specific Streamlit warnings
+# Suppress specific Streamlit warnings more comprehensively
 warnings.filterwarnings("ignore", message=".*was created with a default value but also had its value set via the Session State API.*")
+warnings.filterwarnings("ignore", message=".*widget.*default value.*Session State API.*")
+warnings.filterwarnings("ignore", category=UserWarning, module="streamlit")
 
 # Add parent directory to path to allow imports
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
