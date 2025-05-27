@@ -25,24 +25,28 @@ DEFAULT_SETTINGS = {
 # Color schemes for graph visualization - updated for new structure
 COLOR_SCHEMES = {
     "Default": {
-        "main": "#FF6B6B",     # Red for main word
-        "synset": "#DDA0DD",   # Purple for word senses
-        "word": "#4ECDC4"      # Teal for related words
+        "main": "#FF6B6B",        # Red for main word
+        "word_sense": "#FFB347",  # Orange for word senses (individual meanings)
+        "synset": "#DDA0DD",      # Purple for synsets (semantic groups)
+        "word": "#4ECDC4"         # Teal for related words
     },
     "Pastel": {
-        "main": "#FFB3BA",     # Light red for main word
-        "synset": "#BFBFFF",   # Light purple for word senses
-        "word": "#BAFFCA"      # Light teal for related words
+        "main": "#FFB3BA",        # Light red for main word
+        "word_sense": "#FFC985",  # Light orange for word senses
+        "synset": "#BFBFFF",      # Light purple for synsets
+        "word": "#BAFFCA"         # Light teal for related words
     },
     "Vibrant": {
-        "main": "#FF0000",     # Bright red for main word
-        "synset": "#9932CC",   # Bright purple for word senses
-        "word": "#00CED1"      # Bright teal for related words
+        "main": "#FF0000",        # Bright red for main word
+        "word_sense": "#FF8C00",  # Bright orange for word senses
+        "synset": "#9932CC",      # Bright purple for synsets
+        "word": "#00CED1"         # Bright teal for related words
     },
     "Monochrome": {
-        "main": "#2C2C2C",     # Dark grey for main word
-        "synset": "#5A5A5A",   # Medium grey for word senses
-        "word": "#777777"      # Light grey for related words
+        "main": "#2C2C2C",        # Dark grey for main word
+        "word_sense": "#777777",  # Medium grey for word senses
+        "synset": "#5A5A5A",      # Medium grey for synsets
+        "word": "#777777"         # Light grey for related words
     }
 }
 

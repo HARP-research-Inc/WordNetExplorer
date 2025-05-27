@@ -24,7 +24,7 @@ def render_color_legend(color_scheme):
             <strong>Main Word</strong> - Your input word
         </div>
         <div class="legend-item">
-            <div style="width: 20px; height: 20px; background-color: {colors['synset']}; border-radius: 50%; margin-right: 10px;"></div>
+            <div style="width: 20px; height: 20px; background-color: {colors['synset']}; margin-right: 10px;"></div>
             <strong>Word Senses</strong> - Different meanings/synsets of the word
         </div>
         <div class="legend-item">

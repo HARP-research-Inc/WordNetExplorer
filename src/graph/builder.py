@@ -61,12 +61,12 @@ class GraphBuilder:
         
         # Build graph for each synset
         for synset in synsets:
-            self._add_synset_connections(G, node_labels, synset, 0)
+            self._add_synset_connections(G, node_labels, synset, 0, word)
         
         return G, node_labels
     
     def _add_synset_connections(self, G: nx.Graph, node_labels: Dict, 
-                               synset, current_depth: int):
+                               synset, current_depth: int, focus_word: str = None):
         """Add connections for a synset and its relationships."""
         if current_depth > self.config.depth or synset in self.visited_synsets:
             return
@@ -84,20 +84,41 @@ class GraphBuilder:
         
         node_labels[synset_node] = create_synset_label(synset)
         
-        # Create and connect root word node
-        root_word = synset_info['lemma_names'][0].replace('_', ' ')
-        root_node = create_node_id(NodeType.MAIN, root_word)
-        
-        if root_node not in G.nodes():
-            G.add_node(root_node, **create_node_attributes(
-                NodeType.MAIN,
-                word=root_word.lower()
-            ))
-            node_labels[root_node] = root_word.upper()
-        
-        # Connect synset to root word
-        sense_props = get_relationship_properties(RelationshipType.SENSE)
-        G.add_edge(root_node, synset_node, **sense_props)
+        # For the first level (current_depth == 0), this is a sense of the focus word
+        if current_depth == 0 and focus_word:
+            # Create word sense node for this meaning of the focus word
+            word_sense_node = create_node_id(NodeType.WORD_SENSE, f"{focus_word}_{synset_info['sense_number']}")
+            
+            # Create word sense attributes
+            sense_attrs = create_node_attributes(
+                NodeType.WORD_SENSE,
+                word=focus_word,
+                synset_name=synset.name(),
+                definition=synset_info['definition'],
+                pos=synset_info['pos'],
+                pos_label=synset_info['pos_label'],
+                sense_number=synset_info['sense_number']
+            )
+            G.add_node(word_sense_node, **sense_attrs)
+            
+            # Create label for word sense
+            from .nodes import create_node_label
+            node_labels[word_sense_node] = create_node_label(NodeType.WORD_SENSE, sense_attrs)
+            
+            # Create and connect root word node
+            root_node = create_node_id(NodeType.MAIN, focus_word)
+            
+            if root_node not in G.nodes():
+                G.add_node(root_node, **create_node_attributes(
+                    NodeType.MAIN,
+                    word=focus_word.lower()
+                ))
+                node_labels[root_node] = focus_word.upper()
+            
+            # Connect: root word -> word sense -> synset
+            sense_props = get_relationship_properties(RelationshipType.SENSE)
+            G.add_edge(root_node, word_sense_node, **sense_props)
+            G.add_edge(word_sense_node, synset_node, **sense_props)
         
         # Add relationship connections
         relationships = get_relationships(synset, self.config.relationship_config)

@@ -33,16 +33,16 @@ class GraphVisualizer:
         self.config = config or VisualizationConfig()
         self.color_schemes = {
             "Default": {
-                "main": "#FF6B6B", "synset": "#DDA0DD"
+                "main": "#FF6B6B", "word_sense": "#FFB347", "synset": "#DDA0DD"
             },
             "Pastel": {
-                "main": "#FFB3BA", "synset": "#BFBFFF"
+                "main": "#FFB3BA", "word_sense": "#FFC985", "synset": "#BFBFFF"
             },
             "Vibrant": {
-                "main": "#FF0000", "synset": "#9932CC"
+                "main": "#FF0000", "word_sense": "#FF8C00", "synset": "#9932CC"
             },
             "Monochrome": {
-                "main": "#2C2C2C", "synset": "#5A5A5A"
+                "main": "#2C2C2C", "word_sense": "#777777", "synset": "#5A5A5A"
             }
         }
     
@@ -230,13 +230,22 @@ class GraphVisualizer:
                 size = int(30 * self.config.node_size_multiplier)
                 title = f"Main word: {node_data.get('word', '').upper()}"
                 node_style = {}
+            elif node_type == 'word_sense':
+                color = colors.get("word_sense", "#FFB347")  # Orange for word senses
+                size = int(25 * self.config.node_size_multiplier)
+                synset_name = node_data.get('synset_name', node)
+                definition = node_data.get('definition', 'No definition')
+                word = node_data.get('word', '')
+                sense_num = node_data.get('sense_number', '')
+                title = f"Word sense: {word} (sense {sense_num})\\nSynset: {synset_name}\\nDefinition: {definition}"
+                node_style = {'shape': 'diamond'}
             elif node_type == 'synset':
                 color = colors["synset"]
                 size = int(25 * self.config.node_size_multiplier)
                 synset_name = node_data.get('synset_name', node)
                 definition = node_data.get('definition', 'No definition')
-                title = f"Word sense: {node_labels.get(node, node)}\\nSynset: {synset_name}\\nDefinition: {definition}"
-                node_style = {}
+                title = f"Synset: {node_labels.get(node, node)}\\nSynset: {synset_name}\\nDefinition: {definition}"
+                node_style = {'shape': 'square'}
             else:
                 color = colors.get("synset", "#CCCCCC")
                 size = int(20 * self.config.node_size_multiplier)

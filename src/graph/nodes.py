@@ -11,7 +11,8 @@ from typing import Dict, Any
 class NodeType(Enum):
     """Enumeration of graph node types."""
     MAIN = "main"           # Root word nodes
-    SYNSET = "synset"       # Synset nodes
+    WORD_SENSE = "word_sense"  # Word sense nodes (individual meanings of focus word)
+    SYNSET = "synset"       # Synset nodes (semantic groups of synonyms)
     RELATIONSHIP = "relationship"  # Relationship nodes (if used)
 
 
@@ -19,6 +20,8 @@ def create_node_id(node_type: NodeType, identifier: str) -> str:
     """Create a standardized node ID."""
     if node_type == NodeType.MAIN:
         return f"ROOT_{identifier.upper()}"
+    elif node_type == NodeType.WORD_SENSE:
+        return f"SENSE_{identifier}"
     elif node_type == NodeType.SYNSET:
         return identifier  # Synset names are already unique
     else:
@@ -29,6 +32,11 @@ def create_node_label(node_type: NodeType, data: Dict[str, Any]) -> str:
     """Create a display label for a node based on its type and data."""
     if node_type == NodeType.MAIN:
         return data.get('word', '').upper()
+    elif node_type == NodeType.WORD_SENSE:
+        word = data.get('word', '')
+        sense_num = data.get('sense_number', '')
+        pos_label = data.get('pos_label', '')
+        return f"{word} ({pos_label}.{sense_num})"
     elif node_type == NodeType.SYNSET:
         lemma = data.get('lemma_names', [''])[0].replace('_', ' ')
         pos_label = data.get('pos_label', '')
