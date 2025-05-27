@@ -6,7 +6,7 @@ A web-based interface for exploring WordNet semantic relationships
 using Streamlit with a clean, modular architecture.
 """
 
-import streamlit as st 
+import streamlit as st
 import sys
 import os
 import warnings
@@ -16,8 +16,11 @@ warnings.filterwarnings("ignore", message=".*was created with a default value bu
 warnings.filterwarnings("ignore", message=".*widget.*default value.*Session State API.*")
 warnings.filterwarnings("ignore", category=UserWarning, module="streamlit")
 
-# Add parent directory to path to allow imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+# Add parent directory to path to allow imports (works for both local and deployment)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+parent_dir = os.path.dirname(current_dir)
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 
 # Import configuration
 from src.config.settings import PAGE_CONFIG
