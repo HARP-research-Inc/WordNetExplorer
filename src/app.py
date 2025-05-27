@@ -63,17 +63,36 @@ def main():
     # Main content area
     if current_display_word:
         try:
-            # Show word information if requested
-            if settings.get('show_info', False):
+            # Check if we're in synset search mode
+            synset_search_mode = settings.get('synset_search_mode', False)
+            display_input = current_display_word
+            
+            # If in synset search mode, convert word+sense to synset name
+            if synset_search_mode and settings.get('parsed_sense_number'):
+                from src.wordnet import get_synsets_for_word
+                synsets = get_synsets_for_word(current_display_word)
+                sense_number = settings['parsed_sense_number']
+                if synsets and 1 <= sense_number <= len(synsets):
+                    # Use the synset name instead of the word
+                    display_input = synsets[sense_number - 1].name()
+                else:
+                    st.error(f"Invalid sense number {sense_number} for word '{current_display_word}'")
+                    synset_search_mode = False  # Fall back to word mode
+            
+            # Show word information if requested (not applicable in synset mode)
+            if settings.get('show_info', False) and not synset_search_mode:
                 render_word_information(current_display_word)
             
             # Build and display graph if requested
             if settings.get('show_graph', True):
-                render_graph_visualization(current_display_word, settings, explorer)
+                render_graph_visualization(display_input, settings, explorer, synset_search_mode)
         
         except Exception as e:
             st.error(f"Error: {e}")
-            st.error("Please check that you have entered a valid English word.")
+            if settings.get('synset_search_mode', False):
+                st.error("Please check that you have entered a valid synset name (e.g., 'dog.n.01').")
+            else:
+                st.error("Please check that you have entered a valid English word.")
     
     else:
         # Show welcome screen

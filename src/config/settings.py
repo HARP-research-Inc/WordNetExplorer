@@ -20,6 +20,7 @@ DEFAULT_SETTINGS = {
     'show_info': True,
     'show_graph': True,
     'sense_number': None,  # Specific sense to display (None = all senses)
+    'synset_search_mode': False,  # Whether to search by synset instead of word
 }
 
 # Color schemes for graph visualization - updated for new structure

@@ -8,30 +8,55 @@ import os
 import shutil
 from src.config.settings import COLOR_SCHEMES
 from src.utils.helpers import ensure_downloads_directory, validate_filename
-def render_color_legend(color_scheme):
+def render_color_legend(color_scheme, synset_search_mode=False):
     """
     Render the color legend for the graph.
     
     Args:
         color_scheme (str): The selected color scheme
+        synset_search_mode (bool): Whether we're in synset search mode
     """
     colors = COLOR_SCHEMES.get(color_scheme, COLOR_SCHEMES["Default"])
     
-    st.markdown(f"""
-    <div class="legend-container">
-        <div class="legend-item">
-            <div style="width: 20px; height: 20px; background-color: {colors['main']}; border-radius: 50%; margin-right: 10px;"></div>
-            <strong>Main Word</strong> - Your input word
+    if synset_search_mode:
+        # Legend for synset-focused mode
+        st.markdown(f"""
+        <div class="legend-container">
+            <div class="legend-item">
+                <div style="width: 20px; height: 20px; background-color: {colors.get('word_sense', '#FFB347')}; clip-path: polygon(50% 0%, 0% 100%, 100% 100%); margin-right: 10px;"></div>
+                <strong>Word Senses</strong> - Individual word meanings in the synset
+            </div>
+            <div class="legend-item">
+                <div style="width: 20px; height: 20px; background-color: {colors['synset']}; margin-right: 10px;"></div>
+                <strong>Synsets</strong> - Semantic groups of synonymous words (focus and related)
+            </div>
+            <div class="legend-item">
+                <div style="width: 20px; height: 20px; background-color: {colors['main']}; border-radius: 50%; margin-right: 10px;"></div>
+                <strong>Main Words</strong> - Root forms of words in synsets
+            </div>
         </div>
-        <div class="legend-item">
-            <div style="width: 20px; height: 20px; background-color: {colors['synset']}; margin-right: 10px;"></div>
-            <strong>Word Senses</strong> - Different meanings/synsets of the word
+        """, unsafe_allow_html=True)
+    else:
+        # Legend for word-focused mode
+        st.markdown(f"""
+        <div class="legend-container">
+            <div class="legend-item">
+                <div style="width: 20px; height: 20px; background-color: {colors['main']}; border-radius: 50%; margin-right: 10px;"></div>
+                <strong>Main Word</strong> - Your input word
+            </div>
+            <div class="legend-item">
+                <div style="width: 20px; height: 20px; background-color: {colors.get('word_sense', '#FFB347')}; clip-path: polygon(50% 0%, 0% 100%, 100% 100%); margin-right: 10px;"></div>
+                <strong>Word Senses</strong> - Different meanings of your word
+            </div>
+            <div class="legend-item">
+                <div style="width: 20px; height: 20px; background-color: {colors['synset']}; margin-right: 10px;"></div>
+                <strong>Synsets</strong> - Semantic groups containing related words
+            </div>
+            <div class="legend-item">
+                <div style="width: 20px; height: 20px; background-color: {colors['word']}; border-radius: 50%; margin-right: 10px;"></div>
+                <strong>Related Words</strong> - Connected through semantic relationships
+            </div>
         </div>
-        <div class="legend-item">
-            <div style="width: 20px; height: 20px; background-color: {colors['word']}; border-radius: 50%; margin-right: 10px;"></div>
-            <strong>Related Words</strong> - Connected through semantic relationships
-        </div>
-    </div>
     
     <div style="margin-top: 15px;">
         <strong>Edge Colors & Relationships:</strong>
@@ -124,77 +149,97 @@ def render_exploration_tips():
         """, unsafe_allow_html=True)
 
 
-def render_graph_visualization(word, settings, explorer=None):
+def render_graph_visualization(word, settings, explorer=None, synset_search_mode=False):
     """
     Render the complete graph visualization section.
     
     Args:
-        word (str): The word to visualize
+        word (str): The word to visualize (or synset name if in synset mode)
         settings (dict): Dictionary containing all graph settings
         explorer: WordNetExplorer instance (optional, will create if not provided)
+        synset_search_mode (bool): Whether we're searching by synset instead of word
     """
     st.markdown('<h2 class="sub-header">Relationship Graph</h2>', unsafe_allow_html=True)
     
-    # Show navigation info
-    st.info("💡 **Double-click any node** to explore that concept! Your navigation history is saved above.")
+    # Show navigation info - different message for synset mode
+    if synset_search_mode:
+        st.info(f"💡 **Synset Mode**: Exploring synset `{word}` and its word senses. **Double-click any node** to explore further!")
+    else:
+        st.info("💡 **Double-click any node** to explore that concept! Your navigation history is saved above.")
     
     # Create explorer if not provided
     if explorer is None:
         from src.core import WordNetExplorer
         explorer = WordNetExplorer()
     
-    with st.spinner(f"Building WordNet graph for '{word}'..."):
-        # Build the graph using the new modular explorer
-        G, node_labels = explorer.explore_word(
-            word=word, 
-            depth=settings['depth'],
-            sense_number=settings.get('parsed_sense_number'),
-            include_hypernyms=settings['show_hypernyms'],
-            include_hyponyms=settings['show_hyponyms'],
-            include_meronyms=settings['show_meronyms'],
-            include_holonyms=settings['show_holonyms']
+    if synset_search_mode:
+        with st.spinner(f"Building WordNet graph for synset '{word}'..."):
+            # Build synset-focused graph
+            G, node_labels = explorer.explore_synset(
+                synset_name=word, 
+                depth=settings['depth'],
+                include_hypernyms=settings['show_hypernyms'],
+                include_hyponyms=settings['show_hyponyms'],
+                include_meronyms=settings['show_meronyms'],
+                include_holonyms=settings['show_holonyms']
+            )
+    else:
+        with st.spinner(f"Building WordNet graph for '{word}'..."):
+            # Build the graph using the new modular explorer
+            G, node_labels = explorer.explore_word(
+                word=word, 
+                depth=settings['depth'],
+                sense_number=settings.get('parsed_sense_number'),
+                include_hypernyms=settings['show_hypernyms'],
+                include_hyponyms=settings['show_hyponyms'],
+                include_meronyms=settings['show_meronyms'],
+                include_holonyms=settings['show_holonyms']
+            )
+    
+    if G.number_of_nodes() > 0:
+        st.info(f"Graph created with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges")
+        
+        # Generate the interactive graph using the new modular explorer
+        html_content = explorer.visualize_graph(
+            G, node_labels, word,
+            save_path=None,  # Don't save to file, get HTML content
+            layout_type=settings['layout_type'],
+            node_size_multiplier=settings['node_size_multiplier'],
+            enable_physics=settings['enable_physics'],
+            spring_strength=settings['spring_strength'],
+            central_gravity=settings['central_gravity'],
+            show_labels=settings['show_labels'],
+            edge_width=settings['edge_width'],
+            color_scheme=settings['color_scheme']
         )
         
-        if G.number_of_nodes() > 0:
-            st.info(f"Graph created with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges")
+        if html_content:
+            # Display the HTML content directly
+            components.html(html_content, height=600)
             
-            # Generate the interactive graph using the new modular explorer
-            html_content = explorer.visualize_graph(
-                G, node_labels, word,
-                save_path=None,  # Don't save to file, get HTML content
-                layout_type=settings['layout_type'],
-                node_size_multiplier=settings['node_size_multiplier'],
-                enable_physics=settings['enable_physics'],
-                spring_strength=settings['spring_strength'],
-                central_gravity=settings['central_gravity'],
-                show_labels=settings['show_labels'],
-                edge_width=settings['edge_width'],
-                color_scheme=settings['color_scheme']
-            )
+            # Add comprehensive legend and controls
+            render_graph_legend_and_controls(G, settings, synset_search_mode)
             
-            if html_content:
-                # Display the HTML content directly
-                components.html(html_content, height=600)
-                
-                # Add comprehensive legend and controls
-                render_graph_legend_and_controls(G, settings)
-                
-                # Save the graph if requested
-                if settings['save_graph']:
-                    save_graph_to_file(explorer, G, node_labels, word, settings)
-            else:
-                st.error("Failed to generate graph visualization")
+            # Save the graph if requested
+            if settings['save_graph']:
+                save_graph_to_file(explorer, G, node_labels, word, settings)
+        else:
+            st.error("Failed to generate graph visualization")
+    else:
+        if synset_search_mode:
+            st.warning(f"No WordNet connections found for synset '{word}'")
         else:
             st.warning(f"No WordNet connections found for '{word}'")
 
 
-def render_graph_legend_and_controls(G, settings):
+def render_graph_legend_and_controls(G, settings, synset_search_mode=False):
     """
     Render the complete legend and controls section below the graph.
     
     Args:
         G: The NetworkX graph
         settings (dict): Dictionary containing all graph settings
+        synset_search_mode (bool): Whether we're in synset search mode
     """
     st.markdown("---")
     st.markdown("### 🗝️ Graph Legend & Controls")
@@ -204,7 +249,7 @@ def render_graph_legend_and_controls(G, settings):
     
     with col1:
         st.markdown("#### 🎨 Node Types")
-        render_color_legend(settings['color_scheme'])
+        render_color_legend(settings['color_scheme'], synset_search_mode)
     
     with col2:
         st.markdown("#### 🎮 Interactive Controls")

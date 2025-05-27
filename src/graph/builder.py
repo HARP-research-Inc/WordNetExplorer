@@ -65,6 +65,81 @@ class GraphBuilder:
         
         return G, node_labels
     
+    def build_synset_graph(self, synset_name: str) -> Tuple[nx.Graph, Dict]:
+        """Build a NetworkX graph focused on a specific synset."""
+        G = nx.Graph()
+        node_labels = {}
+        self.visited_synsets.clear()
+        
+        # Try to get the synset by name
+        try:
+            from nltk.corpus import wordnet as wn
+            synset = wn.synset(synset_name)
+        except Exception as e:
+            print(f"Error: Invalid synset name '{synset_name}': {e}")
+            return G, node_labels
+        
+        if not synset:
+            print(f"No synset found for '{synset_name}'")
+            return G, node_labels
+        
+        # Create the main synset node (this will be the focus/center)
+        synset_info = get_synset_info(synset)
+        synset_node = create_node_id(NodeType.SYNSET, synset.name())
+        
+        # Prepare node attributes
+        node_attrs = create_node_attributes(NodeType.SYNSET, **synset_info)
+        node_attrs['synset_name'] = synset.name()
+        G.add_node(synset_node, **node_attrs)
+        
+        node_labels[synset_node] = create_synset_label(synset)
+        
+        # Add all word senses that belong to this synset
+        for lemma in synset.lemmas():
+            word = lemma.name().replace('_', ' ')
+            
+            # Create word sense node for each word in the synset
+            word_sense_node = create_node_id(NodeType.WORD_SENSE, f"{word}_{synset_info['sense_number']}")
+            
+            # Create word sense attributes
+            sense_attrs = create_node_attributes(
+                NodeType.WORD_SENSE,
+                word=word,
+                synset_name=synset.name(),
+                definition=synset_info['definition'],
+                pos=synset_info['pos'],
+                pos_label=synset_info['pos_label'],
+                sense_number=synset_info['sense_number']
+            )
+            G.add_node(word_sense_node, **sense_attrs)
+            
+            # Create label for word sense
+            from .nodes import create_node_label
+            node_labels[word_sense_node] = create_node_label(NodeType.WORD_SENSE, sense_attrs)
+            
+            # Connect word sense to synset
+            sense_props = get_relationship_properties(RelationshipType.SENSE)
+            G.add_edge(word_sense_node, synset_node, **sense_props)
+        
+        # Mark this synset as visited to avoid re-processing
+        self.visited_synsets.add(synset)
+        
+        # Add relationship connections to other synsets
+        self._add_synset_relationships(G, node_labels, synset, synset_node, 0)
+        
+        return G, node_labels
+    
+    def _add_synset_relationships(self, G: nx.Graph, node_labels: Dict,
+                                 synset, synset_node: str, current_depth: int):
+        """Add relationship connections for a synset in synset-focused mode."""
+        # Add relationship connections
+        relationships = get_relationships(synset, self.config.relationship_config)
+        
+        for rel_type, related_synsets in relationships.items():
+            for related_synset in related_synsets:
+                self._add_relationship_edge(G, node_labels, synset_node, 
+                                          related_synset, rel_type, current_depth)
+    
     def _add_synset_connections(self, G: nx.Graph, node_labels: Dict, 
                                synset, current_depth: int, focus_word: str = None):
         """Add connections for a synset and its relationships."""

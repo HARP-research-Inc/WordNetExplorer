@@ -25,18 +25,25 @@ def render_word_input(session_manager):
     selected_word = st.session_state.get('selected_history_word', None)
     log_word_input_event("SELECTED_WORD_CHECK", selected_word=selected_word)
     
-    # Get word from URL if available
+    # Get word and search mode from URL if available
     url_word = get_url_default(session_manager, 'word', None)
+    synset_search_mode = get_url_default(session_manager, 'synset_search_mode', False)
+    
+    # Input label and help (will be updated after we have word and sense info)
+    input_label = "Enter a word to explore"
+    input_help = "Press Enter to add the word to your search history"
+    input_placeholder = "e.g., dog"
     
     # Word input field - prioritize selected word, then URL word, then empty
     input_value = selected_word or url_word or ""
     log_word_input_event("INPUT_VALUE_CALCULATION", input_value=input_value, selected_word=selected_word, current_word=st.session_state.get('current_word', 'None'))
     
     word = st.text_input(
-        "Enter a word to explore", 
+        input_label, 
         value=input_value,
         key="word_input",
-        help="Press Enter to add the word to your search history"
+        help=input_help,
+        placeholder=input_placeholder
     ).strip().lower()
     
     # Get sense number from URL if available
@@ -55,7 +62,11 @@ def render_word_input(session_manager):
     if word:
         synsets = get_synsets_for_word(word)
         if synsets:
-            st.info(f"💡 '{word}' has {len(synsets)} sense(s) available (1-{len(synsets)})")
+            if synset_search_mode and parsed_sense_number:
+                synset_name = synsets[parsed_sense_number - 1].name()
+                st.success(f"🎯 Synset Mode: Will explore synset `{synset_name}` (sense {parsed_sense_number} of '{word}')")
+            else:
+                st.info(f"💡 '{word}' has {len(synsets)} sense(s) available (1-{len(synsets)})")
         else:
             st.warning(f"⚠️ No WordNet entries found for '{word}'")
     
@@ -74,6 +85,19 @@ def render_word_input(session_manager):
                     parsed_sense_number = None
         except ValueError:
             st.warning("Please enter a valid number for sense number")
+    
+    # Search mode toggle - only enabled when both word and sense number are provided
+    can_enable_synset_mode = bool(parsed_sense_number and word)
+    
+    if not can_enable_synset_mode:
+        synset_search_mode = False  # Force disable if no sense specified
+    
+    synset_search_mode = st.checkbox(
+        "🔍 Synset Search Mode", 
+        value=synset_search_mode if can_enable_synset_mode else False,
+        disabled=not can_enable_synset_mode,
+        help="Focus on the synset containing the specified word sense. Only available when both word and sense number are provided." if can_enable_synset_mode else "Enter both a word and sense number to enable synset search mode."
+    )
     
     log_word_input_event("TEXT_INPUT_RESULT", word=word, input_value=input_value)
     
@@ -131,7 +155,7 @@ def render_word_input(session_manager):
     # Determine if word changed (Enter was pressed)
     word_changed = bool(word and word != last_processed_value)
     
-    return word, parsed_sense_number, word_changed
+    return word, parsed_sense_number, word_changed, synset_search_mode
 
 
 def render_search_history():
@@ -311,6 +335,7 @@ def render_about_section():
     - Enter any English word to explore its meanings
     - Use the sense number field to focus on a specific meaning (1, 2, 3, etc.)
     - Leave sense number blank to see all meanings
+    - Enable "Synset Search Mode" to focus on the synset containing that specific sense
     
     **Navigation:**
     - Double-click any node to explore that concept
@@ -319,7 +344,8 @@ def render_about_section():
     
     **Node Types:**
     - 🔴 Root words - uppercase word forms (e.g., SHEEP, BOVINE)
-    - 🟣 Word senses - specific meanings/synsets (e.g., sheep.n.01, bovine.n.01)
+    - 🔶 Word senses - specific meanings of words (diamond-shaped)
+    - 🟪 Synsets - semantic groups of synonymous words (square-shaped)
     
     **Edge Colors (Directed Graph):**
     - Red arrows: Hypernyms ("is a type of")
@@ -357,7 +383,7 @@ def render_sidebar(session_manager):
         st.markdown("---")
         
         # Word input
-        word, parsed_sense_number, word_changed = render_word_input(session_manager)
+        word, parsed_sense_number, word_changed, synset_search_mode = render_word_input(session_manager)
         
         # Search history
         render_search_history()
@@ -406,7 +432,8 @@ def render_sidebar(session_manager):
             'show_graph': show_graph,
             'save_graph': save_graph,
             'filename': filename,
-            'parsed_sense_number': parsed_sense_number
+            'parsed_sense_number': parsed_sense_number,
+            'synset_search_mode': synset_search_mode
         }
         
         # Update URL with current settings only when Apply is clicked or word changed (Enter pressed)

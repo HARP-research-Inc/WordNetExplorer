@@ -70,6 +70,46 @@ class WordNetExplorer:
         # Build and return graph
         return self.graph_builder.build_graph(word)
     
+    def explore_synset(self, synset_name: str, 
+                      depth: int = 1,
+                      include_hypernyms: bool = True,
+                      include_hyponyms: bool = True,
+                      include_meronyms: bool = True,
+                      include_holonyms: bool = True) -> Tuple[nx.Graph, Dict]:
+        """
+        Explore a synset and build its relationship graph, focusing on the synset node.
+        
+        Args:
+            synset_name: The synset name to explore (e.g., 'dog.n.01')
+            depth: How many levels deep to explore relationships
+            include_hypernyms: Whether to include hypernym relationships
+            include_hyponyms: Whether to include hyponym relationships
+            include_meronyms: Whether to include meronym relationships
+            include_holonyms: Whether to include holonym relationships
+            
+        Returns:
+            Tuple of (graph, node_labels)
+        """
+        # Update configuration
+        relationship_config = RelationshipConfig(
+            include_hypernyms=include_hypernyms,
+            include_hyponyms=include_hyponyms,
+            include_meronyms=include_meronyms,
+            include_holonyms=include_holonyms
+        )
+        
+        graph_config = GraphConfig(
+            depth=depth,
+            sense_number=None,  # Not applicable for synset search
+            relationship_config=relationship_config
+        )
+        
+        # Update builder with new config
+        self.graph_builder.config = graph_config
+        
+        # Build synset-focused graph
+        return self.graph_builder.build_synset_graph(synset_name)
+    
     def visualize_graph(self, G: nx.Graph, node_labels: Dict, word: str,
                        save_path: str = None,
                        layout_type: str = "Force-directed (default)",
