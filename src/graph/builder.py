@@ -179,10 +179,22 @@ class GraphBuilder:
         
         # For the first level (current_depth == 0), this is a sense of the focus word
         if current_depth == 0 and focus_word:
-            # Create word sense node for this meaning of the focus word
-            word_sense_node = create_node_id(NodeType.WORD_SENSE, f"{focus_word}_{synset_info['sense_number']}")
+            # Find the actual sense number for this word (position in the synsets list)
+            word_synsets = get_synsets_for_word(focus_word)
+            actual_sense_number = None
+            for i, word_synset in enumerate(word_synsets, 1):
+                if word_synset.name() == synset.name():
+                    actual_sense_number = i
+                    break
             
-            # Create word sense attributes
+            if actual_sense_number is None:
+                # Fallback if we can't find the sense number
+                actual_sense_number = 1
+            
+            # Create word sense node for this meaning of the focus word
+            word_sense_node = create_node_id(NodeType.WORD_SENSE, f"{focus_word}_{actual_sense_number}")
+            
+            # Create word sense attributes with the correct actual sense number
             sense_attrs = create_node_attributes(
                 NodeType.WORD_SENSE,
                 word=focus_word,
@@ -190,7 +202,7 @@ class GraphBuilder:
                 definition=synset_info['definition'],
                 pos=synset_info['pos'],
                 pos_label=synset_info['pos_label'],
-                sense_number=synset_info['sense_number']
+                sense_number=actual_sense_number  # Use the actual sense number
             )
             G.add_node(word_sense_node, **sense_attrs)
             
@@ -208,7 +220,7 @@ class GraphBuilder:
                 ))
                 node_labels[root_node] = focus_word.upper()
             
-            # Connect: root word -> word sense -> synset
+            # Connect: root word -> word sense -> synset (ALL edges should go FROM root TO sense)
             sense_props = get_relationship_properties(RelationshipType.SENSE)
             G.add_edge(root_node, word_sense_node, **sense_props)
             G.add_edge(word_sense_node, synset_node, **sense_props)
