@@ -50,6 +50,36 @@ def main():
     st.markdown('<h1 class="main-header">WordNet Explorer</h1>', unsafe_allow_html=True)
     st.markdown("Explore semantic relationships between words using WordNet")
     
+    # TEST: Add navigation test buttons
+    st.markdown("### 🧪 Navigation Test Buttons")
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        if st.button("🐕 Navigate to 'dog'"):
+            st.query_params.word = "dog"
+            st.query_params.clicked_node = "test_button"
+            st.rerun()
+    
+    with col2:
+        if st.button("🐱 Navigate to 'cat'"):
+            st.query_params.word = "cat"
+            st.query_params.clicked_node = "test_button"
+            st.rerun()
+    
+    with col3:
+        if st.button("🐑 Navigate to 'sheep'"):
+            st.query_params.word = "sheep"
+            st.query_params.clicked_node = "test_button"
+            st.rerun()
+    
+    with col4:
+        if st.button("🐄 Navigate to 'bovine'"):
+            st.query_params.word = "bovine"
+            st.query_params.clicked_node = "test_button"
+            st.rerun()
+    
+    st.markdown("---")
+    
     # Handle URL navigation
     session_manager.handle_url_navigation()
     
