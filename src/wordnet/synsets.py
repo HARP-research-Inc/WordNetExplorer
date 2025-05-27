@@ -40,6 +40,9 @@ def filter_synsets_by_sense(synsets: List, sense_number: int = None) -> List:
 
 def create_synset_label(synset) -> str:
     """Create a descriptive label for a synset."""
-    info = get_synset_info(synset)
-    primary_lemma = info['lemma_names'][0].replace('_', ' ')
-    return f"{primary_lemma} ({info['pos_label']}.{info['sense_number']})" 
+    # Get the most frequent/common lemma (usually the first one)
+    primary_lemma = synset.lemmas()[0].name().replace('_', ' ')
+    synset_parts = synset.name().split('.')
+    pos_part = synset_parts[1] if len(synset_parts) > 1 else 'n'
+    index_part = synset_parts[2] if len(synset_parts) > 2 else '01'
+    return f"{primary_lemma}\n{pos_part}.{index_part}" 

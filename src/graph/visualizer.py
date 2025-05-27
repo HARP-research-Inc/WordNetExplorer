@@ -237,14 +237,14 @@ class GraphVisualizer:
                 definition = node_data.get('definition', 'No definition')
                 word = node_data.get('word', '')
                 sense_num = node_data.get('sense_number', '')
-                title = f"Word sense: {word} (sense {sense_num})\\nSynset: {synset_name}\\nDefinition: {definition}"
+                title = f"Word sense: {word} (sense {sense_num})\nSynset: {synset_name}\nDefinition: {definition}"
                 node_style = {'shape': 'diamond'}
             elif node_type == 'synset':
                 color = colors["synset"]
                 size = int(25 * self.config.node_size_multiplier)
                 synset_name = node_data.get('synset_name', node)
                 definition = node_data.get('definition', 'No definition')
-                title = f"Synset: {node_labels.get(node, node)}\\nSynset: {synset_name}\\nDefinition: {definition}"
+                title = f"Synset: {node_labels.get(node, node)}\nSynset: {synset_name}\nDefinition: {definition}"
                 node_style = {'shape': 'square'}
             else:
                 color = colors.get("synset", "#CCCCCC")

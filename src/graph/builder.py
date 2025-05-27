@@ -92,28 +92,46 @@ class GraphBuilder:
         node_attrs['synset_name'] = synset.name()
         G.add_node(synset_node, **node_attrs)
         
-        node_labels[synset_node] = create_synset_label(synset)
+        # Create a label showing the most common word + synset index
+        # Get the most frequent/common lemma (usually the first one)
+        primary_lemma = synset.lemmas()[0].name().replace('_', ' ')
+        synset_parts = synset.name().split('.')
+        pos_part = synset_parts[1] if len(synset_parts) > 1 else 'n'
+        index_part = synset_parts[2] if len(synset_parts) > 2 else '01'
+        node_labels[synset_node] = f"{primary_lemma}\n{pos_part}.{index_part}"
         
         # Add all word senses that belong to this synset
         for lemma in synset.lemmas():
-            word = lemma.name().replace('_', ' ')
+            lemma_word = lemma.name().replace('_', ' ')
+            
+            # Find the sense number for this specific word
+            word_synsets = get_synsets_for_word(lemma_word)
+            word_sense_number = None
+            for i, word_synset in enumerate(word_synsets, 1):
+                if word_synset.name() == synset.name():
+                    word_sense_number = i
+                    break
+            
+            if word_sense_number is None:
+                # Fallback if we can't find the sense number
+                word_sense_number = 1
             
             # Create word sense node for each word in the synset
-            word_sense_node = create_node_id(NodeType.WORD_SENSE, f"{word}_{synset_info['sense_number']}")
+            word_sense_node = create_node_id(NodeType.WORD_SENSE, f"{lemma_word}_{word_sense_number}")
             
-            # Create word sense attributes
+            # Create word sense attributes with the correct sense number for this word
             sense_attrs = create_node_attributes(
                 NodeType.WORD_SENSE,
-                word=word,
+                word=lemma_word,
                 synset_name=synset.name(),
                 definition=synset_info['definition'],
                 pos=synset_info['pos'],
                 pos_label=synset_info['pos_label'],
-                sense_number=synset_info['sense_number']
+                sense_number=word_sense_number  # Use the word-specific sense number
             )
             G.add_node(word_sense_node, **sense_attrs)
             
-            # Create label for word sense
+            # Create label for word sense (this will show "word (pos.sense_num)")
             from .nodes import create_node_label
             node_labels[word_sense_node] = create_node_label(NodeType.WORD_SENSE, sense_attrs)
             

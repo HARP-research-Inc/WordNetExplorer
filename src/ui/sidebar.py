@@ -58,18 +58,6 @@ def render_word_input(session_manager):
         help="Enter a specific sense number (1, 2, 3, etc.) to show only that sense. Leave blank to show all senses."
     ).strip()
     
-    # Show available senses if word is provided
-    if word:
-        synsets = get_synsets_for_word(word)
-        if synsets:
-            if synset_search_mode and parsed_sense_number:
-                synset_name = synsets[parsed_sense_number - 1].name()
-                st.success(f"🎯 Synset Mode: Will explore synset `{synset_name}` (sense {parsed_sense_number} of '{word}')")
-            else:
-                st.info(f"💡 '{word}' has {len(synsets)} sense(s) available (1-{len(synsets)})")
-        else:
-            st.warning(f"⚠️ No WordNet entries found for '{word}'")
-    
     # Convert sense number to integer if provided
     parsed_sense_number = None
     if sense_number:
@@ -85,6 +73,18 @@ def render_word_input(session_manager):
                     parsed_sense_number = None
         except ValueError:
             st.warning("Please enter a valid number for sense number")
+
+    # Show available senses if word is provided
+    if word:
+        synsets = get_synsets_for_word(word)
+        if synsets:
+            if synset_search_mode and parsed_sense_number:
+                synset_name = synsets[parsed_sense_number - 1].name()
+                st.success(f"🎯 Synset Mode: Will explore synset `{synset_name}` (sense {parsed_sense_number} of '{word}')")
+            else:
+                st.info(f"💡 '{word}' has {len(synsets)} sense(s) available (1-{len(synsets)})")
+        else:
+            st.warning(f"⚠️ No WordNet entries found for '{word}'")
     
     # Search mode toggle - only enabled when both word and sense number are provided
     can_enable_synset_mode = bool(parsed_sense_number and word)
