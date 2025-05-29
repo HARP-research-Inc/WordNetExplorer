@@ -32,6 +32,12 @@ class WordNetExplorer:
     def explore_word(self, word: str, 
                     depth: int = 1,
                     sense_number: int = None,
+                    max_nodes: int = 100,
+                    max_branches: int = 5,
+                    min_frequency: int = 0,
+                    pos_filter: list = None,
+                    enable_clustering: bool = False,
+                    simplified_mode: bool = False,
                     **relationship_kwargs) -> Tuple[nx.Graph, Dict]:
         """
         Explore a word and build its relationship graph.
@@ -40,18 +46,34 @@ class WordNetExplorer:
             word: The word to explore
             depth: How many levels deep to explore relationships
             sense_number: Specific sense number to display (1-based, None for all)
+            max_nodes: Maximum number of nodes to include in graph
+            max_branches: Maximum branches per node
+            min_frequency: Minimum word frequency filter
+            pos_filter: List of part-of-speech types to include
+            enable_clustering: Whether to enable node clustering
+            simplified_mode: Whether to use simplified rendering
             **relationship_kwargs: All relationship type settings
             
         Returns:
             Tuple of (graph, node_labels)
         """
+        # Set default POS filter if not provided
+        if pos_filter is None:
+            pos_filter = ["Nouns", "Verbs", "Adjectives", "Adverbs"]
+            
         # Update configuration with all relationship settings
         relationship_config = RelationshipConfig(**relationship_kwargs)
         
         graph_config = GraphConfig(
             depth=depth,
             sense_number=sense_number,
-            relationship_config=relationship_config
+            relationship_config=relationship_config,
+            max_nodes=max_nodes,
+            max_branches=max_branches,
+            min_frequency=min_frequency,
+            pos_filter=pos_filter,
+            enable_clustering=enable_clustering,
+            simplified_mode=simplified_mode
         )
         
         # Update builder with new config
@@ -62,6 +84,12 @@ class WordNetExplorer:
     
     def explore_synset(self, synset_name: str, 
                       depth: int = 1,
+                      max_nodes: int = 100,
+                      max_branches: int = 5,
+                      min_frequency: int = 0,
+                      pos_filter: list = None,
+                      enable_clustering: bool = False,
+                      simplified_mode: bool = False,
                       **relationship_kwargs) -> Tuple[nx.Graph, Dict]:
         """
         Explore a synset and build its relationship graph, focusing on the synset node.
@@ -69,18 +97,34 @@ class WordNetExplorer:
         Args:
             synset_name: The synset name to explore (e.g., 'dog.n.01')
             depth: How many levels deep to explore relationships
+            max_nodes: Maximum number of nodes to include in graph
+            max_branches: Maximum branches per node
+            min_frequency: Minimum word frequency filter
+            pos_filter: List of part-of-speech types to include
+            enable_clustering: Whether to enable node clustering
+            simplified_mode: Whether to use simplified rendering
             **relationship_kwargs: All relationship type settings
             
         Returns:
             Tuple of (graph, node_labels)
         """
+        # Set default POS filter if not provided
+        if pos_filter is None:
+            pos_filter = ["Nouns", "Verbs", "Adjectives", "Adverbs"]
+            
         # Update configuration with all relationship settings
         relationship_config = RelationshipConfig(**relationship_kwargs)
         
         graph_config = GraphConfig(
             depth=depth,
             sense_number=None,  # Not applicable for synset search
-            relationship_config=relationship_config
+            relationship_config=relationship_config,
+            max_nodes=max_nodes,
+            max_branches=max_branches,
+            min_frequency=min_frequency,
+            pos_filter=pos_filter,
+            enable_clustering=enable_clustering,
+            simplified_mode=simplified_mode
         )
         
         # Update builder with new config

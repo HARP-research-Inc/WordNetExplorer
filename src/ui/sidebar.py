@@ -198,7 +198,93 @@ def render_basic_settings(session_manager):
         value=get_url_default(session_manager, 'depth', DEFAULT_SETTINGS['depth']), 
         help="How deep to explore relationships (higher values create larger graphs)"
     )
-    return depth
+    
+    # Advanced Options
+    with st.expander("⚙️ Advanced Options", expanded=False):
+        st.markdown("**Advanced Graph Parameters**")
+        
+        # Advanced depth setting (allows higher values)
+        advanced_depth = st.slider(
+            "Advanced Exploration Depth", 
+            min_value=1, 
+            max_value=10, 
+            value=get_url_default(session_manager, 'advanced_depth', depth), 
+            help="Higher depth values for complex exploration (warning: values above 3 may create very large graphs)"
+        )
+        
+        # Use advanced depth if it's different from basic depth
+        if advanced_depth != depth:
+            depth = advanced_depth
+            if advanced_depth > 3:
+                st.warning(f"⚠️ Depth {advanced_depth} may create very large graphs. Consider using relationship filters to limit complexity.")
+        
+        # Maximum nodes limit
+        max_nodes = st.number_input(
+            "Maximum Nodes", 
+            min_value=10, 
+            max_value=1000, 
+            value=get_url_default(session_manager, 'max_nodes', 100),
+            step=10,
+            help="Limit the total number of nodes in the graph to prevent performance issues"
+        )
+        
+        # Branch limiting
+        max_branches = st.slider(
+            "Max Branches per Node",
+            min_value=1,
+            max_value=20,
+            value=get_url_default(session_manager, 'max_branches', 5),
+            help="Maximum number of related concepts to show for each node"
+        )
+        
+        # Node filtering options
+        st.markdown("**Node Filtering**")
+        
+        # Minimum frequency threshold
+        min_frequency = st.slider(
+            "Minimum Word Frequency",
+            min_value=0,
+            max_value=100,
+            value=get_url_default(session_manager, 'min_frequency', 0),
+            help="Filter out rare words (0 = no filtering). Higher values show only common words."
+        )
+        
+        # Show only certain POS types
+        pos_filter = st.multiselect(
+            "Part-of-Speech Filter",
+            options=["Nouns", "Verbs", "Adjectives", "Adverbs"],
+            default=get_url_default(session_manager, 'pos_filter', ["Nouns", "Verbs", "Adjectives", "Adverbs"]),
+            help="Show only specific parts of speech"
+        )
+        
+        # Performance settings
+        st.markdown("**Performance Settings**")
+        
+        # Enable/disable heavy computations
+        enable_clustering = st.checkbox(
+            "Enable Node Clustering",
+            value=get_url_default(session_manager, 'enable_clustering', False),
+            help="Group related nodes together (may slow down large graphs)"
+        )
+        
+        # Simplified mode for large graphs
+        simplified_mode = st.checkbox(
+            "Simplified Mode",
+            value=get_url_default(session_manager, 'simplified_mode', False),
+            help="Use simplified rendering for better performance with large graphs"
+        )
+        
+        # Return all advanced settings as a dictionary
+        advanced_settings = {
+            'max_nodes': max_nodes,
+            'max_branches': max_branches,
+            'min_frequency': min_frequency,
+            'pos_filter': pos_filter,
+            'enable_clustering': enable_clustering,
+            'simplified_mode': simplified_mode
+        }
+        
+    return depth, advanced_settings
 
 
 def render_relationship_types(session_manager):
@@ -558,6 +644,14 @@ def render_about_section():
     - Leave sense number blank to see all meanings
     - Enable "Synset Search Mode" to focus on the synset containing that specific sense
     
+    **Advanced Options:**
+    - **Advanced Depth**: Explore up to 10 levels deep (warning: large graphs above depth 3)
+    - **Max Nodes**: Limit graph size to prevent performance issues (10-1000 nodes)
+    - **Max Branches**: Control how many related concepts to show per node (1-20)
+    - **POS Filter**: Show only specific parts of speech (nouns, verbs, etc.)
+    - **Node Filtering**: Filter by word frequency or enable clustering
+    - **Performance**: Simplified mode for better performance with large graphs
+    
     **Navigation:**
     - Double-click any node to explore that concept
     - Use search history to revisit previous words
@@ -610,7 +704,7 @@ def render_sidebar(session_manager):
         render_search_history()
         
         # Basic settings
-        depth = render_basic_settings(session_manager)
+        depth, advanced_settings = render_basic_settings(session_manager)
         
         # Relationship types
         relationship_settings = render_relationship_types(session_manager)
@@ -655,6 +749,9 @@ def render_sidebar(session_manager):
         
         # Add all relationship settings
         settings.update(relationship_settings)
+        
+        # Add advanced settings
+        settings.update(advanced_settings)
         
         # Update URL with current settings only when Apply is clicked or word changed (Enter pressed)
         should_update_url = apply_clicked or word_changed

@@ -22,6 +22,15 @@ DEFAULT_SETTINGS = {
     'sense_number': None,  # Specific sense to display (None = all senses)
     'synset_search_mode': False,  # Whether to search by synset instead of word
     
+    # Advanced options
+    'advanced_depth': 1,  # Advanced depth setting (allows higher values)
+    'max_nodes': 100,  # Maximum number of nodes to prevent performance issues
+    'max_branches': 5,  # Maximum branches per node
+    'min_frequency': 0,  # Minimum word frequency filter
+    'pos_filter': ["Nouns", "Verbs", "Adjectives", "Adverbs"],  # Part-of-speech filter
+    'enable_clustering': False,  # Enable node clustering
+    'simplified_mode': False,  # Simplified rendering mode
+    
     # Comprehensive WordNet relationship types
     # Taxonomic Relations
     'show_hypernym': False,

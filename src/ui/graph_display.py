@@ -106,14 +106,13 @@ def render_color_legend(color_scheme, synset_search_mode=False):
     """, unsafe_allow_html=True)
 
 
-def render_interactive_controls(G, depth, enable_physics):
+def render_interactive_controls(G, settings):
     """
     Render the interactive controls information.
     
     Args:
         G: The NetworkX graph
-        depth (int): The exploration depth
-        enable_physics (bool): Whether physics is enabled
+        settings (dict): Dictionary containing all graph settings including advanced options
     """
     st.markdown(f"""
     <div class="legend-container">
@@ -130,10 +129,13 @@ def render_interactive_controls(G, depth, enable_physics):
         <div style="margin-bottom: 8px;">
             <strong style="color: #333;">📊 Graph Info:</strong>
             <ul style="margin: 5px 0; padding-left: 20px; color: #333;">
-                <li><strong>Nodes:</strong> {G.number_of_nodes()}</li>
+                <li><strong>Nodes:</strong> {G.number_of_nodes()}{f" (max: {settings.get('max_nodes', 100)})" if settings.get('max_nodes', 100) != 100 else ""}</li>
                 <li><strong>Edges:</strong> {G.number_of_edges()}</li>
-                <li><strong>Depth:</strong> {depth} level(s)</li>
-                <li><strong>Physics:</strong> {'Enabled' if enable_physics else 'Disabled'}</li>
+                <li><strong>Depth:</strong> {settings.get('depth', 1)} level(s)</li>
+                <li><strong>Max Branches:</strong> {settings.get('max_branches', 5)} per node</li>
+                <li><strong>Physics:</strong> {'Enabled' if settings.get('enable_physics', True) else 'Disabled'}</li>
+                {f"<li><strong>POS Filter:</strong> {', '.join(settings.get('pos_filter', ['All']))}</li>" if settings.get('pos_filter') and len(settings.get('pos_filter', [])) < 4 else ""}
+                {f"<li><strong>Simplified Mode:</strong> {'Yes' if settings.get('simplified_mode', False) else 'No'}</li>" if settings.get('simplified_mode', False) else ""}
             </ul>
         </div>
     </div>
@@ -209,19 +211,31 @@ def render_graph_visualization(word, settings, explorer=None, synset_search_mode
     
     if synset_search_mode:
         with st.spinner(f"Building WordNet graph for synset '{word}'..."):
-            # Build synset-focused graph - pass all relationship settings
+            # Build synset-focused graph - pass all relationship settings and advanced settings
             G, node_labels = explorer.explore_synset(
                 synset_name=word, 
                 depth=settings['depth'],
+                max_nodes=settings.get('max_nodes', 100),
+                max_branches=settings.get('max_branches', 5),
+                min_frequency=settings.get('min_frequency', 0),
+                pos_filter=settings.get('pos_filter', ["Nouns", "Verbs", "Adjectives", "Adverbs"]),
+                enable_clustering=settings.get('enable_clustering', False),
+                simplified_mode=settings.get('simplified_mode', False),
                 **{k: v for k, v in settings.items() if k.startswith('show_')}
             )
     else:
         with st.spinner(f"Building WordNet graph for '{word}'..."):
-            # Build the graph using the new modular explorer - pass all relationship settings
+            # Build the graph using the new modular explorer - pass all relationship settings and advanced settings
             G, node_labels = explorer.explore_word(
                 word=word, 
                 depth=settings['depth'],
                 sense_number=settings.get('parsed_sense_number'),
+                max_nodes=settings.get('max_nodes', 100),
+                max_branches=settings.get('max_branches', 5),
+                min_frequency=settings.get('min_frequency', 0),
+                pos_filter=settings.get('pos_filter', ["Nouns", "Verbs", "Adjectives", "Adverbs"]),
+                enable_clustering=settings.get('enable_clustering', False),
+                simplified_mode=settings.get('simplified_mode', False),
                 **{k: v for k, v in settings.items() if k.startswith('show_')}
             )
     
@@ -282,7 +296,7 @@ def render_graph_legend_and_controls(G, settings, synset_search_mode=False):
     
     with col2:
         st.markdown("#### 🎮 Interactive Controls")
-        render_interactive_controls(G, settings['depth'], settings['enable_physics'])
+        render_interactive_controls(G, settings)
     
     # Additional info section
     st.markdown("#### 💡 Tips for Exploration")
