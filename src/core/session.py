@@ -6,6 +6,7 @@ Handles Streamlit session state management for the WordNet Explorer application.
 
 from typing import List, Optional, Any, Dict
 import streamlit as st
+from streamlit.runtime.scriptrunner import ScriptRunContext
 from urllib.parse import urlencode
 
 

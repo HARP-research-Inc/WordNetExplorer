@@ -3,8 +3,8 @@ Word information display components for WordNet Explorer.
 """
 
 import streamlit as st
-from ..utils.helpers import capture_function_output
-from ..wordnet_explorer import print_word_info
+from utils.helpers import capture_function_output
+from wordnet_explorer import print_word_info
 
 
 def render_word_information(word):

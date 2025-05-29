@@ -3,11 +3,11 @@ Sidebar components for WordNet Explorer.
 """
 
 import streamlit as st
-from ..config.settings import DEFAULT_SETTINGS, LAYOUT_OPTIONS
+from config.settings import DEFAULT_SETTINGS, LAYOUT_OPTIONS
 
-from ..utils.session_state import add_to_search_history, clear_search_history
-from ..utils.debug_logger import log_word_input_event, log_session_state
-from ..wordnet_explorer import get_synsets_for_word
+from utils.session_state import add_to_search_history, clear_search_history
+from utils.debug_logger import log_word_input_event, log_session_state
+from wordnet_explorer import get_synsets_for_word
 
 
 def get_url_default(session_manager, setting_key: str, default_value):
@@ -733,16 +733,43 @@ def render_display_options(session_manager):
 def render_save_options():
     """Render save options settings."""
     with st.expander("💾 Save Options"):
-        save_graph = st.checkbox("Save graph to file")
+        # HTML export
+        save_graph = st.checkbox("Save graph as HTML")
         filename = "wordnet_graph"
         if save_graph:
-            filename = st.text_input("Filename (without extension)", "wordnet_graph")
+            filename = st.text_input("HTML filename (without extension)", "wordnet_graph")
             if not filename:
                 filename = "wordnet_graph"
             if not filename.endswith(".html"):
                 filename += ".html"
+        
+        # JSON export
+        st.markdown("---")
+        st.markdown("#### JSON Export/Import")
+        export_json = st.checkbox("Export graph as JSON")
+        if export_json:
+            json_filename = st.text_input("JSON filename (without extension)", "wordnet_graph")
+            if not json_filename:
+                json_filename = "wordnet_graph"
+            if not json_filename.endswith(".json"):
+                json_filename += ".json"
+        
+        # JSON import
+        st.markdown("#### Import Graph")
+        uploaded_file = st.file_uploader("Import JSON graph", type=['json'])
+        if uploaded_file is not None:
+            try:
+                import json
+                from src.graph import GraphSerializer
+                serializer = GraphSerializer()
+                json_str = uploaded_file.getvalue().decode('utf-8')
+                G, node_labels, metadata = serializer.deserialize_graph(json_str)
+                st.session_state.imported_graph = (G, node_labels, metadata)
+                st.success("✅ Graph imported successfully!")
+            except Exception as e:
+                st.error(f"❌ Error importing graph: {str(e)}")
     
-    return save_graph, filename
+    return save_graph, filename, export_json, json_filename if export_json else None, uploaded_file is not None
 
 
 def render_about_section():
@@ -851,7 +878,7 @@ def render_sidebar(session_manager):
         show_info, show_graph = render_display_options(session_manager)
         
         # Save options
-        save_graph, filename = render_save_options()
+        save_graph, filename, export_json, json_filename, uploaded_file = render_save_options()
         
         # About section
         render_about_section()
@@ -873,7 +900,10 @@ def render_sidebar(session_manager):
             'save_graph': save_graph,
             'filename': filename,
             'parsed_sense_number': parsed_sense_number,
-            'synset_search_mode': synset_search_mode
+            'synset_search_mode': synset_search_mode,
+            'export_json': export_json,
+            'json_filename': json_filename,
+            'uploaded_file': uploaded_file
         }
         
         # Add all relationship settings

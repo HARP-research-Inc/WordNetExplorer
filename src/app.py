@@ -23,17 +23,17 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
 # Import configuration
-from src.config.settings import PAGE_CONFIG
+from config.settings import PAGE_CONFIG
 
 # Import core modules
-from src.core import WordNetExplorer, SessionManager
+from core import WordNetExplorer, SessionManager
 
 # Import UI components
-from src.ui.styles import load_custom_css
-from src.ui.sidebar import render_sidebar
-from src.ui.word_info import render_word_information
-from src.ui.graph_display import render_graph_visualization
-from src.ui.welcome import render_welcome_screen
+from ui.styles import load_custom_css
+from ui.sidebar import render_sidebar
+from ui.word_info import render_word_information
+from ui.graph_display import render_graph_visualization
+from ui.welcome import render_welcome_screen
 
 
 def render_header():
@@ -161,7 +161,7 @@ def main():
             
             # If in synset search mode, convert word+sense to synset name
             if synset_search_mode and settings.get('parsed_sense_number'):
-                from src.wordnet import get_synsets_for_word
+                from wordnet import get_synsets_for_word
                 synsets = get_synsets_for_word(current_display_word)
                 sense_number = settings['parsed_sense_number']
                 if synsets and 1 <= sense_number <= len(synsets):
