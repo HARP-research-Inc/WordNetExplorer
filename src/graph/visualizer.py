@@ -321,30 +321,56 @@ class GraphVisualizer:
             'holonym': '#44AA44'
         }
         
-        relation_descriptions = {
-            'sense': 'Word sense connection',
-            'hypernym': 'Is a type of (more general)',
-            'hyponym': 'Type includes (more specific)',
-            'meronym': 'Part of',
-            'holonym': 'Has part'
-        }
-        
         for source, target, edge_data in G.edges(data=True):
             relation = edge_data.get('relation', 'unknown')
             color = edge_data.get('color', edge_colors.get(relation, '#888888'))
-            description = relation_descriptions.get(relation, relation)
             arrow_direction = edge_data.get('arrow_direction', 'to')
             
             # Handle reverse arrow direction by swapping source and target
             if arrow_direction == 'from':
                 actual_source, actual_target = target, source
-                # Update description to reflect the reversed direction
-                if relation == 'hyponym':
-                    description = 'Type includes (more specific)'
-                elif relation in ['member_holonym', 'substance_holonym', 'part_holonym']:
-                    description = 'Has part'
             else:
                 actual_source, actual_target = source, target
+            
+            # Create accurate tooltip based on the actual arrow direction and relationship
+            source_name = actual_source.split('.')[0] if '.' in actual_source else actual_source.split('_')[-1]
+            target_name = actual_target.split('.')[0] if '.' in actual_target else actual_target.split('_')[-1]
+            
+            # Generate semantic description based on relationship type and actual direction
+            if relation == 'sense':
+                description = f"Word sense connection: {source_name} → {target_name}"
+            elif relation == 'hypernym':
+                # Hypernym always means "is a type of" regardless of arrow direction
+                description = f"Is-a relationship: {source_name} is a type of {target_name}"
+            elif relation == 'hyponym':
+                # Hyponym always means "includes type" but we need to interpret the direction correctly
+                # When arrow_direction is 'from', the original edge was target->source (hyponym)
+                # So the actual semantic meaning is still "target includes type source"
+                if arrow_direction == 'from':
+                    # Original edge was target->source, so target includes type source
+                    description = f"Type-includes relationship: {target_name} includes type {source_name}"
+                else:
+                    # Normal direction: source includes type target
+                    description = f"Type-includes relationship: {source_name} includes type {target_name}"
+            elif relation in ['member_meronym', 'substance_meronym', 'part_meronym']:
+                description = f"Part-of relationship: {source_name} is part of {target_name}"
+            elif relation in ['member_holonym', 'substance_holonym', 'part_holonym']:
+                if arrow_direction == 'from':
+                    description = f"Has-part relationship: {target_name} has part {source_name}"
+                else:
+                    description = f"Has-part relationship: {source_name} has part {target_name}"
+            elif relation == 'similar_to':
+                description = f"Similar to: {source_name} is similar to {target_name}"
+            elif relation == 'antonym':
+                description = f"Opposite of: {source_name} is opposite to {target_name}"
+            elif relation == 'also':
+                description = f"Related to: {source_name} is also related to {target_name}"
+            elif relation in ['entailment', 'entails']:
+                description = f"Entails: {source_name} entails {target_name}"
+            elif relation in ['cause', 'causes']:
+                description = f"Causes: {source_name} causes {target_name}"
+            else:
+                description = f"{relation.replace('_', ' ').title()}: {source_name} → {target_name}"
             
             edge_config = {
                 'color': color,

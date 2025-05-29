@@ -96,13 +96,13 @@ def render_color_legend(color_scheme, synset_search_mode=False):
     <div style="margin-top: 15px;">
         <strong>Edge Colors & Relationships:</strong>
         <div style="margin-left: 10px; margin-top: 5px;">
-            <div style="margin: 3px 0;"><span style="color: #FF4444; font-weight: bold;">→</span> <strong>Taxonomic Relations (Red)</strong> - "is a/type of" relationships</div>
-            <div style="margin: 3px 0; margin-left: 15px;">↗ <strong>Hypernym</strong> - points to more general concepts</div>
-            <div style="margin: 3px 0; margin-left: 15px;">↙ <strong>Hyponym</strong> - points to more specific concepts</div>
-            <div style="margin: 3px 0;"><span style="color: #44AA44; font-weight: bold;">→</span> <strong>Part-Whole Relations (Green)</strong> - "part of/has part" relationships</div>
-            <div style="margin: 3px 0; margin-left: 15px;">↗ <strong>Meronym</strong> - points from whole to part</div>
-            <div style="margin: 3px 0; margin-left: 15px;">↙ <strong>Holonym</strong> - points from part to whole</div>
-            <div style="margin: 3px 0;"><span style="color: #666666; font-weight: bold;">→</span> <strong>Sense</strong> - connects word to its meanings</div>
+            <div style="margin: 3px 0;"><span style="color: #FF4444; font-weight: bold;">→</span> <strong>Taxonomic Relations (Red)</strong> - Classification relationships</div>
+            <div style="margin: 3px 0; margin-left: 15px;">• <strong>Hypernym arrows</strong> point from specific to general (\"femtosecond → time_unit\")</div>
+            <div style="margin: 3px 0; margin-left: 15px;">• <strong>Hyponym arrows</strong> point from general to specific (\"time_unit → femtosecond\")</div>
+            <div style="margin: 3px 0;"><span style="color: #44AA44; font-weight: bold;">→</span> <strong>Part-Whole Relations (Green)</strong> - Compositional relationships</div>
+            <div style="margin: 3px 0; margin-left: 15px;">• <strong>Meronym arrows</strong> point from part to whole (\"wheel → car\")</div>
+            <div style="margin: 3px 0; margin-left: 15px;">• <strong>Holonym arrows</strong> point from whole to part (\"car → wheel\")</div>
+            <div style="margin: 3px 0;"><span style="color: #666666; font-weight: bold;">→</span> <strong>Word Sense (Gray)</strong> - connects word senses to synsets</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
