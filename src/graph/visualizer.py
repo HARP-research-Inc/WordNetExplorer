@@ -326,34 +326,37 @@ class GraphVisualizer:
             color = edge_data.get('color', edge_colors.get(relation, '#888888'))
             arrow_direction = edge_data.get('arrow_direction', 'to')
             
-            # Handle reverse arrow direction by swapping source and target
-            if arrow_direction == 'from':
-                actual_source, actual_target = target, source
+            # For taxonomic relationships, ensure consistent direction: specific → general
+            if relation in ['hypernym', 'hyponym']:
+                # Always make taxonomic arrows go specific → general (consistent direction)
+                if relation == 'hypernym':
+                    # Hypernym means source is more specific than target
+                    # So arrow should go source → target (specific → general)
+                    actual_source, actual_target = source, target
+                elif relation == 'hyponym':
+                    # Hyponym means source is more general than target
+                    # So arrow should go target → source (specific → general)
+                    actual_source, actual_target = target, source
             else:
-                actual_source, actual_target = source, target
+                # For non-taxonomic relationships, handle reverse arrow direction normally
+                if arrow_direction == 'from':
+                    actual_source, actual_target = target, source
+                else:
+                    actual_source, actual_target = source, target
             
-            # Create accurate tooltip based on the ORIGINAL relationship and direction
-            # We need to interpret based on the original edge, not the swapped one
-            original_source = source
-            original_target = target
+            # Create accurate tooltip based on the VISUAL arrow direction
+            source_name = actual_source.split('.')[0] if '.' in actual_source else actual_source.split('_')[-1]
+            target_name = actual_target.split('.')[0] if '.' in actual_target else actual_target.split('_')[-1]
             
-            source_name = original_source.split('.')[0] if '.' in original_source else original_source.split('_')[-1]
-            target_name = original_target.split('.')[0] if '.' in original_target else original_target.split('_')[-1]
-            
-            # Generate semantic description based on relationship type and original direction
+            # Generate semantic description based on the visual arrow direction
             if relation == 'sense':
                 description = f"Word sense connection: {source_name} → {target_name}"
-            elif relation == 'hypernym':
-                # For hypernym: original_source is a type of original_target
+            elif relation in ['hypernym', 'hyponym']:
+                # Both hypernyms and hyponyms now have consistent visual direction: specific → general
                 description = f"Is-a relationship: {source_name} is a type of {target_name}"
-            elif relation == 'hyponym':
-                # For hyponym: original_source includes type original_target
-                description = f"Type-includes relationship: {source_name} includes type {target_name}"
             elif relation in ['member_meronym', 'substance_meronym', 'part_meronym']:
-                # For meronym: original_source is part of original_target
                 description = f"Part-of relationship: {source_name} is part of {target_name}"
             elif relation in ['member_holonym', 'substance_holonym', 'part_holonym']:
-                # For holonym: original_source has part original_target
                 description = f"Has-part relationship: {source_name} has part {target_name}"
             elif relation == 'similar_to':
                 description = f"Similar to: {source_name} is similar to {target_name}"
@@ -372,7 +375,7 @@ class GraphVisualizer:
                 'color': color,
                 'width': self.config.edge_width + 1 if relation != 'sense' else self.config.edge_width,
                 'title': description,
-                'arrows': 'to'  # Always use 'to' since we swap source/target for 'from'
+                'arrows': 'to'
             }
             
             net.add_edge(actual_source, actual_target, **edge_config)
