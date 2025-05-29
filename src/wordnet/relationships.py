@@ -262,19 +262,19 @@ def get_relationship_color(relationship_type: RelationshipType) -> str:
         # Basic
         RelationshipType.SENSE: '#666666',  # Grey
         
-        # Taxonomic Relations (Red/Blue family)
+        # Taxonomic Relations (Red family - same color for hyper/hypo)
         RelationshipType.HYPERNYM: '#FF4444',  # Red
-        RelationshipType.HYPONYM: '#4488FF',   # Blue
+        RelationshipType.HYPONYM: '#FF4444',   # Red (same as hypernym)
         RelationshipType.INSTANCE_HYPERNYM: '#FF8888',  # Light red
-        RelationshipType.INSTANCE_HYPONYM: '#88AAFF',   # Light blue
+        RelationshipType.INSTANCE_HYPONYM: '#FF8888',   # Light red (same as instance_hypernym)
         
-        # Part-Whole Relations (Green/Orange family)
+        # Part-Whole Relations (Green family - same color for mero/holo)
         RelationshipType.MEMBER_HOLONYM: '#44AA44',   # Green
-        RelationshipType.SUBSTANCE_HOLONYM: '#66BB66', # Light green
-        RelationshipType.PART_HOLONYM: '#88CC88',     # Pale green
-        RelationshipType.MEMBER_MERONYM: '#FFAA00',   # Orange
-        RelationshipType.SUBSTANCE_MERONYM: '#FFCC44', # Light orange
-        RelationshipType.PART_MERONYM: '#FFDD88',     # Pale orange
+        RelationshipType.SUBSTANCE_HOLONYM: '#44AA44', # Green (same as member_holonym)
+        RelationshipType.PART_HOLONYM: '#44AA44',     # Green (same as member_holonym)
+        RelationshipType.MEMBER_MERONYM: '#44AA44',   # Green (same as holonyms)
+        RelationshipType.SUBSTANCE_MERONYM: '#44AA44', # Green (same as holonyms)
+        RelationshipType.PART_MERONYM: '#44AA44',     # Green (same as holonyms)
         
         # Antonymy & Similarity (Purple family)
         RelationshipType.ANTONYM: '#AA44AA',   # Purple
@@ -310,9 +310,48 @@ def get_relationship_color(relationship_type: RelationshipType) -> str:
 
 def get_relationship_properties(relationship_type: RelationshipType) -> Dict[str, Any]:
     """Get display properties for a relationship type."""
+    # Define arrow directions for different relationship types
+    arrow_direction_map = {
+        # Basic - no specific direction
+        RelationshipType.SENSE: 'to',
+        
+        # Taxonomic Relations - hypernyms point up (to more general), hyponyms point down (to more specific)
+        RelationshipType.HYPERNYM: 'to',  # points from specific to general
+        RelationshipType.HYPONYM: 'from',  # points from general to specific (reverse direction)
+        RelationshipType.INSTANCE_HYPERNYM: 'to',
+        RelationshipType.INSTANCE_HYPONYM: 'from',
+        
+        # Part-Whole Relations - meronyms point up (to whole), holonyms point down (to parts)
+        RelationshipType.MEMBER_HOLONYM: 'from',  # points from part to whole (reverse direction)
+        RelationshipType.SUBSTANCE_HOLONYM: 'from',
+        RelationshipType.PART_HOLONYM: 'from',
+        RelationshipType.MEMBER_MERONYM: 'to',  # points from whole to part
+        RelationshipType.SUBSTANCE_MERONYM: 'to',
+        RelationshipType.PART_MERONYM: 'to',
+        
+        # Default direction for all others
+        RelationshipType.ANTONYM: 'to',
+        RelationshipType.SIMILAR_TO: 'to',
+        RelationshipType.ENTAILMENT: 'to',
+        RelationshipType.CAUSE: 'to',
+        RelationshipType.ATTRIBUTE: 'to',
+        RelationshipType.ALSO_SEE: 'to',
+        RelationshipType.VERB_GROUP: 'to',
+        RelationshipType.PARTICIPLE_OF_VERB: 'to',
+        RelationshipType.DERIVATIONALLY_RELATED_FORM: 'to',
+        RelationshipType.PERTAINYM: 'to',
+        RelationshipType.DERIVED_FROM: 'to',
+        RelationshipType.DOMAIN_OF_SYNSET_TOPIC: 'to',
+        RelationshipType.MEMBER_OF_DOMAIN_TOPIC: 'to',
+        RelationshipType.DOMAIN_OF_SYNSET_REGION: 'to',
+        RelationshipType.MEMBER_OF_DOMAIN_REGION: 'to',
+        RelationshipType.DOMAIN_OF_SYNSET_USAGE: 'to',
+        RelationshipType.MEMBER_OF_DOMAIN_USAGE: 'to',
+    }
+    
     return {
         'color': get_relationship_color(relationship_type),
-        'arrow_direction': 'to',
+        'arrow_direction': arrow_direction_map.get(relationship_type, 'to'),
         'relation': relationship_type.value
     }
 

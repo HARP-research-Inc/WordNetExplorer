@@ -316,9 +316,9 @@ class GraphVisualizer:
         edge_colors = {
             'sense': '#666666',
             'hypernym': '#FF4444',
-            'hyponym': '#4488FF',
-            'meronym': '#44AA44',
-            'holonym': '#FFAA00'
+            'hyponym': '#FF4444',  # Same color as hypernym
+            'meronym': '#44AA44',  # Same color as holonym
+            'holonym': '#44AA44'
         }
         
         relation_descriptions = {
@@ -333,15 +333,27 @@ class GraphVisualizer:
             relation = edge_data.get('relation', 'unknown')
             color = edge_data.get('color', edge_colors.get(relation, '#888888'))
             description = relation_descriptions.get(relation, relation)
+            arrow_direction = edge_data.get('arrow_direction', 'to')
+            
+            # Handle reverse arrow direction by swapping source and target
+            if arrow_direction == 'from':
+                actual_source, actual_target = target, source
+                # Update description to reflect the reversed direction
+                if relation == 'hyponym':
+                    description = 'Type includes (more specific)'
+                elif relation in ['member_holonym', 'substance_holonym', 'part_holonym']:
+                    description = 'Has part'
+            else:
+                actual_source, actual_target = source, target
             
             edge_config = {
                 'color': color,
                 'width': self.config.edge_width + 1 if relation != 'sense' else self.config.edge_width,
                 'title': description,
-                'arrows': 'to'
+                'arrows': 'to'  # Always use 'to' since we swap source/target for 'from'
             }
             
-            net.add_edge(source, target, **edge_config)
+            net.add_edge(actual_source, actual_target, **edge_config)
     
     def _add_navigation_js(self, net: Network):
         """Add JavaScript for double-click navigation with enhanced console logging."""
@@ -435,18 +447,26 @@ class GraphVisualizer:
         edge_colors = {
             'sense': '#666666',
             'hypernym': '#FF4444',
-            'hyponym': '#4488FF',
-            'meronym': '#44AA44',
-            'holonym': '#FFAA00'
+            'hyponym': '#FF4444',  # Same color as hypernym
+            'meronym': '#44AA44',  # Same color as holonym
+            'holonym': '#44AA44'
         }
         
         # Group edges by relationship type
         edges_by_type = {}
         for source, target, data in G.edges(data=True):
             relation = data.get('relation', 'unknown')
+            arrow_direction = data.get('arrow_direction', 'to')
+            
+            # Handle reverse arrow direction by swapping source and target
+            if arrow_direction == 'from':
+                actual_edge = (target, source)
+            else:
+                actual_edge = (source, target)
+                
             if relation not in edges_by_type:
                 edges_by_type[relation] = []
-            edges_by_type[relation].append((source, target))
+            edges_by_type[relation].append(actual_edge)
         
         # Draw each group with its color
         for relation, edges in edges_by_type.items():
