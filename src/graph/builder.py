@@ -351,9 +351,19 @@ class GraphBuilder:
                 
             node_labels[target_node] = create_synset_label(target_synset)
         
-        # Add edge with relationship properties
+        # Add edge with relationship properties, respecting arrow direction
         rel_props = get_relationship_properties(rel_type)
-        G.add_edge(source_node, target_node, **rel_props)
+        arrow_direction = rel_props.get('arrow_direction', 'to')
+        
+        # Swap source and target if arrow direction is 'from'
+        if arrow_direction == 'from':
+            actual_source, actual_target = target_node, source_node
+        else:
+            actual_source, actual_target = source_node, target_node
+        
+        # Only add edge if it doesn't already exist to prevent overwriting
+        if not G.has_edge(actual_source, actual_target):
+            G.add_edge(actual_source, actual_target, **rel_props)
         
         # Recursively add connections if within depth limit
         if current_depth < self.config.depth:
@@ -393,16 +403,33 @@ class GraphBuilder:
                                 # Add edge if it doesn't exist
                                 if not G.has_edge(source_node, target_node):
                                     rel_props = get_relationship_properties(rel_type)
-                                    G.add_edge(source_node, target_node, **rel_props)
+                                    arrow_direction = rel_props.get('arrow_direction', 'to')
+                                    
+                                    # Respect arrow direction when adding cross-connections
+                                    if arrow_direction == 'from':
+                                        actual_source, actual_target = target_node, source_node
+                                    else:
+                                        actual_source, actual_target = source_node, target_node
+                                        
+                                    if not G.has_edge(actual_source, actual_target):
+                                        G.add_edge(actual_source, actual_target, **rel_props)
                                     
                         # Also check reverse relationships (target -> source)
                         target_relationships = get_relationships(target_synset, self.config.relationship_config)
                         for rel_type, related_synsets in target_relationships.items():
                             if source_synset in related_synsets:
                                 # Add edge if it doesn't exist (reverse direction)
-                                if not G.has_edge(target_node, source_node):
-                                    rel_props = get_relationship_properties(rel_type)
-                                    G.add_edge(target_node, source_node, **rel_props)
+                                rel_props = get_relationship_properties(rel_type)
+                                arrow_direction = rel_props.get('arrow_direction', 'to')
+                                
+                                # Respect arrow direction when adding reverse cross-connections
+                                if arrow_direction == 'from':
+                                    actual_source, actual_target = source_node, target_node
+                                else:
+                                    actual_source, actual_target = target_node, source_node
+                                    
+                                if not G.has_edge(actual_source, actual_target):
+                                    G.add_edge(actual_source, actual_target, **rel_props)
                                     
                     except Exception:
                         continue  # Skip invalid synset names
