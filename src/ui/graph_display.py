@@ -98,8 +98,8 @@ def render_color_legend(color_scheme, synset_search_mode=False):
         <div style="margin-left: 10px; margin-top: 5px;">
             <div style="margin: 3px 0;"><span style="color: #FF4444; font-weight: bold;">→</span> <strong>Hypernym</strong> - "is a type of" (more general)</div>
             <div style="margin: 3px 0;"><span style="color: #4488FF; font-weight: bold;">→</span> <strong>Hyponym</strong> - "type includes" (more specific)</div>
-            <div style="margin: 3px 0;"><span style="color: #44AA44; font-weight: bold;">→</span> <strong>Meronym</strong> - "has part"</div>
-            <div style="margin: 3px 0;"><span style="color: #FFAA00; font-weight: bold;">→</span> <strong>Holonym</strong> - "part of"</div>
+            <div style="margin: 3px 0;"><span style="color: #44AA44; font-weight: bold;">→</span> <strong>Meronym</strong> - "part of"</div>
+            <div style="margin: 3px 0;"><span style="color: #FFAA00; font-weight: bold;">→</span> <strong>Holonym</strong> - "has part"</div>
             <div style="margin: 3px 0;"><span style="color: #666666; font-weight: bold;">→</span> <strong>Sense</strong> - connects word to its meanings</div>
         </div>
     </div>

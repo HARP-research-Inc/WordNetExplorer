@@ -325,8 +325,8 @@ class GraphVisualizer:
             'sense': 'Word sense connection',
             'hypernym': 'Is a type of (more general)',
             'hyponym': 'Type includes (more specific)',
-            'meronym': 'Has part',
-            'holonym': 'Part of'
+            'meronym': 'Part of',
+            'holonym': 'Has part'
         }
         
         for source, target, edge_data in G.edges(data=True):
