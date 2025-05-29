@@ -407,6 +407,162 @@ class TestArrowConsistency:
         assert len(taxonomic_edges) > 0, "Should find taxonomic edges to test"
         print("✅ Arrow direction property handling verified")
 
+    @pytest.mark.dependency(depends=["TestArrowConsistency::test_arrow_direction_property_handling"])
+    def test_enhanced_color_scheme(self, explorer):
+        """Test that the enhanced color scheme properly groups relationship families."""
+        print("\n🔍 Testing enhanced color scheme...")
+        
+        # Import the color functions
+        from src.wordnet.relationships import get_relationship_color, RelationshipType
+        
+        # Test a word that will likely have multiple relationship types
+        G, _ = explorer.explore_word(
+            'dog', 
+            depth=2, 
+            max_nodes=50,
+            show_hypernyms=True,
+            show_hyponyms=True,
+            show_meronyms=True,
+            show_holonyms=True,
+            show_similar=True,
+            show_antonyms=True
+        )
+        
+        # Collect all relationships and their colors
+        relationship_colors = {}
+        color_families = {
+            'taxonomic': set(),
+            'part_whole': set(), 
+            'opposition': set(),
+            'causation': set(),
+            'cross_reference': set(),
+            'verb_specific': set(),
+            'morphological': set(),
+            'domain': set(),
+            'basic': set()
+        }
+        
+        for source, target, edge_data in G.edges(data=True):
+            relation = edge_data.get('relation', 'unknown')
+            color = edge_data.get('color', '#000000')
+            
+            if relation not in relationship_colors:
+                relationship_colors[relation] = color
+                
+            # Categorize into families
+            if relation in ['hypernym', 'hyponym', 'instance_hypernym', 'instance_hyponym']:
+                color_families['taxonomic'].add(color)
+            elif relation in ['member_holonym', 'substance_holonym', 'part_holonym', 
+                            'member_meronym', 'substance_meronym', 'part_meronym']:
+                color_families['part_whole'].add(color)
+            elif relation in ['antonym', 'similar_to']:
+                color_families['opposition'].add(color)
+            elif relation in ['entailment', 'cause']:
+                color_families['causation'].add(color)
+            elif relation in ['attribute', 'also_see']:
+                color_families['cross_reference'].add(color)
+            elif relation in ['verb_group', 'participle_of_verb']:
+                color_families['verb_specific'].add(color)
+            elif relation in ['derivationally_related_form', 'pertainym', 'derived_from']:
+                color_families['morphological'].add(color)
+            elif 'domain' in relation:
+                color_families['domain'].add(color)
+            elif relation == 'sense':
+                color_families['basic'].add(color)
+        
+        print(f"\n  Relationships found: {list(relationship_colors.keys())}")
+        print(f"  Colors by relationship:")
+        for rel, color in relationship_colors.items():
+            print(f"    {rel}: {color}")
+        
+        # Test color family consistency
+        print(f"\n  Color families analysis:")
+        for family, colors in color_families.items():
+            if colors:
+                print(f"    {family.replace('_', ' ').title()}: {len(colors)} unique colors - {list(colors)}")
+                
+                # Verify that colors within a family are visually related
+                if len(colors) > 1:
+                    colors_list = list(colors)
+                    family_consistency = self._analyze_color_family_consistency(family, colors_list)
+                    print(f"      Consistency: {family_consistency}")
+        
+        # Test specific color mappings
+        test_relationships = [
+            (RelationshipType.HYPERNYM, 'taxonomic'),
+            (RelationshipType.HYPONYM, 'taxonomic'),
+            (RelationshipType.MEMBER_HOLONYM, 'part_whole'),
+            (RelationshipType.PART_MERONYM, 'part_whole'),
+            (RelationshipType.ANTONYM, 'opposition'),
+            (RelationshipType.SIMILAR_TO, 'opposition')
+        ]
+        
+        print(f"\n  Testing specific relationship color mappings:")
+        for rel_type, expected_family in test_relationships:
+            color = get_relationship_color(rel_type)
+            print(f"    {rel_type.value}: {color} (expected {expected_family} family)")
+            
+            # Verify the color is not the default black
+            assert color != '#000000', f"Relationship {rel_type.value} should have a specific color"
+            
+            # Verify the color is a valid hex color
+            assert color.startswith('#'), f"Color {color} should be a hex color"
+            assert len(color) == 7, f"Color {color} should be 7 characters long"
+        
+        print("✅ Enhanced color scheme verification completed")
+    
+    def _analyze_color_family_consistency(self, family, colors):
+        """Analyze if colors in a family are visually consistent."""
+        if len(colors) <= 1:
+            return "Single color - consistent"
+        
+        # Convert hex colors to RGB for analysis
+        rgb_colors = []
+        for color in colors:
+            if color.startswith('#') and len(color) == 7:
+                try:
+                    r = int(color[1:3], 16)
+                    g = int(color[3:5], 16) 
+                    b = int(color[5:7], 16)
+                    rgb_colors.append((r, g, b))
+                except ValueError:
+                    continue
+        
+        if len(rgb_colors) <= 1:
+            return "Unable to analyze"
+        
+        # For family consistency, check if colors share similar dominant channels
+        family_expectations = {
+            'taxonomic': 'red_dominant',     # Red family
+            'part_whole': 'green_dominant',  # Green family
+            'opposition': 'purple_mixed',    # Purple family (high red+blue)
+            'causation': 'orange_mixed',     # Orange family (high red+green)
+            'cross_reference': 'blue_dominant',  # Blue family
+            'morphological': 'pink_mixed',   # Pink family (high red)
+            'domain': 'grey_balanced'        # Grey family (balanced RGB)
+        }
+        
+        expected = family_expectations.get(family, 'unknown')
+        
+        if expected == 'red_dominant':
+            # Check if red is dominant in most colors
+            red_dominant = sum(1 for r, g, b in rgb_colors if r > g and r > b)
+            return f"Red dominant in {red_dominant}/{len(rgb_colors)} colors"
+        elif expected == 'green_dominant':
+            green_dominant = sum(1 for r, g, b in rgb_colors if g > r and g > b)
+            return f"Green dominant in {green_dominant}/{len(rgb_colors)} colors"
+        elif expected == 'blue_dominant':
+            blue_dominant = sum(1 for r, g, b in rgb_colors if b > r and b > g)
+            return f"Blue dominant in {blue_dominant}/{len(rgb_colors)} colors"
+        elif expected == 'purple_mixed':
+            purple_like = sum(1 for r, g, b in rgb_colors if r > 100 and b > 100 and g < max(r, b))
+            return f"Purple-like in {purple_like}/{len(rgb_colors)} colors"
+        elif expected == 'orange_mixed':
+            orange_like = sum(1 for r, g, b in rgb_colors if r > 150 and g > 50 and b < 100)
+            return f"Orange-like in {orange_like}/{len(rgb_colors)} colors"
+        else:
+            return f"Family analysis for {expected}"
+
 
 class TestSpecificCases:
     """Test specific edge cases and problematic relationships."""

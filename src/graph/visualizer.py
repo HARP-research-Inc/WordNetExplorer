@@ -313,13 +313,19 @@ class GraphVisualizer:
     
     def _add_edges(self, net: Network, G: nx.Graph):
         """Add edges to the pyvis network."""
-        edge_colors = {
+        # Import here to avoid circular imports
+        from src.wordnet.relationships import get_relationship_color, RelationshipType
+        
+        # Create mapping from relationship strings to colors
+        edge_colors = {}
+        for rel_type in RelationshipType:
+            edge_colors[rel_type.value] = get_relationship_color(rel_type)
+        
+        # Add fallback colors for any unmapped relationships
+        edge_colors.update({
             'sense': '#666666',
-            'hypernym': '#FF4444',
-            'hyponym': '#FF4444',  # Same color as hypernym
-            'meronym': '#44AA44',  # Same color as holonym
-            'holonym': '#44AA44'
-        }
+            'unknown': '#888888'
+        })
         
         for source, target, edge_data in G.edges(data=True):
             relation = edge_data.get('relation', 'unknown')
@@ -365,7 +371,7 @@ class GraphVisualizer:
                 description = f"Similar to: {source_name} is similar to {target_name}"
             elif relation == 'antonym':
                 description = f"Opposite of: {source_name} is opposite to {target_name}"
-            elif relation == 'also':
+            elif relation == 'also_see':
                 description = f"Related to: {source_name} is also related to {target_name}"
             elif relation in ['entailment', 'entails']:
                 description = f"Entails: {source_name} entails {target_name}"
@@ -472,13 +478,19 @@ class GraphVisualizer:
     
     def _draw_colored_edges(self, G: nx.Graph, pos: Dict):
         """Draw edges with different colors based on relationship type."""
-        edge_colors = {
+        # Import here to avoid circular imports
+        from src.wordnet.relationships import get_relationship_color, RelationshipType
+        
+        # Create mapping from relationship strings to colors
+        edge_colors = {}
+        for rel_type in RelationshipType:
+            edge_colors[rel_type.value] = get_relationship_color(rel_type)
+        
+        # Add fallback colors for any unmapped relationships
+        edge_colors.update({
             'sense': '#666666',
-            'hypernym': '#FF4444',
-            'hyponym': '#FF4444',  # Same color as hypernym
-            'meronym': '#44AA44',  # Same color as holonym
-            'holonym': '#44AA44'
-        }
+            'unknown': '#888888'
+        })
         
         # Group edges by relationship type
         edges_by_type = {}

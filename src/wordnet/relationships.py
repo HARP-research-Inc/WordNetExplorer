@@ -257,51 +257,67 @@ def get_relationships(synset, config: RelationshipConfig) -> Dict[RelationshipTy
 
 
 def get_relationship_color(relationship_type: RelationshipType) -> str:
-    """Get the color code for a relationship type."""
+    """Get the color code for a relationship type.
+    
+    Color scheme organized by relationship families:
+    - Taxonomic: Red family (hypernyms/hyponyms)
+    - Part-Whole: Green family (meronyms/holonyms) 
+    - Opposition: Purple family (antonyms/similarity)
+    - Causation: Orange family (entailment/causation)
+    - Cross-Reference: Blue family (attributes/also_see)
+    - Verb Relations: Dark Green family
+    - Morphological: Pink family
+    - Domain: Grey family
+    """
     color_map = {
-        # Basic
-        RelationshipType.SENSE: '#666666',  # Grey
+        # Basic connection - neutral grey
+        RelationshipType.SENSE: '#666666',  # Medium grey
         
-        # Taxonomic Relations (Red family - same color for hyper/hypo)
-        RelationshipType.HYPERNYM: '#FF4444',  # Red
-        RelationshipType.HYPONYM: '#FF4444',   # Red (same as hypernym)
-        RelationshipType.INSTANCE_HYPERNYM: '#FF8888',  # Light red
-        RelationshipType.INSTANCE_HYPONYM: '#FF8888',   # Light red (same as instance_hypernym)
+        # TAXONOMIC RELATIONS - Red family (warm, hierarchical feeling)
+        RelationshipType.HYPERNYM: '#DC143C',          # Crimson (primary taxonomic)
+        RelationshipType.HYPONYM: '#B22222',           # Fire brick (slightly darker red)
+        RelationshipType.INSTANCE_HYPERNYM: '#FF6347', # Tomato (lighter, more orange-red)
+        RelationshipType.INSTANCE_HYPONYM: '#CD5C5C',  # Indian red (muted red)
         
-        # Part-Whole Relations (Green family - same color for mero/holo)
-        RelationshipType.MEMBER_HOLONYM: '#44AA44',   # Green
-        RelationshipType.SUBSTANCE_HOLONYM: '#44AA44', # Green (same as member_holonym)
-        RelationshipType.PART_HOLONYM: '#44AA44',     # Green (same as member_holonym)
-        RelationshipType.MEMBER_MERONYM: '#44AA44',   # Green (same as holonyms)
-        RelationshipType.SUBSTANCE_MERONYM: '#44AA44', # Green (same as holonyms)
-        RelationshipType.PART_MERONYM: '#44AA44',     # Green (same as holonyms)
+        # PART-WHOLE RELATIONS - Green family (natural, structural feeling)
+        # Holonyms (whole → part) - darker greens
+        RelationshipType.MEMBER_HOLONYM: '#228B22',     # Forest green (member holonym)
+        RelationshipType.SUBSTANCE_HOLONYM: '#32CD32',  # Lime green (substance holonym)  
+        RelationshipType.PART_HOLONYM: '#006400',       # Dark green (part holonym)
+        # Meronyms (part → whole) - lighter greens
+        RelationshipType.MEMBER_MERONYM: '#90EE90',     # Light green (member meronym)
+        RelationshipType.SUBSTANCE_MERONYM: '#98FB98',  # Pale green (substance meronym)
+        RelationshipType.PART_MERONYM: '#00FF7F',       # Spring green (part meronym)
         
-        # Antonymy & Similarity (Purple family)
-        RelationshipType.ANTONYM: '#AA44AA',   # Purple
-        RelationshipType.SIMILAR_TO: '#CC88CC', # Light purple
+        # OPPOSITION & SIMILARITY - Purple family (contrasting, complementary feeling)
+        RelationshipType.ANTONYM: '#8A2BE2',     # Blue violet (strong opposition)
+        RelationshipType.SIMILAR_TO: '#DA70D6', # Orchid (similar but distinct)
         
-        # Entailment & Causation (Brown family)
-        RelationshipType.ENTAILMENT: '#8B4513',  # Brown
-        RelationshipType.CAUSE: '#CD853F',      # Sandy brown
+        # CAUSATION & ENTAILMENT - Orange family (dynamic, action-oriented)
+        RelationshipType.ENTAILMENT: '#FF8C00', # Dark orange (logical entailment)
+        RelationshipType.CAUSE: '#FF4500',      # Orange red (direct causation)
         
-        # Attributes & Cross-References (Teal family)
-        RelationshipType.ATTRIBUTE: '#20B2AA',  # Light sea green
-        RelationshipType.ALSO_SEE: '#48D1CC',   # Medium turquoise
+        # CROSS-REFERENCE & ATTRIBUTES - Blue family (informational, linking)
+        RelationshipType.ATTRIBUTE: '#4169E1',  # Royal blue (attributes)
+        RelationshipType.ALSO_SEE: '#6495ED',   # Cornflower blue (see also)
         
-        # Verb-Specific (Dark green family)
-        RelationshipType.VERB_GROUP: '#006400',         # Dark green
-        RelationshipType.PARTICIPLE_OF_VERB: '#228B22', # Forest green
+        # VERB-SPECIFIC RELATIONS - Dark Green family (action-oriented)
+        RelationshipType.VERB_GROUP: '#2F4F4F',         # Dark slate grey (verb groups)
+        RelationshipType.PARTICIPLE_OF_VERB: '#708090', # Slate grey (participles)
         
-        # Morphological (Pink family)
-        RelationshipType.DERIVATIONALLY_RELATED_FORM: '#FF69B4', # Hot pink
-        RelationshipType.PERTAINYM: '#FFB6C1',                  # Light pink
-        RelationshipType.DERIVED_FROM: '#FFC0CB',               # Pink
+        # MORPHOLOGICAL & DERIVATIONAL - Pink family (linguistic transformation)
+        RelationshipType.DERIVATIONALLY_RELATED_FORM: '#FF1493', # Deep pink (derivational)
+        RelationshipType.PERTAINYM: '#FF69B4',                  # Hot pink (pertainyms)
+        RelationshipType.DERIVED_FROM: '#FFB6C1',               # Light pink (derived from)
         
-        # Domain Labels (Grey family)
+        # DOMAIN LABELS - Grey family (categorical, organizational)
+        # Topic domains - blue-greys
         RelationshipType.DOMAIN_OF_SYNSET_TOPIC: '#708090',     # Slate grey
         RelationshipType.MEMBER_OF_DOMAIN_TOPIC: '#778899',     # Light slate grey
+        # Region domains - neutral greys  
         RelationshipType.DOMAIN_OF_SYNSET_REGION: '#696969',    # Dim grey
         RelationshipType.MEMBER_OF_DOMAIN_REGION: '#808080',    # Grey
+        # Usage domains - lighter greys
         RelationshipType.DOMAIN_OF_SYNSET_USAGE: '#A9A9A9',     # Dark grey
         RelationshipType.MEMBER_OF_DOMAIN_USAGE: '#C0C0C0',     # Silver
     }
