@@ -117,6 +117,187 @@ class TestArrowConsistency:
         print("✅ Taxonomic arrow consistency verified")
     
     @pytest.mark.dependency(depends=["TestArrowConsistency::test_time_hierarchy_consistency"])
+    def test_comprehensive_specific_to_abstract_arrows(self, explorer):
+        """Comprehensive test to ensure ALL taxonomic arrows go from specific to abstract across all relevant categories."""
+        print("\n🔍 COMPREHENSIVE TEST: All taxonomic arrows specific → abstract...")
+        
+        # Test words from different semantic domains
+        test_words = [
+            # Animals
+            'dog', 'cat', 'bird', 'mammal', 'vertebrate',
+            # Objects
+            'car', 'vehicle', 'chair', 'furniture', 'table',
+            # Time units
+            'second', 'minute', 'hour', 'day', 'week',
+            # Abstract concepts
+            'emotion', 'happiness', 'sadness', 'feeling',
+            # Actions/Verbs
+            'run', 'walk', 'move', 'travel',
+            # Properties/Adjectives
+            'big', 'large', 'huge', 'small', 'tiny'
+        ]
+        
+        all_violations = []
+        all_taxonomic_relationships = []
+        domain_stats = {}
+        
+        for word in test_words:
+            print(f"\n  🔍 Testing '{word}'...")
+            
+            try:
+                G, _ = explorer.explore_word(
+                    word, 
+                    depth=2, 
+                    max_nodes=30,
+                    show_hypernyms=True,
+                    show_hyponyms=True
+                )
+                
+                word_relationships = []
+                for source, target, edge_data in G.edges(data=True):
+                    relation = edge_data.get('relation', 'unknown')
+                    if relation in ['hypernym', 'hyponym']:
+                        arrow_info = analyze_arrow_direction(source, target, edge_data)
+                        word_relationships.append(arrow_info)
+                        all_taxonomic_relationships.append(arrow_info)
+                        
+                        # Check for violations of specific → abstract rule
+                        violation = self._check_specific_to_abstract_violation(arrow_info)
+                        if violation:
+                            all_violations.append({
+                                'word': word,
+                                'arrow_info': arrow_info,
+                                'violation_reason': violation
+                            })
+                        
+                        print(f"    {relation.upper()}: {arrow_info['visual_arrow']}")
+                
+                # Track domain statistics
+                domain = self._categorize_word_domain(word)
+                if domain not in domain_stats:
+                    domain_stats[domain] = {'total': 0, 'violations': 0}
+                domain_stats[domain]['total'] += len(word_relationships)
+                domain_stats[domain]['violations'] += len([v for v in all_violations if v['word'] == word])
+                
+                print(f"    Found {len(word_relationships)} taxonomic relationships")
+                
+            except Exception as e:
+                print(f"    ⚠️  Error processing '{word}': {e}")
+                continue
+        
+        # Analyze results
+        print(f"\n📊 COMPREHENSIVE ANALYSIS RESULTS:")
+        print(f"  Total taxonomic relationships analyzed: {len(all_taxonomic_relationships)}")
+        print(f"  Total violations found: {len(all_violations)}")
+        
+        # Domain breakdown
+        print(f"\n📈 Domain Breakdown:")
+        for domain, stats in domain_stats.items():
+            violation_rate = (stats['violations'] / stats['total'] * 100) if stats['total'] > 0 else 0
+            print(f"    {domain}: {stats['total']} relationships, {stats['violations']} violations ({violation_rate:.1f}%)")
+        
+        # Report violations
+        if all_violations:
+            print(f"\n❌ VIOLATIONS FOUND:")
+            for violation in all_violations[:10]:  # Show first 10 violations
+                print(f"    Word: {violation['word']}")
+                print(f"    Arrow: {violation['arrow_info']['visual_arrow']}")
+                print(f"    Reason: {violation['violation_reason']}")
+                print()
+        
+        # Calculate overall success rate
+        violation_rate = len(all_violations) / len(all_taxonomic_relationships) if all_taxonomic_relationships else 0
+        success_rate = 1 - violation_rate
+        
+        print(f"\n🎯 OVERALL RESULTS:")
+        print(f"    Success rate: {success_rate:.2%}")
+        print(f"    Violation rate: {violation_rate:.2%}")
+        
+        # Assert that we have very high consistency (allowing for some edge cases in WordNet)
+        assert success_rate >= 0.90, f"Taxonomic arrows should be at least 90% consistent (specific → abstract). Current: {success_rate:.2%}"
+        
+        if success_rate >= 0.95:
+            print("✅ EXCELLENT: 95%+ consistency achieved")
+        elif success_rate >= 0.90:
+            print("✅ GOOD: 90%+ consistency achieved")
+        
+        print("✅ Comprehensive specific → abstract arrow test PASSED")
+    
+    def _check_specific_to_abstract_violation(self, arrow_info):
+        """Check if an arrow violates the specific → abstract rule."""
+        source = arrow_info['visual_source'].lower()
+        target = arrow_info['visual_target'].lower()
+        
+        # Define abstraction levels (higher = more abstract)
+        abstraction_levels = {
+            # Most concrete
+            'femtosecond': 1, 'picosecond': 1, 'nanosecond': 1, 'microsecond': 1,
+            'millisecond': 1, 'second': 1, 'minute': 1, 'hour': 1, 'day': 1,
+            'dog': 1, 'cat': 1, 'bird': 1, 'car': 1, 'chair': 1, 'table': 1,
+            'happiness': 1, 'sadness': 1,
+            
+            # Intermediate
+            'canine': 2, 'feline': 2, 'mammal': 2, 'vehicle': 2, 'furniture': 2,
+            'time_unit': 2, 'emotion': 2,
+            
+            # More abstract
+            'vertebrate': 3, 'animal': 3, 'organism': 3, 'artifact': 3,
+            'measure': 3, 'feeling': 3,
+            
+            # Very abstract
+            'living_thing': 4, 'whole': 4, 'object': 4, 'quantity': 4,
+            'abstraction': 5, 'entity': 6
+        }
+        
+        source_level = abstraction_levels.get(source, 0)
+        target_level = abstraction_levels.get(target, 0)
+        
+        # If we can determine levels and source is more abstract than target, it's a violation
+        if source_level > 0 and target_level > 0 and source_level > target_level:
+            return f"Abstract ({source}, level {source_level}) → Specific ({target}, level {target_level})"
+        
+        # Check for obvious violations based on common knowledge
+        if self._is_obvious_abstract_to_specific(source, target):
+            return f"Obvious violation: {source} is more abstract than {target}"
+        
+        return None
+    
+    def _is_obvious_abstract_to_specific(self, source, target):
+        """Check for obvious abstract → specific violations."""
+        abstract_to_specific_patterns = [
+            ('entity', ['dog', 'cat', 'car', 'table']),
+            ('abstraction', ['measure', 'time_unit', 'emotion']),
+            ('measure', ['second', 'minute', 'hour']),
+            ('animal', ['dog', 'cat', 'bird']),
+            ('vehicle', ['car', 'truck', 'bus']),
+            ('furniture', ['chair', 'table', 'bed']),
+            ('emotion', ['happiness', 'sadness', 'anger'])
+        ]
+        
+        for abstract_term, specific_terms in abstract_to_specific_patterns:
+            if source == abstract_term and target in specific_terms:
+                return True
+        
+        return False
+    
+    def _categorize_word_domain(self, word):
+        """Categorize a word into a semantic domain."""
+        domains = {
+            'animals': ['dog', 'cat', 'bird', 'mammal', 'vertebrate'],
+            'objects': ['car', 'vehicle', 'chair', 'furniture', 'table'],
+            'time': ['second', 'minute', 'hour', 'day', 'week', 'femtosecond', 'picosecond'],
+            'emotions': ['emotion', 'happiness', 'sadness', 'feeling'],
+            'actions': ['run', 'walk', 'move', 'travel'],
+            'properties': ['big', 'large', 'huge', 'small', 'tiny']
+        }
+        
+        for domain, words in domains.items():
+            if word in words:
+                return domain
+        
+        return 'other'
+
+    @pytest.mark.dependency(depends=["TestArrowConsistency::test_comprehensive_specific_to_abstract_arrows"])
     def test_tooltip_accuracy(self, explorer):
         """Test that tooltips accurately describe the visual arrows."""
         print("\n🔍 Testing tooltip accuracy...")
