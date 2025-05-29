@@ -29,6 +29,7 @@ DEFAULT_SETTINGS = {
     'min_frequency': 0,  # Minimum word frequency filter
     'pos_filter': ["Nouns", "Verbs", "Adjectives", "Adverbs"],  # Part-of-speech filter
     'enable_clustering': False,  # Enable node clustering
+    'enable_cross_connections': True,  # Enable cross-connections between nodes
     'simplified_mode': False,  # Simplified rendering mode
     
     # Comprehensive WordNet relationship types

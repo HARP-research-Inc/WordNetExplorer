@@ -220,6 +220,7 @@ def render_graph_visualization(word, settings, explorer=None, synset_search_mode
                 min_frequency=settings.get('min_frequency', 0),
                 pos_filter=settings.get('pos_filter', ["Nouns", "Verbs", "Adjectives", "Adverbs"]),
                 enable_clustering=settings.get('enable_clustering', False),
+                enable_cross_connections=settings.get('enable_cross_connections', True),
                 simplified_mode=settings.get('simplified_mode', False),
                 **{k: v for k, v in settings.items() if k.startswith('show_')}
             )
@@ -235,6 +236,7 @@ def render_graph_visualization(word, settings, explorer=None, synset_search_mode
                 min_frequency=settings.get('min_frequency', 0),
                 pos_filter=settings.get('pos_filter', ["Nouns", "Verbs", "Adjectives", "Adverbs"]),
                 enable_clustering=settings.get('enable_clustering', False),
+                enable_cross_connections=settings.get('enable_cross_connections', True),
                 simplified_mode=settings.get('simplified_mode', False),
                 **{k: v for k, v in settings.items() if k.startswith('show_')}
             )

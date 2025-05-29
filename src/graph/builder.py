@@ -34,6 +34,7 @@ class GraphConfig:
     min_frequency: int = 0
     pos_filter: list = None
     enable_clustering: bool = False
+    enable_cross_connections: bool = True
     simplified_mode: bool = False
     
     def __post_init__(self):
@@ -106,8 +107,9 @@ class GraphBuilder:
                 break
             self._add_synset_connections(G, node_labels, synset, 0, word)
         
-        # Add cross-connections between existing nodes
-        self._add_cross_connections(G, node_labels)
+        # Add cross-connections between existing nodes (if enabled)
+        if self.config.enable_cross_connections:
+            self._add_cross_connections(G, node_labels)
         
         return G, node_labels
     
@@ -203,8 +205,9 @@ class GraphBuilder:
         # Add relationship connections to other synsets
         self._add_synset_relationships(G, node_labels, synset, synset_node, 0)
         
-        # Add cross-connections between existing nodes
-        self._add_cross_connections(G, node_labels)
+        # Add cross-connections between existing nodes (if enabled)
+        if self.config.enable_cross_connections:
+            self._add_cross_connections(G, node_labels)
         
         return G, node_labels
     

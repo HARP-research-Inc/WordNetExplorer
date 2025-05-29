@@ -37,6 +37,7 @@ class WordNetExplorer:
                     min_frequency: int = 0,
                     pos_filter: list = None,
                     enable_clustering: bool = False,
+                    enable_cross_connections: bool = True,
                     simplified_mode: bool = False,
                     **relationship_kwargs) -> Tuple[nx.Graph, Dict]:
         """
@@ -48,23 +49,21 @@ class WordNetExplorer:
             sense_number: Specific sense number to display (1-based, None for all)
             max_nodes: Maximum number of nodes to include in graph
             max_branches: Maximum branches per node
-            min_frequency: Minimum word frequency filter
-            pos_filter: List of part-of-speech types to include
+            min_frequency: Minimum word frequency to include
+            pos_filter: List of parts of speech to include
             enable_clustering: Whether to enable node clustering
+            enable_cross_connections: Whether to find cross-connections between nodes
             simplified_mode: Whether to use simplified rendering
-            **relationship_kwargs: All relationship type settings
+            **relationship_kwargs: Relationship configuration (show_hypernyms, etc.)
             
         Returns:
-            Tuple of (graph, node_labels)
+            Tuple of (NetworkX graph, node labels dict)
         """
-        # Set default POS filter if not provided
-        if pos_filter is None:
-            pos_filter = ["Nouns", "Verbs", "Adjectives", "Adverbs"]
-            
-        # Update configuration with all relationship settings
+        # Create relationship configuration
         relationship_config = RelationshipConfig(**relationship_kwargs)
         
-        graph_config = GraphConfig(
+        # Create graph configuration
+        config = GraphConfig(
             depth=depth,
             sense_number=sense_number,
             relationship_config=relationship_config,
@@ -73,14 +72,13 @@ class WordNetExplorer:
             min_frequency=min_frequency,
             pos_filter=pos_filter,
             enable_clustering=enable_clustering,
+            enable_cross_connections=enable_cross_connections,
             simplified_mode=simplified_mode
         )
         
-        # Update builder with new config
-        self.graph_builder.config = graph_config
-        
-        # Build and return graph
-        return self.graph_builder.build_graph(word)
+        # Build and return the graph
+        builder = GraphBuilder(config)
+        return builder.build_graph(word)
     
     def explore_synset(self, synset_name: str, 
                       depth: int = 1,
@@ -89,6 +87,7 @@ class WordNetExplorer:
                       min_frequency: int = 0,
                       pos_filter: list = None,
                       enable_clustering: bool = False,
+                      enable_cross_connections: bool = True,
                       simplified_mode: bool = False,
                       **relationship_kwargs) -> Tuple[nx.Graph, Dict]:
         """
@@ -99,23 +98,21 @@ class WordNetExplorer:
             depth: How many levels deep to explore relationships
             max_nodes: Maximum number of nodes to include in graph
             max_branches: Maximum branches per node
-            min_frequency: Minimum word frequency filter
-            pos_filter: List of part-of-speech types to include
+            min_frequency: Minimum word frequency to include
+            pos_filter: List of parts of speech to include
             enable_clustering: Whether to enable node clustering
+            enable_cross_connections: Whether to find cross-connections between nodes
             simplified_mode: Whether to use simplified rendering
-            **relationship_kwargs: All relationship type settings
+            **relationship_kwargs: Relationship configuration (show_hypernyms, etc.)
             
         Returns:
-            Tuple of (graph, node_labels)
+            Tuple of (NetworkX graph, node labels dict)
         """
-        # Set default POS filter if not provided
-        if pos_filter is None:
-            pos_filter = ["Nouns", "Verbs", "Adjectives", "Adverbs"]
-            
-        # Update configuration with all relationship settings
+        # Create relationship configuration
         relationship_config = RelationshipConfig(**relationship_kwargs)
         
-        graph_config = GraphConfig(
+        # Create graph configuration
+        config = GraphConfig(
             depth=depth,
             sense_number=None,  # Not applicable for synset search
             relationship_config=relationship_config,
@@ -124,14 +121,13 @@ class WordNetExplorer:
             min_frequency=min_frequency,
             pos_filter=pos_filter,
             enable_clustering=enable_clustering,
+            enable_cross_connections=enable_cross_connections,
             simplified_mode=simplified_mode
         )
         
-        # Update builder with new config
-        self.graph_builder.config = graph_config
-        
-        # Build synset-focused graph
-        return self.graph_builder.build_synset_graph(synset_name)
+        # Build and return the graph
+        builder = GraphBuilder(config)
+        return builder.build_synset_graph(synset_name)
     
     def visualize_graph(self, G: nx.Graph, node_labels: Dict, word: str,
                        save_path: str = None,

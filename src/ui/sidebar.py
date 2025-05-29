@@ -267,6 +267,13 @@ def render_basic_settings(session_manager):
             help="Group related nodes together (may slow down large graphs)"
         )
         
+        # Cross-connections option
+        enable_cross_connections = st.checkbox(
+            "Enable Cross-Connections",
+            value=get_url_default(session_manager, 'enable_cross_connections', True),
+            help="Find and display relationships between existing nodes (creates richer graphs but may be slower)"
+        )
+        
         # Simplified mode for large graphs
         simplified_mode = st.checkbox(
             "Simplified Mode",
@@ -281,6 +288,7 @@ def render_basic_settings(session_manager):
             'min_frequency': min_frequency,
             'pos_filter': pos_filter,
             'enable_clustering': enable_clustering,
+            'enable_cross_connections': enable_cross_connections,
             'simplified_mode': simplified_mode
         }
         
@@ -648,9 +656,11 @@ def render_about_section():
     - **Advanced Depth**: Explore up to 10 levels deep (warning: large graphs above depth 3)
     - **Max Nodes**: Limit graph size to prevent performance issues (10-1000 nodes)
     - **Max Branches**: Control how many related concepts to show per node (1-20)
-    - **POS Filter**: Show only specific parts of speech (nouns, verbs, etc.)
-    - **Node Filtering**: Filter by word frequency or enable clustering
-    - **Performance**: Simplified mode for better performance with large graphs
+    - **Min Frequency**: Filter out rare words (0 = include all)
+    - **POS Filter**: Choose which parts of speech to include
+    - **Cross-Connections**: When enabled, finds relationships between all nodes in the graph (creates richer, more interconnected graphs but may be slower)
+    - **Clustering**: Group related nodes together visually
+    - **Simplified Mode**: Use simpler rendering for better performance with large graphs
     
     **Navigation:**
     - Double-click any node to explore that concept
