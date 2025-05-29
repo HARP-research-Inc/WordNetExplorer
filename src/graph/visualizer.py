@@ -326,6 +326,9 @@ class GraphVisualizer:
             color = edge_data.get('color', edge_colors.get(relation, '#888888'))
             arrow_direction = edge_data.get('arrow_direction', 'to')
             
+            # Initialize actual_source and actual_target for all cases
+            actual_source, actual_target = source, target
+            
             # For taxonomic relationships, ensure consistent direction: specific → general
             if relation in ['hypernym', 'hyponym']:
                 # Always make taxonomic arrows go specific → general (consistent direction)
