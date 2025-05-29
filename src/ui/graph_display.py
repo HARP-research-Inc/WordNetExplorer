@@ -201,130 +201,75 @@ def save_graph_to_file(explorer, G, node_labels, word, settings):
         word: The word being visualized
         settings: Settings dictionary containing filename and other options
     """
-    downloads_dir = ensure_downloads_directory()
+    # Generate HTML content
+    html_content = explorer.visualize_graph(
+        G, node_labels, word,
+        save_path=None,  # Don't save to file, get HTML content
+        layout_type=settings['layout_type'],
+        node_size_multiplier=settings['node_size_multiplier'],
+        enable_physics=settings['enable_physics'],
+        spring_strength=settings['spring_strength'],
+        central_gravity=settings['central_gravity'],
+        show_labels=settings['show_labels'],
+        edge_width=settings['edge_width'],
+        color_scheme=settings['color_scheme']
+    )
     
-    # Save HTML if requested
-    if settings['save_graph']:
-        validated_filename = validate_filename(settings['filename'], ".html")
-        save_path = downloads_dir / validated_filename
-        
-        # Generate HTML and save to file
-        explorer.visualize_graph(
-            G, node_labels, word,
-            save_path=str(save_path),
-            layout_type=settings['layout_type'],
-            node_size_multiplier=settings['node_size_multiplier'],
-            enable_physics=settings['enable_physics'],
-            spring_strength=settings['spring_strength'],
-            central_gravity=settings['central_gravity'],
-            show_labels=settings['show_labels'],
-            edge_width=settings['edge_width'],
-            color_scheme=settings['color_scheme']
-        )
-        st.success(f"Interactive graph saved to: {save_path}")
+    if html_content:
+        # Store HTML content in session state
+        st.session_state.html_content = html_content
     
-    # Save JSON if requested
-    if settings.get('export_json'):
-        from src.graph import GraphSerializer
-        serializer = GraphSerializer()
-        
-        # Add metadata
-        metadata = {
-            'word': word,
-            'description': f'WordNet graph for "{word}"',
-            'version': '1.0',
-            'visualization_config': {
-                'layout_type': settings['layout_type'],
-                'node_size_multiplier': settings['node_size_multiplier'],
-                'enable_physics': settings['enable_physics'],
-                'spring_strength': settings['spring_strength'],
-                'central_gravity': settings['central_gravity'],
-                'show_labels': settings['show_labels'],
-                'edge_width': settings['edge_width'],
-                'color_scheme': settings['color_scheme']
-            }
+    # Generate JSON content
+    from src.graph import GraphSerializer
+    serializer = GraphSerializer()
+    
+    # Add metadata
+    metadata = {
+        'word': word,
+        'description': f'WordNet graph for "{word}"',
+        'version': '1.0',
+        'visualization_config': {
+            'layout_type': settings['layout_type'],
+            'node_size_multiplier': settings['node_size_multiplier'],
+            'enable_physics': settings['enable_physics'],
+            'spring_strength': settings['spring_strength'],
+            'central_gravity': settings['central_gravity'],
+            'show_labels': settings['show_labels'],
+            'edge_width': settings['edge_width'],
+            'color_scheme': settings['color_scheme']
         }
-        
-        # Save JSON file
-        json_filename = validate_filename(settings['json_filename'], ".json")
-        json_path = downloads_dir / json_filename
-        serializer.save_graph(G, node_labels, str(json_path), metadata)
-        st.success(f"Graph data saved to: {json_path}")
+    }
+    
+    # Store JSON content in session state
+    st.session_state.graph_data = serializer.serialize_graph(G, node_labels, metadata)
 
 
 def render_graph_visualization(word, settings, explorer=None, synset_search_mode=False):
     """
-    Render the complete graph visualization section.
+    Render the graph visualization with the given settings.
     
     Args:
-        word (str): The word to visualize (or synset name if in synset mode)
-        settings (dict): Dictionary containing all graph settings
-        explorer: WordNetExplorer instance (optional, will create if not provided)
-        synset_search_mode (bool): Whether we're searching by synset instead of word
+        word: The word to visualize
+        settings: Dictionary of visualization settings
+        explorer: Optional WordNetExplorer instance
+        synset_search_mode: Whether we're in synset search mode
     """
-    st.markdown('<h2 class="sub-header">Relationship Graph</h2>', unsafe_allow_html=True)
+    if explorer is None:
+        from src.wordnet_explorer import WordNetExplorer
+        explorer = WordNetExplorer()
     
     # Check for imported graph
     if 'imported_graph' in st.session_state:
         G, node_labels, metadata = st.session_state.imported_graph
-        st.info("📥 Using imported graph data")
-        
-        # Apply visualization settings from metadata if available
+        # Update visualization settings from metadata if available
         if 'visualization_config' in metadata:
-            vis_config = metadata['visualization_config']
-            settings.update({
-                'layout_type': vis_config.get('layout_type', settings['layout_type']),
-                'node_size_multiplier': vis_config.get('node_size_multiplier', settings['node_size_multiplier']),
-                'enable_physics': vis_config.get('enable_physics', settings['enable_physics']),
-                'spring_strength': vis_config.get('spring_strength', settings['spring_strength']),
-                'central_gravity': vis_config.get('central_gravity', settings['central_gravity']),
-                'show_labels': vis_config.get('show_labels', settings['show_labels']),
-                'edge_width': vis_config.get('edge_width', settings['edge_width']),
-                'color_scheme': vis_config.get('color_scheme', settings['color_scheme'])
-            })
+            settings.update(metadata['visualization_config'])
     else:
-        # Show navigation info - different message for synset mode
+        # Build the graph
         if synset_search_mode:
-            st.info(f"💡 **Synset Mode**: Exploring synset `{word}` and its word senses. **Double-click any node** to explore further!")
+            G, node_labels = explorer.explore_synset(word)
         else:
-            st.info("💡 **Double-click any node** to explore that concept! Your navigation history is saved above.")
-        
-        # Create explorer if not provided
-        if explorer is None:
-            from src.core import WordNetExplorer
-            explorer = WordNetExplorer()
-        
-        if synset_search_mode:
-            with st.spinner(f"Building WordNet graph for synset '{word}'..."):
-                # Build synset-focused graph - pass all relationship settings and advanced settings
-                G, node_labels = explorer.explore_synset(
-                    synset_name=word, 
-                    depth=settings['depth'],
-                    max_nodes=settings.get('max_nodes', 100),
-                    max_branches=settings.get('max_branches', 5),
-                    min_frequency=settings.get('min_frequency', 0),
-                    pos_filter=settings.get('pos_filter', ["Nouns", "Verbs", "Adjectives", "Adverbs"]),
-                    enable_clustering=settings.get('enable_clustering', False),
-                    enable_cross_connections=settings.get('enable_cross_connections', True),
-                    simplified_mode=settings.get('simplified_mode', False),
-                    **{k: v for k, v in settings.items() if k.startswith('show_')}
-                )
-        else:
-            with st.spinner(f"Building WordNet graph for '{word}'..."):
-                # Build the graph using the new modular explorer - pass all relationship settings and advanced settings
-                G, node_labels = explorer.explore_word(
-                    word=word, 
-                    depth=settings['depth'],
-                    sense_number=settings.get('parsed_sense_number'),
-                    max_nodes=settings.get('max_nodes', 100),
-                    max_branches=settings.get('max_branches', 5),
-                    min_frequency=settings.get('min_frequency', 0),
-                    pos_filter=settings.get('pos_filter', ["Nouns", "Verbs", "Adjectives", "Adverbs"]),
-                    enable_clustering=settings.get('enable_clustering', False),
-                    enable_cross_connections=settings.get('enable_cross_connections', True),
-                    simplified_mode=settings.get('simplified_mode', False),
-                    **{k: v for k, v in settings.items() if k.startswith('show_')}
-                )
+            G, node_labels = explorer.explore_word(word)
     
     if G.number_of_nodes() > 0:
         st.info(f"Graph created with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges")
@@ -350,9 +295,8 @@ def render_graph_visualization(word, settings, explorer=None, synset_search_mode
             # Add comprehensive legend and controls
             render_graph_legend_and_controls(G, settings, synset_search_mode)
             
-            # Save the graph if requested
-            if settings['save_graph'] or settings.get('export_json'):
-                save_graph_to_file(explorer, G, node_labels, word, settings)
+            # Always save graph data for download
+            save_graph_to_file(explorer, G, node_labels, word, settings)
         else:
             st.error("Failed to generate graph visualization")
     else:
