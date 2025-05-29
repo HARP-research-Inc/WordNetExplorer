@@ -189,6 +189,98 @@ def render_search_history():
         log_word_input_event("NO_SEARCH_HISTORY_TO_RENDER")
 
 
+def render_relationship_types(session_manager):
+    """Render general relationship type checkboxes at top level."""
+    
+    st.markdown("### 🔗 Relationship Types")
+    st.markdown("**Select which types of semantic relationships to display:**")
+    
+    # General relationship categories (vertical list)
+    # Taxonomic Relations
+    taxonomic_all = st.checkbox(
+        "🏛️ Taxonomic Relations", 
+        value=get_url_default(session_manager, 'show_hypernym', False) or get_url_default(session_manager, 'show_hyponym', False),
+        help="'is-a' relationships - hierarchical connections between general and specific concepts"
+    )
+    
+    # Part-Whole Relations  
+    parthole_all = st.checkbox(
+        "🧩 Part-Whole Relations", 
+        value=get_url_default(session_manager, 'show_member_meronym', False) or get_url_default(session_manager, 'show_part_meronym', False),
+        help="Meronymy/Holonymy - relationships between wholes and their parts"
+    )
+
+    # Similarity & Opposition
+    similarity_all = st.checkbox(
+        "🔄 Similarity & Opposition", 
+        value=get_url_default(session_manager, 'show_antonym', False) or get_url_default(session_manager, 'show_similar_to', False),
+        help="Antonyms, synonyms, and similarity relationships"
+    )
+    
+    # Other Relations
+    other_all = st.checkbox(
+        "⚡ Other Relations", 
+        value=get_url_default(session_manager, 'show_entailment', False) or get_url_default(session_manager, 'show_cause', False),
+        help="Entailment, causation, attributes, and domain relationships"
+    )
+    
+    # Set basic relationship flags based on general selections
+    show_hypernym = taxonomic_all
+    show_hyponym = taxonomic_all
+    show_member_meronym = parthole_all
+    show_part_meronym = parthole_all
+    show_member_holonym = parthole_all
+    show_part_holonym = parthole_all
+    show_antonym = similarity_all
+    show_similar_to = similarity_all
+    show_entailment = other_all
+    show_cause = other_all
+    show_attribute = other_all
+    show_also_see = other_all
+    
+    # Return basic settings for backward compatibility
+    basic_relationships = {
+        # Legacy compatibility
+        'show_hypernyms': show_hypernym,
+        'show_hyponyms': show_hyponym,
+        'show_meronyms': show_member_meronym or show_part_meronym,
+        'show_holonyms': show_member_holonym or show_part_holonym,
+        
+        # Basic new settings
+        'show_hypernym': show_hypernym,
+        'show_hyponym': show_hyponym,
+        'show_member_meronym': show_member_meronym,
+        'show_part_meronym': show_part_meronym,
+        'show_member_holonym': show_member_holonym,
+        'show_part_holonym': show_part_holonym,
+        'show_antonym': show_antonym,
+        'show_similar_to': show_similar_to,
+        'show_entailment': show_entailment,
+        'show_cause': show_cause,
+        'show_attribute': show_attribute,
+        'show_also_see': show_also_see,
+        
+        # Set remaining specific types to False by default (can be overridden in advanced)
+        'show_instance_hypernym': False,
+        'show_instance_hyponym': False,
+        'show_substance_holonym': False,
+        'show_substance_meronym': False,
+        'show_verb_group': False,
+        'show_participle_of_verb': False,
+        'show_derivationally_related_form': False,
+        'show_pertainym': False,
+        'show_derived_from': False,
+        'show_domain_of_synset_topic': False,
+        'show_member_of_domain_topic': False,
+        'show_domain_of_synset_region': False,
+        'show_member_of_domain_region': False,
+        'show_domain_of_synset_usage': False,
+        'show_member_of_domain_usage': False,
+    }
+    
+    return basic_relationships
+
+
 def render_basic_settings(session_manager):
     """Render basic exploration settings."""
     depth = st.slider(
@@ -307,102 +399,6 @@ def render_basic_settings(session_manager):
         advanced_settings.update(advanced_relationship_settings)
         
     return depth, advanced_settings
-
-
-def render_relationship_types(session_manager):
-    """Render general relationship type checkboxes at top level."""
-    
-    st.markdown("### 🔗 Relationship Types")
-    st.markdown("**Select which types of semantic relationships to display:**")
-    
-    # General relationship categories (top level)
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        # Taxonomic Relations
-        taxonomic_all = st.checkbox(
-            "🏛️ Taxonomic Relations", 
-            value=get_url_default(session_manager, 'show_hypernym', False) or get_url_default(session_manager, 'show_hyponym', False),
-            help="'is-a' relationships - hierarchical connections between general and specific concepts"
-        )
-        
-        # Part-Whole Relations  
-        parthole_all = st.checkbox(
-            "🧩 Part-Whole Relations", 
-            value=get_url_default(session_manager, 'show_member_meronym', False) or get_url_default(session_manager, 'show_part_meronym', False),
-            help="Meronymy/Holonymy - relationships between wholes and their parts"
-        )
-    
-    with col2:
-        # Similarity & Opposition
-        similarity_all = st.checkbox(
-            "🔄 Similarity & Opposition", 
-            value=get_url_default(session_manager, 'show_antonym', False) or get_url_default(session_manager, 'show_similar_to', False),
-            help="Antonyms, synonyms, and similarity relationships"
-        )
-        
-        # Other Relations
-        other_all = st.checkbox(
-            "⚡ Other Relations", 
-            value=get_url_default(session_manager, 'show_entailment', False) or get_url_default(session_manager, 'show_cause', False),
-            help="Entailment, causation, attributes, and domain relationships"
-        )
-    
-    # Set basic relationship flags based on general selections
-    show_hypernym = taxonomic_all
-    show_hyponym = taxonomic_all
-    show_member_meronym = parthole_all
-    show_part_meronym = parthole_all
-    show_member_holonym = parthole_all
-    show_part_holonym = parthole_all
-    show_antonym = similarity_all
-    show_similar_to = similarity_all
-    show_entailment = other_all
-    show_cause = other_all
-    show_attribute = other_all
-    show_also_see = other_all
-    
-    # Return basic settings for backward compatibility
-    basic_relationships = {
-        # Legacy compatibility
-        'show_hypernyms': show_hypernym,
-        'show_hyponyms': show_hyponym,
-        'show_meronyms': show_member_meronym or show_part_meronym,
-        'show_holonyms': show_member_holonym or show_part_holonym,
-        
-        # Basic new settings
-        'show_hypernym': show_hypernym,
-        'show_hyponym': show_hyponym,
-        'show_member_meronym': show_member_meronym,
-        'show_part_meronym': show_part_meronym,
-        'show_member_holonym': show_member_holonym,
-        'show_part_holonym': show_part_holonym,
-        'show_antonym': show_antonym,
-        'show_similar_to': show_similar_to,
-        'show_entailment': show_entailment,
-        'show_cause': show_cause,
-        'show_attribute': show_attribute,
-        'show_also_see': show_also_see,
-        
-        # Set remaining specific types to False by default (can be overridden in advanced)
-        'show_instance_hypernym': False,
-        'show_instance_hyponym': False,
-        'show_substance_holonym': False,
-        'show_substance_meronym': False,
-        'show_verb_group': False,
-        'show_participle_of_verb': False,
-        'show_derivationally_related_form': False,
-        'show_pertainym': False,
-        'show_derived_from': False,
-        'show_domain_of_synset_topic': False,
-        'show_member_of_domain_topic': False,
-        'show_domain_of_synset_region': False,
-        'show_member_of_domain_region': False,
-        'show_domain_of_synset_usage': False,
-        'show_member_of_domain_usage': False,
-    }
-    
-    return basic_relationships
 
 
 def render_advanced_relationship_types(session_manager, basic_relationships):
@@ -830,14 +826,14 @@ def render_sidebar(session_manager):
         # Search history
         render_search_history()
         
-        # Basic settings
-        depth, advanced_settings = render_basic_settings(session_manager)
-        
         # Relationship types (basic level)
         relationship_settings = render_relationship_types(session_manager)
         
         # Store basic relationships in session state for advanced options
         st.session_state['basic_relationships'] = relationship_settings
+        
+        # Basic settings (includes advanced options)
+        depth, advanced_settings = render_basic_settings(session_manager)
         
         # Advanced relationship types are handled within advanced_settings now
         # No need for separate render call
