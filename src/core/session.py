@@ -206,7 +206,7 @@ class SessionManager:
         reverse_mappings = {
             'word': 'word',
             'depth': 'depth',
-            'parsed_sense_number': 'sense',
+            'sense_number': 'sense',
             'show_hypernyms': 'hypernyms',
             'show_hyponyms': 'hyponyms',
             'show_meronyms': 'meronyms',
