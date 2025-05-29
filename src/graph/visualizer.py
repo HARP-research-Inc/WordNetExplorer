@@ -332,33 +332,29 @@ class GraphVisualizer:
             else:
                 actual_source, actual_target = source, target
             
-            # Create accurate tooltip based on the actual arrow direction and relationship
-            source_name = actual_source.split('.')[0] if '.' in actual_source else actual_source.split('_')[-1]
-            target_name = actual_target.split('.')[0] if '.' in actual_target else actual_target.split('_')[-1]
+            # Create accurate tooltip based on the ORIGINAL relationship and direction
+            # We need to interpret based on the original edge, not the swapped one
+            original_source = source
+            original_target = target
             
-            # Generate semantic description based on relationship type and actual direction
+            source_name = original_source.split('.')[0] if '.' in original_source else original_source.split('_')[-1]
+            target_name = original_target.split('.')[0] if '.' in original_target else original_target.split('_')[-1]
+            
+            # Generate semantic description based on relationship type and original direction
             if relation == 'sense':
                 description = f"Word sense connection: {source_name} → {target_name}"
             elif relation == 'hypernym':
-                # Hypernym always means "is a type of" regardless of arrow direction
+                # For hypernym: original_source is a type of original_target
                 description = f"Is-a relationship: {source_name} is a type of {target_name}"
             elif relation == 'hyponym':
-                # Hyponym always means "includes type" but we need to interpret the direction correctly
-                # When arrow_direction is 'from', the original edge was target->source (hyponym)
-                # So the actual semantic meaning is still "target includes type source"
-                if arrow_direction == 'from':
-                    # Original edge was target->source, so target includes type source
-                    description = f"Type-includes relationship: {target_name} includes type {source_name}"
-                else:
-                    # Normal direction: source includes type target
-                    description = f"Type-includes relationship: {source_name} includes type {target_name}"
+                # For hyponym: original_source includes type original_target
+                description = f"Type-includes relationship: {source_name} includes type {target_name}"
             elif relation in ['member_meronym', 'substance_meronym', 'part_meronym']:
+                # For meronym: original_source is part of original_target
                 description = f"Part-of relationship: {source_name} is part of {target_name}"
             elif relation in ['member_holonym', 'substance_holonym', 'part_holonym']:
-                if arrow_direction == 'from':
-                    description = f"Has-part relationship: {target_name} has part {source_name}"
-                else:
-                    description = f"Has-part relationship: {source_name} has part {target_name}"
+                # For holonym: original_source has part original_target
+                description = f"Has-part relationship: {source_name} has part {target_name}"
             elif relation == 'similar_to':
                 description = f"Similar to: {source_name} is similar to {target_name}"
             elif relation == 'antonym':
