@@ -5,9 +5,15 @@ Sidebar components for WordNet Explorer.
 import streamlit as st
 from config.settings import DEFAULT_SETTINGS, LAYOUT_OPTIONS
 
-from utils.session_state import add_to_search_history, clear_search_history, get_search_history, get_query_display_string
+from utils.session_state import add_to_search_history, clear_search_history
 from utils.debug_logger import log_word_input_event, log_session_state
 from wordnet_explorer import get_synsets_for_word
+from datetime import datetime
+
+# Import new OOP classes
+from core.query import Query
+from core.search_history import SearchHistory
+from core.query_navigator import QueryNavigator
 
 
 def get_url_default(session_manager, setting_key: str, default_value):
@@ -21,9 +27,9 @@ def render_word_input(session_manager):
     log_session_state("FUNCTION_START")
     log_word_input_event("FUNCTION_ENTRY", function="render_word_input")
     
-    # Check if a history query was selected
-    selected_query = st.session_state.get('selected_history_query', None)
+    # Check if a history word was selected and get its parameters
     selected_word = st.session_state.get('selected_history_word', None)
+    selected_params = st.session_state.get('selected_history_params', None)
     log_word_input_event("SELECTED_WORD_CHECK", selected_word=selected_word)
     
     # Get word and search mode from URL if available
@@ -47,17 +53,12 @@ def render_word_input(session_manager):
         placeholder=input_placeholder
     ).strip().lower()
     
-    # Get sense number from URL or selected query if available
-    url_sense = get_url_default(session_manager, 'sense_number', None)
-    selected_sense = None
-    if selected_query:
-        selected_sense = selected_query.get('sense_number')
-    
-    sense_input_value = ""
-    if selected_sense:
-        sense_input_value = str(selected_sense)
-    elif url_sense is not None:
-        sense_input_value = str(url_sense)
+    # Get sense number from selected history params, URL, or default
+    if selected_params and selected_params.get('sense_number'):
+        sense_input_value = str(selected_params['sense_number'])
+    else:
+        url_sense = get_url_default(session_manager, 'sense_number', None)
+        sense_input_value = str(url_sense) if url_sense is not None else ""
     
     # Sense number input field
     sense_number = st.text_input(
@@ -66,6 +67,10 @@ def render_word_input(session_manager):
         key="sense_number_input",
         help="Enter a specific sense number (1, 2, 3, etc.) to show only that sense. Leave blank to show all senses."
     ).strip()
+    
+    # Get synset search mode from selected history params if available
+    if selected_params and 'synset_search_mode' in selected_params:
+        synset_search_mode = selected_params['synset_search_mode']
     
     # Convert sense number to integer if provided
     parsed_sense_number = None
@@ -101,10 +106,6 @@ def render_word_input(session_manager):
     if not can_enable_synset_mode:
         synset_search_mode = False  # Force disable if no sense specified
     
-    # Override synset mode if selected from history
-    if selected_query and 'synset_search_mode' in selected_query:
-        synset_search_mode = selected_query['synset_search_mode']
-    
     synset_search_mode = st.checkbox(
         "🔍 Synset Search Mode", 
         value=synset_search_mode if can_enable_synset_mode else False,
@@ -114,23 +115,52 @@ def render_word_input(session_manager):
     
     log_word_input_event("TEXT_INPUT_RESULT", word=word, input_value=input_value)
     
-    # Handle selected query from history
-    if selected_query:
-        log_word_input_event("PROCESSING_SELECTED_QUERY", selected_query=selected_query.get('word', 'Unknown'))
-        # Clear the selected history query
-        st.session_state.selected_history_query = None
-        st.session_state.selected_history_word = None
-        log_word_input_event("CLEARED_SELECTED_QUERY")
-        
-        # Return the selected word to ensure it's processed
-        return selected_query['word'], selected_query.get('sense_number'), True, selected_query.get('synset_search_mode', False)  # Word changed when selected from history
-    
-    # Handle selected word from history (backward compatibility)
+    # Handle selected word from history
     if selected_word:
         log_word_input_event("PROCESSING_SELECTED_WORD", selected_word=selected_word)
-        # Clear the selected history word
+        # Clear the selected history word and params
         st.session_state.selected_history_word = None
+        st.session_state.selected_history_params = None
         log_word_input_event("CLEARED_SELECTED_WORD")
+        
+        # Add to search history and update last searched word
+        last_searched = st.session_state.get('last_searched_word', '')
+        if selected_word != last_searched:
+            log_word_input_event("ADDING_SELECTED_TO_HISTORY", selected_word=selected_word, last_searched=last_searched)
+            
+            # Create full query parameters for selected word
+            # If we have selected_params, use them; otherwise preserve current URL settings
+            if selected_params:
+                # Use the stored parameters from the history item
+                query_params = selected_params.copy()
+                # Update with current word and derived values
+                query_params.update({
+                    'word': selected_word,
+                    'sense_number': parsed_sense_number,
+                    'synset_search_mode': synset_search_mode,
+                    'timestamp': datetime.now().isoformat()
+                })
+            else:
+                # No stored params (old format), so create new params preserving URL settings
+                query_params = {
+                    'word': selected_word,
+                    'sense_number': parsed_sense_number,
+                    'synset_search_mode': synset_search_mode,
+                    'timestamp': datetime.now().isoformat()
+                }
+                
+                # Add current URL parameters to preserve settings
+                url_settings = session_manager.get_settings_from_url()
+                for key, value in url_settings.items():
+                    if key not in query_params:  # Don't override word-specific params
+                        query_params[key] = value
+            
+            add_to_search_history(query_params)
+            st.session_state.last_searched_word = selected_word
+            st.session_state.previous_word_input = selected_word  # Update this too
+            log_word_input_event("ADDED_SELECTED_TO_HISTORY", selected_word=selected_word)
+        else:
+            log_word_input_event("SKIPPED_SELECTED_DUPLICATE", selected_word=selected_word, last_searched=last_searched)
         
         # Return the selected word to ensure it's processed
         log_word_input_event("RETURNING_SELECTED_WORD", selected_word=selected_word)
@@ -148,10 +178,25 @@ def render_word_input(session_manager):
                         condition_met=bool(word and word != last_processed_value))
     
     # Add word to search history only when we have a new word that hasn't been processed
-    # NOTE: We'll pass full settings in the calling function when available
     if word and word != last_processed_value:
         log_word_input_event("ADDING_NORMAL_TO_HISTORY", word=word, last_processed_value=last_processed_value)
-        add_to_search_history(word)  # Will add full settings in the calling function
+        
+        # Create full query parameters for history
+        query_params = {
+            'word': word,
+            'sense_number': parsed_sense_number,
+            'synset_search_mode': synset_search_mode,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        # Add current URL parameters to preserve settings
+        url_settings = session_manager.get_settings_from_url()
+        for key, value in url_settings.items():
+            if key not in query_params:  # Don't override word-specific params
+                query_params[key] = value
+        
+        # Add to search history with full parameters
+        add_to_search_history(query_params)
         st.session_state.last_searched_word = word
         st.session_state.previous_word_input = word
         st.session_state.last_processed_word_input = word  # Track what we've processed
@@ -172,56 +217,33 @@ def render_word_input(session_manager):
     return word, parsed_sense_number, word_changed, synset_search_mode
 
 
-def render_search_history():
-    """Render the search history in a collapsible expander."""
-    history = get_search_history()
-    log_word_input_event("SEARCH_HISTORY_RENDER_START", history_length=len(history))
+def render_search_history(navigator: QueryNavigator):
+    """Render the search history using the new OOP classes."""
+    history = navigator.history
     
-    if history:
+    if not history.is_empty():
         with st.expander("🔍 Search & Navigation History", expanded=False):
-            st.markdown("Click any query to explore it again:")
+            st.markdown("Click any item to explore with the same settings:")
             
             # Create columns for history items and clear button
             col1, col2 = st.columns([4, 1])
             
             with col1:
-                # Display search history as clickable buttons with detailed info
-                for i, query in enumerate(history):
-                    word = query.get('word', 'Unknown')
-                    display_string = get_query_display_string(query)
-                    
-                    # Show timestamp in a subtle way
-                    timestamp = query.get('timestamp', '')
-                    if timestamp:
-                        try:
-                            from datetime import datetime
-                            dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-                            time_str = dt.strftime("%m/%d %H:%M")
-                        except:
-                            time_str = ""
-                    else:
-                        time_str = ""
-                    
-                    button_label = f"📝 {display_string}"
-                    if time_str:
-                        button_label += f" ({time_str})"
-                    
-                    log_word_input_event("RENDERING_HISTORY_BUTTON", index=i, hist_word=word, button_key=f"search_history_{i}")
-                    if st.button(button_label, key=f"search_history_{i}", help=f"Click to explore '{display_string}'"):
-                        log_word_input_event("HISTORY_BUTTON_CLICKED", hist_word=word, index=i)
-                        st.session_state.selected_history_query = query
-                        st.session_state.selected_history_word = word  # For backward compatibility
-                        log_word_input_event("SET_SELECTED_HISTORY_QUERY", hist_word=word)
-                        log_session_state("BEFORE_RERUN")
+                # Get display items from history
+                display_items = history.get_display_items()
+                
+                for index, display_name, query in display_items:
+                    if st.button(f"📝 {display_name}", 
+                               key=f"search_history_{index}", 
+                               help=f"Click to explore '{display_name}' with previous settings"):
+                        # Navigate to this query
+                        navigator.navigate_from_history(index)
                         st.rerun()
             
             with col2:
                 if st.button("🗑️", help="Clear search history", key="clear_search_history"):
-                    log_word_input_event("CLEAR_HISTORY_CLICKED")
-                    clear_search_history()
+                    history.clear()
                     st.rerun()
-    else:
-        log_word_input_event("NO_SEARCH_HISTORY_TO_RENDER")
 
 
 def render_relationship_types(session_manager):
@@ -844,7 +866,8 @@ def render_sidebar(session_manager):
         word, parsed_sense_number, word_changed, synset_search_mode = render_word_input(session_manager)
         
         # Search history
-        render_search_history()
+        navigator = QueryNavigator(session_manager)
+        render_search_history(navigator)
         
         # Relationship types (basic level)
         relationship_settings = render_relationship_types(session_manager)
@@ -899,8 +922,42 @@ def render_sidebar(session_manager):
         should_update_url = apply_clicked or word_changed
         session_manager.update_url_with_settings(settings, force_update=should_update_url)
         
-        # Add comprehensive query to search history when word changed
-        if word_changed and word:
-            add_to_search_history(word, settings)
+        # If Apply was clicked or word changed, also update the last history item with complete settings
+        if (apply_clicked or word_changed) and word and st.session_state.get('search_history'):
+            # Update the most recent history item with complete current settings
+            last_item = st.session_state.search_history[-1]
+            if isinstance(last_item, dict) and last_item.get('word') == word:
+                # Update the last item with complete settings
+                complete_settings = {
+                    'word': word,
+                    'sense_number': parsed_sense_number,
+                    'synset_search_mode': synset_search_mode,
+                    'depth': depth,
+                    'max_nodes': advanced_settings.get('max_nodes', 100),
+                    'max_branches': advanced_settings.get('max_branches', 5),
+                    'min_frequency': advanced_settings.get('min_frequency', 0),
+                    'pos_filter': advanced_settings.get('pos_filter', ["Nouns", "Verbs", "Adjectives", "Adverbs"]),
+                    'enable_clustering': advanced_settings.get('enable_clustering', False),
+                    'enable_cross_connections': advanced_settings.get('enable_cross_connections', True),
+                    'simplified_mode': advanced_settings.get('simplified_mode', False),
+                    'layout_type': layout_type,
+                    'node_size_multiplier': node_size_multiplier,
+                    'color_scheme': color_scheme,
+                    'enable_physics': enable_physics,
+                    'spring_strength': spring_strength,
+                    'central_gravity': central_gravity,
+                    'show_labels': show_labels,
+                    'edge_width': edge_width,
+                    'show_info': show_info,
+                    'show_graph': show_graph,
+                    'timestamp': last_item.get('timestamp', datetime.now().isoformat())
+                }
+                
+                # Add all relationship settings
+                complete_settings.update(relationship_settings)
+                complete_settings.update(advanced_settings)
+                
+                # Replace the last item with complete settings
+                st.session_state.search_history[-1] = complete_settings
         
         return settings 

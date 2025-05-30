@@ -76,43 +76,14 @@ class GraphSerializer:
         if metadata is None:
             metadata = {}
         
-        # Add current query information if available
+        # Add search history if available (from Streamlit session state)
         try:
             import streamlit as st
-            from utils.session_state import get_search_history, create_query_object
-            
-            # Get current search history
-            history = get_search_history()
-            if history:
-                metadata['search_history'] = history
-                metadata['total_searches'] = len(history)
-                
-                # Add the most recent query as the current query
-                if history:
-                    metadata['current_query'] = history[0]
-                    
-        except Exception:
-            # If we can't access session state or history, that's okay
+            if hasattr(st, 'session_state') and 'search_history' in st.session_state:
+                metadata['search_history'] = st.session_state.search_history
+        except ImportError:
+            # Streamlit not available (e.g., in standalone use)
             pass
-        
-        # Add additional query context if provided in metadata
-        if 'settings' in metadata:
-            settings = metadata['settings']
-            word = metadata.get('word', 'unknown')
-            
-            # Create comprehensive query object from current settings
-            try:
-                from utils.session_state import create_query_object
-                current_query = create_query_object(word, settings)
-                metadata['export_query'] = current_query
-            except Exception:
-                # Fallback to basic query info
-                metadata['export_query'] = {
-                    'word': word,
-                    'sense_number': metadata.get('sense_number'),
-                    'timestamp': metadata.get('timestamp'),
-                    'depth': settings.get('depth', 1) if isinstance(settings, dict) else 1
-                }
         
         # Add visualization config to metadata
         metadata['visualization_config'] = asdict(self.visualization_config)
