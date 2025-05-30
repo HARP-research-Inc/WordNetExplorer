@@ -91,31 +91,34 @@ class QueryNavigator:
         last_word = st.session_state.get('last_processed_word', '')
         word_changed = bool(word and word != last_word)
         
-        # Create query from current inputs, preserving URL settings if available
+        # Always create query from current inputs with proper sense number handling
         if word_changed:
             # New word - start with URL settings and update with current inputs
             base_query = self.create_query_from_url()
             query = base_query.update(
                 word=word,
-                sense_number=sense_number,
+                sense_number=sense_number,  # Explicitly set the sense number
                 synset_search_mode=synset_search_mode
             )
         else:
-            # Same word - use current query or create from current settings
+            # Same word - still update the current inputs to ensure sense number is preserved
             current = self.get_current_query()
             if current and current.word == word:
                 query = current.update(
-                    sense_number=sense_number,
+                    sense_number=sense_number,  # Explicitly set the sense number
                     synset_search_mode=synset_search_mode
                 )
             else:
-                # Fallback to URL settings
+                # Fallback to URL settings with current inputs
                 base_query = self.create_query_from_url()
                 query = base_query.update(
                     word=word,
-                    sense_number=sense_number,
+                    sense_number=sense_number,  # Explicitly set the sense number
                     synset_search_mode=synset_search_mode
                 )
+        
+        # Store the updated query as current
+        self.set_current_query(query)
         
         return query, word_changed
     
@@ -198,12 +201,8 @@ class QueryNavigator:
         
         if url_params:
             try:
-                # Clear existing query params first
-                st.query_params.clear()
-                
-                # Set new query parameters using modern API
-                for key, value in url_params.items():
-                    st.query_params[key] = value
+                # Use the from_dict method which is the proper way to set multiple params
+                st.query_params.from_dict(url_params)
                 
                 st.write(f"✅ **Successfully set {len(url_params)} URL parameters**")
                 st.write("🔄 **URL updated! The page should reload automatically...**")
@@ -229,7 +228,29 @@ class QueryNavigator:
         query = self.history.get_by_index(index)
         if query:
             st.write(f"📋 **Found query:** {query.get_display_name()}")
-            st.write(f"📋 **Query details:** depth={query.depth}, relationships={[k for k,v in query.to_dict().items() if k.startswith('show_') and v]}")
+            
+            # Show detailed settings information
+            settings_summary = query.get_settings_summary()
+            settings_hash = query.generate_settings_hash()
+            
+            st.write(f"🔧 **Settings Summary:** `{settings_summary}`")
+            st.write(f"🔑 **Settings Hash:** `{settings_hash}`")
+            
+            # Show key settings
+            key_settings = []
+            if query.depth != 1:
+                key_settings.append(f"Depth: {query.depth}")
+            if query.max_nodes != 100:
+                key_settings.append(f"Max Nodes: {query.max_nodes}")
+            
+            # Active relationships
+            active_rels = [k.replace('show_', '') for k, v in query.to_dict().items() 
+                          if k.startswith('show_') and v and k not in ['show_labels', 'show_info', 'show_graph']]
+            if active_rels:
+                key_settings.append(f"Relationships: {', '.join(active_rels[:3])}{'...' if len(active_rels) > 3 else ''}")
+            
+            if key_settings:
+                st.write(f"⚙️ **Key Settings:** {' • '.join(key_settings)}")
             
             # Redirect to this query
             self.redirect_to_query(query)

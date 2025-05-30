@@ -207,7 +207,7 @@ def prepare_download_content(explorer, G, node_labels, word, settings):
     """
     # Generate timestamp for filenames
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    sense_number = settings.get('parsed_sense_number', 0)
+    sense_number = settings.get('sense_number', 0)
     if sense_number is None:
         sense_number = 0
     
@@ -303,7 +303,7 @@ def render_graph_visualization(word, settings, explorer=None, synset_search_mode
                 G, node_labels = explorer.explore_word(
                     word=word, 
                     depth=settings['depth'],
-                    sense_number=settings.get('parsed_sense_number'),
+                    sense_number=settings.get('sense_number'),
                     max_nodes=settings.get('max_nodes', 100),
                     max_branches=settings.get('max_branches', 5),
                     min_frequency=settings.get('min_frequency', 0),

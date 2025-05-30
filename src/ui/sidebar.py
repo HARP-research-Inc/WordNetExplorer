@@ -220,8 +220,12 @@ def render_search_history(navigator: QueryNavigator):
                 display_items = history.get_display_items()
                 
                 for index, display_name, query in display_items:
+                    # Create a stable key that includes the index to ensure uniqueness
+                    # This handles cases where we might have mixed old/new format items
+                    stable_key = f"search_history_{index}_{query.word}_{query.sense_number or 'none'}_{query.generate_settings_hash()}"
+                    
                     if st.button(f"📝 {display_name}", 
-                               key=f"search_history_{index}", 
+                               key=stable_key, 
                                help=f"Click to explore '{display_name}' with previous settings"):
                         # Use the new redirect function with visible logging
                         navigator.redirect_from_history_button(index)
@@ -896,6 +900,8 @@ def render_sidebar(session_manager):
         # Collect all settings
         settings = {
             'word': word,
+            'sense_number': parsed_sense_number,  # Revert to sense_number for consistency
+            'synset_search_mode': synset_search_mode,
             'depth': depth,
             'layout_type': layout_type,
             'node_size_multiplier': node_size_multiplier,
@@ -907,8 +913,6 @@ def render_sidebar(session_manager):
             'edge_width': edge_width,
             'show_info': show_info,
             'show_graph': show_graph,
-            'parsed_sense_number': parsed_sense_number,
-            'synset_search_mode': synset_search_mode
         }
         
         # Add all relationship settings
@@ -920,41 +924,26 @@ def render_sidebar(session_manager):
         session_manager.update_url_with_settings(settings, force_update=should_update_url)
         
         # If Apply was clicked or word changed, also update the last history item with complete settings
-        if (apply_clicked or word_changed) and word and st.session_state.get('search_history'):
-            # Update the most recent history item with complete current settings
-            last_item = st.session_state.search_history[-1]
-            if isinstance(last_item, dict) and last_item.get('word') == word:
-                # Update the last item with complete settings
-                complete_settings = {
-                    'word': word,
-                    'sense_number': parsed_sense_number,
-                    'synset_search_mode': synset_search_mode,
-                    'depth': depth,
-                    'max_nodes': advanced_settings.get('max_nodes', 100),
-                    'max_branches': advanced_settings.get('max_branches', 5),
-                    'min_frequency': advanced_settings.get('min_frequency', 0),
-                    'pos_filter': advanced_settings.get('pos_filter', ["Nouns", "Verbs", "Adjectives", "Adverbs"]),
-                    'enable_clustering': advanced_settings.get('enable_clustering', False),
-                    'enable_cross_connections': advanced_settings.get('enable_cross_connections', True),
-                    'simplified_mode': advanced_settings.get('simplified_mode', False),
-                    'layout_type': layout_type,
-                    'node_size_multiplier': node_size_multiplier,
-                    'color_scheme': color_scheme,
-                    'enable_physics': enable_physics,
-                    'spring_strength': spring_strength,
-                    'central_gravity': central_gravity,
-                    'show_labels': show_labels,
-                    'edge_width': edge_width,
-                    'show_info': show_info,
-                    'show_graph': show_graph,
-                    'timestamp': last_item.get('timestamp', datetime.now().isoformat())
-                }
+        if (apply_clicked or word_changed) and word and navigator:
+            # Create a Query object directly from the complete settings dict
+            # This avoids duplicate parameter issues
+            try:
+                complete_query = Query.from_dict(settings)
                 
-                # Add all relationship settings
-                complete_settings.update(relationship_settings)
-                complete_settings.update(advanced_settings)
-                
-                # Replace the last item with complete settings
-                st.session_state.search_history[-1] = complete_settings
+                # Add/update via navigator which handles deduplication properly
+                navigator.history.add(complete_query)
+                # Also update the current query in navigator
+                navigator.set_current_query(complete_query)
+            except Exception as e:
+                # Fallback - create minimal query if there are parameter issues
+                st.error(f"Query creation failed: {e}")
+                simple_query = Query(
+                    word=word,
+                    sense_number=parsed_sense_number,
+                    synset_search_mode=synset_search_mode,
+                    depth=depth
+                )
+                navigator.history.add(simple_query)
+                navigator.set_current_query(simple_query)
         
         return settings 

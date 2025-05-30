@@ -7,6 +7,7 @@ from dataclasses import dataclass, asdict, field, fields
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 import copy
+import hashlib
 
 
 @dataclass
@@ -192,11 +193,73 @@ class Query:
                 setattr(new_query, key, value)
         return new_query
     
+    def generate_settings_hash(self) -> str:
+        """Generate a short hash based on the important settings."""
+        # Get all settings except word, sense_number, timestamp
+        settings_data = self.to_dict()
+        
+        # Remove word-specific and timestamp data for hash generation
+        hash_data = {k: v for k, v in settings_data.items() 
+                    if k not in ['word', 'sense_number', 'timestamp', 'synset_search_mode']}
+        
+        # Convert to string and hash
+        settings_str = str(sorted(hash_data.items()))
+        hash_digest = hashlib.md5(settings_str.encode()).hexdigest()
+        
+        # Return first 6 characters for readability
+        return hash_digest[:6]
+    
+    def get_settings_summary(self) -> str:
+        """Generate a human-readable summary of key settings."""
+        summary_parts = []
+        
+        # Add depth if not default
+        if self.depth != 1:
+            summary_parts.append(f"d{self.depth}")
+        
+        # Add active relationships
+        active_relationships = []
+        if self.show_hypernym or self.show_hypernyms:
+            active_relationships.append("hyper")
+        if self.show_hyponym or self.show_hyponyms:
+            active_relationships.append("hypo")
+        if any([self.show_member_meronym, self.show_part_meronym, self.show_meronyms]):
+            active_relationships.append("mero")
+        if any([self.show_member_holonym, self.show_part_holonym, self.show_holonyms]):
+            active_relationships.append("holo")
+        if self.show_antonym:
+            active_relationships.append("ant")
+        if self.show_similar_to:
+            active_relationships.append("sim")
+        
+        if active_relationships:
+            summary_parts.append("+".join(active_relationships))
+        
+        # Add max_nodes if not default
+        if self.max_nodes != 100:
+            summary_parts.append(f"n{self.max_nodes}")
+        
+        # Add layout if not default
+        if self.layout_type != "Force-directed (default)":
+            layout_short = self.layout_type.replace(" ", "").replace("-", "")[:4].lower()
+            summary_parts.append(f"lay:{layout_short}")
+        
+        return "-".join(summary_parts) if summary_parts else "default"
+
     def get_display_name(self) -> str:
-        """Get display name for this query (word or word.sense)."""
+        """Get enhanced display name for this query with settings identifier."""
+        base_name = self.word
         if self.sense_number:
-            return f"{self.word}.{self.sense_number}"
-        return self.word
+            base_name += f".{self.sense_number}"
+        
+        # Add settings summary
+        settings_summary = self.get_settings_summary()
+        settings_hash = self.generate_settings_hash()
+        
+        if settings_summary != "default":
+            return f"{base_name} [{settings_summary}#{settings_hash}]"
+        else:
+            return f"{base_name} [#{settings_hash}]"
     
     def is_equivalent_to(self, other: 'Query') -> bool:
         """Check if this query is equivalent to another (same word and sense)."""

@@ -160,10 +160,10 @@ def main():
             display_input = current_display_word
             
             # If in synset search mode, convert word+sense to synset name
-            if synset_search_mode and settings.get('parsed_sense_number'):
+            if synset_search_mode and settings.get('sense_number'):
                 from wordnet import get_synsets_for_word
                 synsets = get_synsets_for_word(current_display_word)
-                sense_number = settings['parsed_sense_number']
+                sense_number = settings['sense_number']
                 if synsets and 1 <= sense_number <= len(synsets):
                     # Use the synset name instead of the word
                     display_input = synsets[sense_number - 1].name()

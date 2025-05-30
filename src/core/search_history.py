@@ -17,9 +17,24 @@ class SearchHistory:
         self._ensure_session_state()
     
     def _ensure_session_state(self):
-        """Ensure session state is initialized."""
+        """Ensure session state is initialized and clean up old format items."""
         if 'search_history' not in st.session_state:
             st.session_state.search_history = []
+        else:
+            # Clean up any old format items (strings or mixed types)
+            cleaned_history = []
+            for item in st.session_state.search_history:
+                if isinstance(item, Query):
+                    cleaned_history.append(item)
+                elif isinstance(item, str):
+                    # Convert old string format to Query object
+                    cleaned_history.append(Query(word=item.strip().lower()))
+                elif isinstance(item, dict):
+                    # Convert dict format to Query object  
+                    cleaned_history.append(Query.from_dict(item))
+                # Skip any other invalid types
+            
+            st.session_state.search_history = cleaned_history
     
     def add(self, query: Union[Query, str, Dict[str, Any]]) -> None:
         """
@@ -45,7 +60,7 @@ class SearchHistory:
         if not query_obj.word:
             return
         
-        # Remove any existing equivalent queries
+        # Remove any existing equivalent queries (both old and new formats)
         self._remove_equivalent(query_obj)
         
         # Add to the beginning (most recent first)
@@ -55,20 +70,28 @@ class SearchHistory:
         st.session_state.search_history = st.session_state.search_history[:self.max_size]
     
     def _remove_equivalent(self, query: Query) -> None:
-        """Remove existing equivalent queries from history."""
-        st.session_state.search_history = [
-            item for item in st.session_state.search_history
-            if not self._is_equivalent(item, query)
-        ]
+        """Remove existing equivalent queries from history (handles all formats)."""
+        cleaned_history = []
+        
+        for item in st.session_state.search_history:
+            if not self._is_equivalent(item, query):
+                cleaned_history.append(item)
+        
+        st.session_state.search_history = cleaned_history
     
     def _is_equivalent(self, item: Any, query: Query) -> bool:
         """Check if a history item is equivalent to a query."""
         if isinstance(item, str):
-            return item == query.word
+            # Old format - just compare word
+            return item.strip().lower() == query.word.lower()
         elif isinstance(item, dict):
-            return (item.get('word') == query.word and 
-                   item.get('sense_number') == query.sense_number)
+            # Dict format - compare word and sense number
+            item_word = item.get('word', '').strip().lower()
+            item_sense = item.get('sense_number')
+            return (item_word == query.word.lower() and 
+                   item_sense == query.sense_number)
         elif isinstance(item, Query):
+            # Query object - use built-in comparison
             return item.is_equivalent_to(query)
         return False
     
