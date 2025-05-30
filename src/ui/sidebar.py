@@ -734,25 +734,40 @@ def render_save_options():
     """Render save options settings."""
     with st.expander("💾 Save Options"):
         # HTML export
-        save_graph = st.checkbox("Save graph as HTML")
-        filename = "wordnet_graph"
-        if save_graph:
-            filename = st.text_input("HTML filename (without extension)", "wordnet_graph")
-            if not filename:
-                filename = "wordnet_graph"
-            if not filename.endswith(".html"):
-                filename += ".html"
+        st.markdown("#### Export Graph")
+        col1, col2 = st.columns(2)
         
-        # JSON export
-        st.markdown("---")
-        st.markdown("#### JSON Export/Import")
-        export_json = st.checkbox("Export graph as JSON")
-        if export_json:
-            json_filename = st.text_input("JSON filename (without extension)", "wordnet_graph")
-            if not json_filename:
-                json_filename = "wordnet_graph"
-            if not json_filename.endswith(".json"):
-                json_filename += ".json"
+        with col1:
+            if 'html_content' in st.session_state and st.session_state.html_content:
+                st.download_button(
+                    label="💾 Save as HTML",
+                    data=st.session_state.html_content,
+                    file_name="wordnet_graph.html",
+                    mime="text/html"
+                )
+            else:
+                st.warning("No graph to export. Please generate a graph first.")
+        
+        with col2:
+            if 'graph_data' in st.session_state and st.session_state.graph_data:
+                try:
+                    # Ensure the data is properly serialized
+                    if isinstance(st.session_state.graph_data, str):
+                        json_data = st.session_state.graph_data
+                    else:
+                        import json
+                        json_data = json.dumps(st.session_state.graph_data)
+                    
+                    st.download_button(
+                        label="💾 Save as JSON",
+                        data=json_data,
+                        file_name="wordnet_graph.json",
+                        mime="application/json"
+                    )
+                except Exception as e:
+                    st.error(f"Error preparing JSON data: {str(e)}")
+            else:
+                st.warning("No graph to export. Please generate a graph first.")
         
         # JSON import
         st.markdown("#### Import Graph")
@@ -769,7 +784,7 @@ def render_save_options():
             except Exception as e:
                 st.error(f"❌ Error importing graph: {str(e)}")
     
-    return save_graph, filename, export_json, json_filename if export_json else None, uploaded_file is not None
+    return uploaded_file is not None
 
 
 def render_about_section():
@@ -878,7 +893,7 @@ def render_sidebar(session_manager):
         show_info, show_graph = render_display_options(session_manager)
         
         # Save options
-        save_graph, filename, export_json, json_filename, uploaded_file = render_save_options()
+        uploaded_file = render_save_options()
         
         # About section
         render_about_section()
@@ -897,12 +912,6 @@ def render_sidebar(session_manager):
             'edge_width': edge_width,
             'show_info': show_info,
             'show_graph': show_graph,
-            'save_graph': save_graph,
-            'filename': filename,
-            'parsed_sense_number': parsed_sense_number,
-            'synset_search_mode': synset_search_mode,
-            'export_json': export_json,
-            'json_filename': json_filename,
             'uploaded_file': uploaded_file
         }
         
