@@ -111,38 +111,72 @@ class Query:
     
     def to_url_params(self) -> Dict[str, str]:
         """Convert to URL parameters format."""
-        # Define mapping from internal names to URL parameter names
-        url_mappings = {
-            'word': 'word',
-            'depth': 'depth',
-            'sense_number': 'sense',
-            'show_hypernyms': 'hypernyms',
-            'show_hyponyms': 'hyponyms',
-            'show_meronyms': 'meronyms',
-            'show_holonyms': 'holonyms',
-            'layout_type': 'layout',
-            'node_size_multiplier': 'node_size',
-            'color_scheme': 'color',
-            'enable_physics': 'physics',
-            'spring_strength': 'spring',
-            'central_gravity': 'gravity',
-            'show_labels': 'labels',
-            'edge_width': 'edge_width',
-            'show_info': 'show_info',
-            'show_graph': 'show_graph',
-        }
-        
         url_params = {}
         data = self.to_dict()
         
-        for internal_key, url_key in url_mappings.items():
-            if internal_key in data and data[internal_key] is not None:
-                value = data[internal_key]
-                # Convert boolean values to lowercase strings
-                if isinstance(value, bool):
-                    url_params[url_key] = str(value).lower()
-                else:
-                    url_params[url_key] = str(value)
+        # Core parameters
+        if data.get('word'):
+            url_params['word'] = data['word']
+        if data.get('sense_number'):
+            url_params['sense'] = str(data['sense_number'])
+        if data.get('synset_search_mode'):
+            url_params['synset_search_mode'] = str(data['synset_search_mode']).lower()
+        
+        # Graph parameters
+        if data.get('depth', 1) != 1:
+            url_params['depth'] = str(data['depth'])
+        if data.get('max_nodes', 100) != 100:
+            url_params['max_nodes'] = str(data['max_nodes'])
+        if data.get('max_branches', 5) != 5:
+            url_params['max_branches'] = str(data['max_branches'])
+        if data.get('min_frequency', 0) != 0:
+            url_params['min_frequency'] = str(data['min_frequency'])
+        
+        # Relationship parameters (only include if True)
+        relationship_mappings = {
+            'show_hypernyms': 'hypernyms',
+            'show_hyponyms': 'hyponyms', 
+            'show_meronyms': 'meronyms',
+            'show_holonyms': 'holonyms',
+            'show_hypernym': 'hypernym',
+            'show_hyponym': 'hyponym',
+            'show_member_meronym': 'member_meronym',
+            'show_part_meronym': 'part_meronym',
+            'show_member_holonym': 'member_holonym',
+            'show_part_holonym': 'part_holonym',
+            'show_antonym': 'antonym',
+            'show_similar_to': 'similar_to',
+            'show_entailment': 'entailment',
+            'show_cause': 'cause',
+            'show_attribute': 'attribute',
+            'show_also_see': 'also_see'
+        }
+        
+        for internal_key, url_key in relationship_mappings.items():
+            if data.get(internal_key):
+                url_params[url_key] = 'true'
+        
+        # Visual parameters
+        if data.get('layout_type') and data['layout_type'] != 'Force-directed (default)':
+            url_params['layout'] = data['layout_type']
+        if data.get('node_size_multiplier', 1.0) != 1.0:
+            url_params['node_size'] = str(data['node_size_multiplier'])
+        if data.get('color_scheme') and data['color_scheme'] != 'Default':
+            url_params['color'] = data['color_scheme']
+        if data.get('enable_physics') is not None and data['enable_physics'] != True:
+            url_params['physics'] = str(data['enable_physics']).lower()
+        if data.get('spring_strength', 0.04) != 0.04:
+            url_params['spring'] = str(data['spring_strength'])
+        if data.get('central_gravity', 0.3) != 0.3:
+            url_params['gravity'] = str(data['central_gravity'])
+        if data.get('show_labels') is not None and data['show_labels'] != True:
+            url_params['labels'] = str(data['show_labels']).lower()
+        if data.get('edge_width', 2) != 2:
+            url_params['edge_width'] = str(data['edge_width'])
+        if data.get('show_info'):
+            url_params['show_info'] = str(data['show_info']).lower()
+        if data.get('show_graph') is not None and data['show_graph'] != True:
+            url_params['show_graph'] = str(data['show_graph']).lower()
         
         return url_params
     
@@ -168,6 +202,32 @@ class Query:
         """Check if this query is equivalent to another (same word and sense)."""
         return (self.word == other.word and 
                 self.sense_number == other.sense_number)
+    
+    def construct_url(self, base_url: str = "") -> str:
+        """Construct a complete URL with all query parameters."""
+        url_params = self.to_url_params()
+        
+        if not url_params:
+            return base_url
+        
+        # Convert parameters to URL query string
+        param_string = "&".join([f"{key}={value}" for key, value in url_params.items()])
+        
+        # Construct full URL
+        if base_url:
+            separator = "&" if "?" in base_url else "?"
+            full_url = f"{base_url}{separator}{param_string}"
+        else:
+            full_url = f"?{param_string}"
+        
+        return full_url
+    
+    def log_constructed_url(self, base_url: str = "") -> str:
+        """Construct URL and log it to console for debugging."""
+        url = self.construct_url(base_url)
+        print(f"🔗 CONSTRUCTED URL: {url}")
+        print(f"🔗 URL PARAMS: {self.to_url_params()}")
+        return url
     
     def __str__(self) -> str:
         """String representation."""

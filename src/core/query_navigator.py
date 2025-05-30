@@ -159,4 +159,81 @@ class QueryNavigator:
             if key not in word_specific_keys:
                 update_dict[key] = value
         
-        return query.update(**update_dict) 
+        return query.update(**update_dict)
+    
+    def navigate_to_url(self, query: Query) -> None:
+        """Navigate to a query by constructing and setting the URL."""
+        # Log the constructed URL for debugging
+        url = query.log_constructed_url()
+        
+        # Get URL parameters
+        url_params = query.to_url_params()
+        
+        if url_params:
+            # Update the URL with all parameters
+            self.session_manager.set_query_params(url_params)
+            print(f"🔗 NAVIGATED TO: {url}")
+        else:
+            print(f"🔗 NO PARAMS TO NAVIGATE WITH")
+    
+    def navigate_from_history_simple(self, index: int) -> bool:
+        """Simple navigation to a query from history by URL construction."""
+        query = self.history.get_by_index(index)
+        if query:
+            print(f"🔗 NAVIGATING TO HISTORY ITEM {index}: {query.get_display_name()}")
+            self.navigate_to_url(query)
+            return True
+        else:
+            print(f"🔗 FAILED TO GET HISTORY ITEM {index}")
+            return False
+    
+    def redirect_to_query(self, query: Query) -> None:
+        """Redirect user to a specific query by setting URL parameters."""
+        # Get URL parameters from query
+        url_params = query.to_url_params()
+        
+        # Log to browser (visible to user)
+        st.write(f"🔗 **Redirecting to:** {query.get_display_name()}")
+        st.write(f"🔗 **URL Parameters:** {url_params}")
+        
+        if url_params:
+            try:
+                # Clear existing query params first
+                st.query_params.clear()
+                
+                # Set new query parameters using modern API
+                for key, value in url_params.items():
+                    st.query_params[key] = value
+                
+                st.write(f"✅ **Successfully set {len(url_params)} URL parameters**")
+                st.write("🔄 **URL updated! The page should reload automatically...**")
+                
+                # Streamlit should automatically rerun when query params change
+                # But we can force it if needed
+                st.rerun()
+                
+            except Exception as e:
+                st.error(f"❌ **Failed to redirect:** {str(e)}")
+                
+                # Show the constructed URL for manual copy-paste
+                constructed_url = query.construct_url()
+                st.write(f"**Manual URL:** `{constructed_url}`")
+                st.write("**Copy the URL above and paste it in your browser address bar**")
+        else:
+            st.warning("⚠️ **No URL parameters to redirect with**")
+    
+    def redirect_from_history_button(self, index: int) -> bool:
+        """Handle history button click with visible logging and proper redirection."""
+        st.write(f"🔘 **History button clicked:** Item {index}")
+        
+        query = self.history.get_by_index(index)
+        if query:
+            st.write(f"📋 **Found query:** {query.get_display_name()}")
+            st.write(f"📋 **Query details:** depth={query.depth}, relationships={[k for k,v in query.to_dict().items() if k.startswith('show_') and v]}")
+            
+            # Redirect to this query
+            self.redirect_to_query(query)
+            return True
+        else:
+            st.error(f"❌ **Failed to find history item {index}**")
+            return False 
