@@ -190,28 +190,29 @@ def render_exploration_tips():
         """, unsafe_allow_html=True)
 
 
-def save_graph_to_file(explorer, G, node_labels, word, settings):
+def prepare_download_content(explorer, G, node_labels, word, settings):
     """
-    Save the graph to file(s) based on settings.
+    Prepare download content for HTML and JSON based on button clicks.
     
     Args:
         explorer: WordNetExplorer instance
         G: NetworkX graph
         node_labels: Node labels dictionary
         word: The word being visualized
-        settings: Settings dictionary containing filename and other options
-    """
-    downloads_dir = ensure_downloads_directory()
+        settings: Settings dictionary containing download options
     
-    # Save HTML if requested
-    if settings['save_graph']:
-        validated_filename = validate_filename(settings['filename'], ".html")
-        save_path = downloads_dir / validated_filename
-        
-        # Generate HTML and save to file
-        explorer.visualize_graph(
+    Returns:
+        tuple: (html_content, json_content) where content is None if not requested
+    """
+    html_content = None
+    json_content = None
+    
+    # Prepare HTML content if button was clicked
+    if settings.get('save_html_button'):
+        # Generate HTML content
+        html_content = explorer.visualize_graph(
             G, node_labels, word,
-            save_path=str(save_path),
+            save_path=None,  # Don't save to file, get HTML content
             layout_type=settings['layout_type'],
             node_size_multiplier=settings['node_size_multiplier'],
             enable_physics=settings['enable_physics'],
@@ -221,10 +222,9 @@ def save_graph_to_file(explorer, G, node_labels, word, settings):
             edge_width=settings['edge_width'],
             color_scheme=settings['color_scheme']
         )
-        st.success(f"Interactive graph saved to: {save_path}")
     
-    # Save JSON if requested
-    if settings.get('export_json'):
+    # Prepare JSON content if button was clicked
+    if settings.get('export_json_button'):
         from src.graph import GraphSerializer
         serializer = GraphSerializer()
         
@@ -245,11 +245,10 @@ def save_graph_to_file(explorer, G, node_labels, word, settings):
             }
         }
         
-        # Save JSON file
-        json_filename = validate_filename(settings['json_filename'], ".json")
-        json_path = downloads_dir / json_filename
-        serializer.save_graph(G, node_labels, str(json_path), metadata)
-        st.success(f"Graph data saved to: {json_path}")
+        # Get JSON string
+        json_content = serializer.serialize_graph(G, node_labels, metadata)
+    
+    return html_content, json_content
 
 
 def render_graph_visualization(word, settings, explorer=None, synset_search_mode=False):
@@ -329,8 +328,8 @@ def render_graph_visualization(word, settings, explorer=None, synset_search_mode
     if G.number_of_nodes() > 0:
         st.info(f"Graph created with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges")
         
-        # Generate the interactive graph using the new modular explorer
-        html_content = explorer.visualize_graph(
+        # Generate the interactive graph for display
+        display_html = explorer.visualize_graph(
             G, node_labels, word,
             save_path=None,  # Don't save to file, get HTML content
             layout_type=settings['layout_type'],
@@ -343,16 +342,34 @@ def render_graph_visualization(word, settings, explorer=None, synset_search_mode
             color_scheme=settings['color_scheme']
         )
         
-        if html_content:
+        if display_html:
             # Display the HTML content directly
-            components.html(html_content, height=600)
+            components.html(display_html, height=600)
             
             # Add comprehensive legend and controls
             render_graph_legend_and_controls(G, settings, synset_search_mode)
             
-            # Save the graph if requested
-            if settings['save_graph'] or settings.get('export_json'):
-                save_graph_to_file(explorer, G, node_labels, word, settings)
+            # Handle downloads if buttons were clicked
+            download_html, download_json = prepare_download_content(explorer, G, node_labels, word, settings)
+            
+            # Show download buttons if content is ready
+            if download_html:
+                st.download_button(
+                    label="📥 Download HTML",
+                    data=download_html,
+                    file_name=settings.get('html_filename', f"{word}_graph.html"),
+                    mime="text/html",
+                    help="Download the interactive graph as an HTML file"
+                )
+            
+            if download_json:
+                st.download_button(
+                    label="📥 Download JSON", 
+                    data=download_json,
+                    file_name=settings.get('json_filename', f"{word}_graph.json"),
+                    mime="application/json",
+                    help="Download the graph data as a JSON file"
+                )
         else:
             st.error("Failed to generate graph visualization")
     else:
