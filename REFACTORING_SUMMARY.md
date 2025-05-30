@@ -83,6 +83,49 @@ Extracted components from the large `visualizer.py` (509 lines) into focused mod
 - Moved `wordnet_explorer_backup.py` to `archive/` directory
 - Deleted old `sidebar_old.py` after successful integration
 
+### 6. Object-Oriented Dataflow (NEW)
+Introduced a comprehensive OOP architecture to replace dictionary-based dataflow:
+
+#### Data Models (`src/models/`)
+- **`settings.py`** - Type-safe settings using dataclasses:
+  - `AppSettings` - Complete application settings
+  - `ExplorationSettings` - Graph exploration parameters
+  - `VisualizationSettings` - Display options
+  - `RelationshipSettings` - Which relationships to include
+  - Built-in validation methods
+  - Backward compatibility with `from_dict()` and `to_dict()`
+
+- **`graph_data.py`** - Graph data structures:
+  - `GraphData` - Encapsulates graph and node labels (replaces tuple return)
+  - `NodeData` - Strongly-typed node data with enums
+  - `EdgeData` - Strongly-typed edge data
+  - `NodeType` and `EdgeType` enums for type safety
+  - Helper methods for querying by type
+
+- **`word_data.py`** - WordNet data structures:
+  - `WordInfo` - Complete word information
+  - `SynsetInfo` - Detailed synset data
+  - `WordSense` - Individual word sense
+  - `NavigationContext` - Navigation state management
+  - `PartOfSpeech` enum for type safety
+
+#### Service Layer (`src/services/`)
+- **`wordnet_service.py`** - WordNet operations:
+  - `get_word_info()` - Returns `WordInfo` objects
+  - `get_synset_info()` - Returns `SynsetInfo` objects
+  - `search_words()` - Word search functionality
+  - Validation methods
+
+- **`graph_service.py`** - Graph building:
+  - `build_graph()` - Main graph building with OOP models
+  - Dependency injection of WordNetService
+  - Separated concerns for graph construction
+
+- **`visualization_service.py`** - Visualization creation:
+  - `visualize_graph()` - Create visualizations from GraphData
+  - Uses NodeBuilder and EdgeBuilder internally
+  - Clean separation of visualization logic
+
 ## Benefits
 
 ### 1. **Improved Maintainability**
@@ -114,48 +157,118 @@ Extracted components from the large `visualizer.py` (509 lines) into focused mod
 - Input validation improves robustness
 - Reduced code duplication
 
+### 6. **Type Safety (NEW)**
+- Dataclasses provide type hints and validation
+- Enums prevent invalid string values
+- IDEs can provide better autocomplete and error detection
+- Reduces runtime errors from typos in dictionary keys
+
+### 7. **Better Encapsulation (NEW)**
+- Data and behavior are grouped together
+- Internal state is protected
+- Clear interfaces between components
+- Easier to reason about data flow
+
+## Example: Old vs New Dataflow
+
+### Old Dictionary-Based Approach:
+```python
+# Settings as dictionary
+settings = {
+    'word': 'dog',
+    'depth': 2,
+    'show_hypernym': True,
+    'color_scheme': 'Default'
+}
+
+# Graph as tuple
+G, node_labels = build_graph(settings)
+
+# Node data as dictionary
+node_data = {
+    'node_type': 'synset',
+    'label': 'dog.n.01',
+    'definition': 'a member of the genus Canis'
+}
+```
+
+### New OOP Approach:
+```python
+# Type-safe settings
+settings = AppSettings(
+    exploration=ExplorationSettings(word="dog", depth=2),
+    relationships=RelationshipSettings(show_hypernym=True),
+    visualization=VisualizationSettings(color_scheme="Default")
+)
+
+# Encapsulated graph data
+graph_data = graph_service.build_graph(settings)
+
+# Strongly-typed node data
+node_data = NodeData(
+    node_id="dog.n.01",
+    node_type=NodeType.SYNSET,
+    label="dog.n.01",
+    definition="a member of the genus Canis"
+)
+```
+
 ## Next Steps for Further Improvement
 
-1. **Add Unit Tests**
-   - Test validation functions
-   - Test factory functions
-   - Test individual UI components
-   - Test node and edge builders
+1. **Complete Service Layer Migration**
+   - Migrate all business logic to services
+   - Remove direct WordNet calls from UI code
+   - Implement caching in services
 
-2. **Further Modularize Large Files**
-   - Break down `graph_display.py` (389 lines)
-   - Split remaining parts of `visualizer.py`
+2. **Add Repository Pattern**
+   - Abstract data access behind repositories
+   - Enable easy switching of data sources
+   - Add database support if needed
 
-3. **Create Service Layer**
-   - Abstract WordNet operations into services
-   - Create interfaces for external data sources
+3. **Implement Command Pattern**
+   - Create command objects for user actions
+   - Enable undo/redo functionality
+   - Better action logging
 
-4. **Improve Error Handling**
-   - Create custom exception classes
-   - Implement error recovery strategies
+4. **Add Observer Pattern**
+   - Implement event system for state changes
+   - Decouple UI updates from business logic
+   - Enable plugin architecture
 
-5. **Add Type Hints**
-   - Add comprehensive type annotations
-   - Use mypy for type checking
+5. **Create Unit Tests**
+   - Test all data models
+   - Test service methods
+   - Test validation logic
+   - Achieve high code coverage
 
-6. **Documentation**
-   - Add docstrings to all functions
-   - Create API documentation
-   - Add inline comments for complex logic
+6. **Add Dependency Injection Container**
+   - Centralize service creation
+   - Manage service lifecycles
+   - Enable easy mocking for tests
 
 ## File Structure After Refactoring
 
 ```
 src/
-├── constants.py         # NEW: Application constants
-├── factories.py         # NEW: Factory functions
-├── validators.py        # NEW: Validation functions
+├── models/             # NEW: Data models
+│   ├── __init__.py
+│   ├── settings.py     # Settings dataclasses
+│   ├── graph_data.py   # Graph data structures
+│   └── word_data.py    # WordNet data structures
+├── services/           # NEW: Service layer
+│   ├── __init__.py
+│   ├── wordnet_service.py
+│   ├── graph_service.py
+│   └── visualization_service.py
+├── constants.py         # Application constants
+├── factories.py         # Factory functions
+├── validators.py        # Validation functions
 ├── app.py              # Main Streamlit app
 ├── wordnet_explorer.py # Compatibility layer
 ├── cli.py              # Command-line interface
 ├── core/               # Core business logic
 ├── ui/                 # UI components
-│   ├── sidebar/        # NEW: Modularized sidebar
+│   ├── sidebar/        # Modularized sidebar
 │   ├── graph_display.py
 │   ├── word_info.py
 │   ├── welcome.py
@@ -163,14 +276,16 @@ src/
 ├── wordnet/            # WordNet-specific code
 ├── config/             # Configuration
 ├── utils/              # Utilities
-│   └── import_helper.py # NEW: Import path management
-└── graph/              # Graph operations
-    ├── visualizer.py
-    ├── builder.py
-    ├── html_generator.py    # NEW: HTML/JS generation
-    ├── color_schemes.py     # NEW: Color definitions
-    ├── node_builder.py      # NEW: Node construction
-    └── edge_builder.py      # NEW: Edge construction
+│   └── import_helper.py # Import path management
+├── graph/              # Graph operations
+│   ├── visualizer.py
+│   ├── builder.py
+│   ├── html_generator.py    # HTML/JS generation
+│   ├── color_schemes.py     # Color definitions
+│   ├── node_builder.py      # Node construction
+│   └── edge_builder.py      # Edge construction
+└── examples/           # NEW: Usage examples
+    └── oop_usage_example.py # OOP architecture demo
 
 archive/
 └── wordnet_explorer_backup.py  # Moved legacy code
@@ -179,4 +294,6 @@ archive/
 ## Backward Compatibility
 - The refactoring maintains backward compatibility
 - Existing imports continue to work
+- Dictionary-based settings can be converted to/from OOP models
+- Legacy tuple returns supported via `to_tuple()` and `from_tuple()` methods
 - No changes required to the main application logic 
