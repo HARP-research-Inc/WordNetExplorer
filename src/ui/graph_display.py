@@ -212,7 +212,6 @@ def prepare_download_content(explorer, G, node_labels, word, settings):
         sense_number = 0
     
     # Generate HTML content
-    print(f"🔍 LOG: [DOWNLOAD_HTML_START] Preparing HTML content for word '{word}'...")
     html_content = explorer.visualize_graph(
         G, node_labels, word,
         save_path=None,  # Get content, don't save to file
@@ -226,10 +225,8 @@ def prepare_download_content(explorer, G, node_labels, word, settings):
         color_scheme=settings['color_scheme']
     )
     html_filename = f"wne-{word}-{sense_number}-{timestamp}.html"
-    print(f"🔍 LOG: [DOWNLOAD_HTML_GENERATED] filename='{html_filename}' content_length={len(html_content) if html_content else 0}")
     
     # Generate JSON content
-    print(f"🔍 LOG: [DOWNLOAD_JSON_START] Preparing JSON content for word '{word}'...")
     from src.graph.serializer import GraphSerializer
     serializer = GraphSerializer()
     json_content = serializer.serialize_graph(G, node_labels, {
@@ -239,7 +236,6 @@ def prepare_download_content(explorer, G, node_labels, word, settings):
         'settings': settings
     })
     json_filename = f"wne-{word}-{sense_number}-{timestamp}.json"
-    print(f"🔍 LOG: [DOWNLOAD_JSON_GENERATED] filename='{json_filename}' content_length={len(json_content) if json_content else 0}")
     
     return html_content, json_content, html_filename, json_filename
 
@@ -340,7 +336,6 @@ def render_graph_visualization(word, settings, explorer=None, synset_search_mode
             components.html(display_html, height=600, scrolling=True)
             
             # Always prepare download content
-            print(f"🔍 LOG: [PREPARING_DOWNLOADS] Generating download content for word '{word}'...")
             download_html, download_json, html_filename, json_filename = prepare_download_content(explorer, G, node_labels, word, settings)
             
             # Show download buttons with pre-generated content
@@ -350,7 +345,6 @@ def render_graph_visualization(word, settings, explorer=None, synset_search_mode
             col1, col2 = st.columns(2)
             with col1:
                 if download_html:
-                    print(f"🔍 LOG: [DOWNLOAD_HTML_BUTTON_CREATE] Creating download button for '{html_filename}'")
                     st.download_button(
                         label="📥 Download HTML",
                         data=download_html,
@@ -359,11 +353,9 @@ def render_graph_visualization(word, settings, explorer=None, synset_search_mode
                         help="Download the interactive graph as an HTML file",
                         use_container_width=True
                     )
-                    print(f"🔍 LOG: [DOWNLOAD_HTML_BUTTON_CREATED] HTML download button rendered successfully")
                 
             with col2:
                 if download_json:
-                    print(f"🔍 LOG: [DOWNLOAD_JSON_BUTTON_CREATE] Creating download button for '{json_filename}'")
                     st.download_button(
                         label="📥 Download JSON",
                         data=download_json,
@@ -372,7 +364,6 @@ def render_graph_visualization(word, settings, explorer=None, synset_search_mode
                         help="Download the graph data as a JSON file",
                         use_container_width=True
                     )
-                    print(f"🔍 LOG: [DOWNLOAD_JSON_BUTTON_CREATED] JSON download button rendered successfully")
         else:
             st.error("Failed to generate graph visualization")
     else:
