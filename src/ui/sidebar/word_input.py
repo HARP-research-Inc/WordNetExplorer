@@ -198,21 +198,33 @@ def render_search_history():
             # Show info about hash codes at the top
             st.info("**Hash codes** (e.g., #12345678) uniquely identify each query configuration including all parameters")
             
-            # Create columns for history items and clear button
-            col1, col2 = st.columns([5, 1])
+            # Create container for history items
+            # Group queries by word
+            unique_words = history_manager.get_unique_words()
             
-            with col1:
-                # Group queries by word
-                unique_words = history_manager.get_unique_words()
+            for word in unique_words:
+                word_queries = history_manager.get_queries_for_word(word)
                 
-                for word in unique_words:
-                    word_queries = history_manager.get_queries_for_word(word)
-                    
-                    # If only one query for this word, show it directly
-                    if len(word_queries) == 1:
-                        query = word_queries[0]
+                # If only one query for this word, show it directly
+                if len(word_queries) == 1:
+                    query = word_queries[0]
+                    if st.button(
+                        f"📝 {query.get_display_label()}", 
+                        key=f"query_{query.get_hash()}",
+                        help=query.get_tooltip()
+                    ):
+                        log_word_input_event("QUERY_BUTTON_CLICKED", word=query.word, hash=query.get_hash())
+                        st.session_state.selected_history_word = query.word
+                        st.session_state.selected_history_query = query
+                        log_word_input_event("SET_SELECTED_HISTORY_QUERY", word=query.word)
+                        st.rerun()
+                else:
+                    # Multiple queries for this word - show them grouped
+                    st.markdown(f"**📚 {word}** ({len(word_queries)} variations):")
+                    for query in word_queries:
+                        # Use a styled button with padding for indentation
                         if st.button(
-                            f"📝 {query.get_display_label()}", 
+                            f"　　{query.get_display_label()}",  # Using ideographic space for indent
                             key=f"query_{query.get_hash()}",
                             help=query.get_tooltip()
                         ):
@@ -221,31 +233,15 @@ def render_search_history():
                             st.session_state.selected_history_query = query
                             log_word_input_event("SET_SELECTED_HISTORY_QUERY", word=query.word)
                             st.rerun()
-                    else:
-                        # Multiple queries for this word - show them grouped
-                        st.markdown(f"**📚 {word}** ({len(word_queries)} variations):")
-                        for query in word_queries:
-                            # Indent the query buttons
-                            col_indent, col_button = st.columns([0.5, 9.5])
-                            with col_button:
-                                if st.button(
-                                    f"{query.get_display_label()}", 
-                                    key=f"query_{query.get_hash()}",
-                                    help=query.get_tooltip()
-                                ):
-                                    log_word_input_event("QUERY_BUTTON_CLICKED", word=query.word, hash=query.get_hash())
-                                    st.session_state.selected_history_word = query.word
-                                    st.session_state.selected_history_query = query
-                                    log_word_input_event("SET_SELECTED_HISTORY_QUERY", word=query.word)
-                                    st.rerun()
             
-            with col2:
-                if st.button("🗑️", help="Clear search history", key="clear_search_history"):
-                    log_word_input_event("CLEAR_HISTORY_CLICKED")
-                    clear_search_history()
-                    st.rerun()
+            # Clear button at the bottom
+            st.markdown("---")
+            if st.button("🗑️ Clear History", help="Clear search history", key="clear_search_history"):
+                log_word_input_event("CLEAR_HISTORY_CLICKED")
+                clear_search_history()
+                st.rerun()
             
-            # Add legend below (not in a nested expander)
+            # Add legend below
             st.markdown("---")
             st.markdown("**📖 Hash Code Legend:**")
             st.markdown("""
