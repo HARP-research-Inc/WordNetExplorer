@@ -7,9 +7,11 @@ using Streamlit with a clean, modular architecture.
 """
 
 import streamlit as st
+import streamlit.components.v1 as components
 import sys
 import os
 import warnings
+import networkx as nx
 
 # Suppress specific Streamlit warnings more comprehensively
 warnings.filterwarnings("ignore", message=".*was created with a default value but also had its value set via the Session State API.*")
@@ -32,7 +34,7 @@ from core import WordNetExplorer, SessionManager
 from ui.styles import load_custom_css
 from ui.sidebar import render_sidebar
 from ui.word_info import render_word_information
-from ui.graph_display import render_graph_visualization
+from ui.graph_display import render_graph_visualization, render_graph_legend_and_controls
 from ui.welcome import render_welcome_screen
 
 # Import enhanced history functionality
@@ -141,103 +143,273 @@ def main():
     # Render header with logo
     render_header()
     
-    # Handle URL navigation
-    session_manager.handle_url_navigation()
+    # Check if we're in comparison mode
+    compare_mode = st.session_state.get('compare_mode', False)
     
-    # Render sidebar and get settings
-    settings = render_sidebar(session_manager)
-    
-    # Determine the current word to display
-    current_display_word = settings.get('word') or session_manager.get_current_word()
-    
-    # Debug logging
-    print(f"🔍 APP: current_display_word='{current_display_word}', settings_word='{settings.get('word')}', current_word='{session_manager.get_current_word()}'")
-    print(f"🔍 APP: word_changed={settings.get('word_changed', False)}, parsed_sense={settings.get('parsed_sense_number')}")
-    
-    # Check if this is a new query that should be added to history
-    # This happens when word_changed is True OR when we have a word that's being displayed
-    should_add_to_history = False
-    
-    # Update session state if this is a new word from input
-    if settings.get('word') and settings['word'] != session_manager.get_current_word():
-        # Update session state without modifying the widget
-        st.session_state.current_word = settings['word']
-        st.session_state.last_searched_word = settings['word']
-        session_manager.add_to_history(settings['word'])
-        should_add_to_history = True
-        current_display_word = settings['word']
-        print(f"🔍 APP: New word detected, should_add_to_history=True")
-    
-    # Also add to history if word_changed flag is set (user pressed Enter)
-    if settings.get('word_changed', False) and settings.get('word'):
-        should_add_to_history = True
-        print(f"🔍 APP: word_changed flag set, should_add_to_history=True")
-    
-    print(f"🔍 APP: Final should_add_to_history={should_add_to_history}")
-    
-    # Main content area
-    if current_display_word:
-        try:
-            # Check if we're in synset search mode
-            synset_search_mode = settings.get('synset_search_mode', False)
-            display_input = current_display_word
-            
-            # If in synset search mode, convert word+sense to synset name
-            if synset_search_mode and settings.get('parsed_sense_number'):
-                from wordnet import get_synsets_for_word
-                synsets = get_synsets_for_word(current_display_word)
-                sense_number = settings['parsed_sense_number']
-                if synsets and 1 <= sense_number <= len(synsets):
-                    # Use the synset name instead of the word
-                    display_input = synsets[sense_number - 1].name()
-                else:
-                    st.error(f"Invalid sense number {sense_number} for word '{current_display_word}'")
-                    synset_search_mode = False  # Fall back to word mode
-            
-            # Add complete query to enhanced history if needed
-            if should_add_to_history:
-                print(f"🔍 APP: Calling add_query_to_history with settings")
-                add_query_to_history(settings)
-            else:
-                print(f"🔍 APP: NOT calling add_query_to_history")
-                # Fallback: If we're displaying a word but it's not in history, add it
-                from utils.session_state import get_search_history_manager
-                from src.models.search_history import SearchQuery
-                
-                history_manager = get_search_history_manager()
-                current_query = SearchQuery.from_settings(settings)
-                
-                # Check if this exact query exists in history
-                query_exists = any(q.get_hash() == current_query.get_hash() for q in history_manager.queries)
-                
-                if not query_exists and current_display_word:
-                    print(f"🔍 APP: Query not in history, adding as fallback")
-                    add_query_to_history(settings)
-            
-            # Show word information if requested (not applicable in synset mode)
-            if settings.get('show_info', False) and not synset_search_mode:
-                render_word_information(current_display_word)
-            
-            # Build and display graph if requested
-            if settings.get('show_graph', True):
-                render_graph_visualization(display_input, settings, explorer, synset_search_mode)
-        
-        except Exception as e:
-            st.error(f"Error: {e}")
-            if settings.get('synset_search_mode', False):
-                st.error("Please check that you have entered a valid synset name (e.g., 'dog.n.01').")
-            else:
-                st.error("Please check that you have entered a valid English word.")
-    
+    if compare_mode:
+        # Comparison mode - render merged graph
+        render_comparison_view(explorer)
     else:
-        # Show welcome screen
-        render_welcome_screen()
+        # Normal mode - single graph view
+        # Handle URL navigation
+        session_manager.handle_url_navigation()
+        
+        # Render sidebar and get settings
+        settings = render_sidebar(session_manager)
+        
+        # Determine the current word to display
+        current_display_word = settings.get('word') or session_manager.get_current_word()
+        
+        # Debug logging
+        print(f"🔍 APP: current_display_word='{current_display_word}', settings_word='{settings.get('word')}', current_word='{session_manager.get_current_word()}'")
+        print(f"🔍 APP: word_changed={settings.get('word_changed', False)}, parsed_sense={settings.get('parsed_sense_number')}")
+        
+        # Check if this is a new query that should be added to history
+        # This happens when word_changed is True OR when we have a word that's being displayed
+        should_add_to_history = False
+        
+        # Update session state if this is a new word from input
+        if settings.get('word') and settings['word'] != session_manager.get_current_word():
+            # Update session state without modifying the widget
+            st.session_state.current_word = settings['word']
+            st.session_state.last_searched_word = settings['word']
+            session_manager.add_to_history(settings['word'])
+            should_add_to_history = True
+            current_display_word = settings['word']
+            print(f"🔍 APP: New word detected, should_add_to_history=True")
+        
+        # Also add to history if word_changed flag is set (user pressed Enter)
+        if settings.get('word_changed', False) and settings.get('word'):
+            should_add_to_history = True
+            print(f"🔍 APP: word_changed flag set, should_add_to_history=True")
+        
+        print(f"🔍 APP: Final should_add_to_history={should_add_to_history}")
+        
+        # Main content area
+        if current_display_word:
+            try:
+                # Check if we're in synset search mode
+                synset_search_mode = settings.get('synset_search_mode', False)
+                display_input = current_display_word
+                
+                # If in synset search mode, convert word+sense to synset name
+                if synset_search_mode and settings.get('parsed_sense_number'):
+                    from wordnet import get_synsets_for_word
+                    synsets = get_synsets_for_word(current_display_word)
+                    sense_number = settings['parsed_sense_number']
+                    if synsets and 1 <= sense_number <= len(synsets):
+                        # Use the synset name instead of the word
+                        display_input = synsets[sense_number - 1].name()
+                    else:
+                        st.error(f"Invalid sense number {sense_number} for word '{current_display_word}'")
+                        synset_search_mode = False  # Fall back to word mode
+                
+                # Add complete query to enhanced history if needed
+                if should_add_to_history:
+                    print(f"🔍 APP: Calling add_query_to_history with settings")
+                    add_query_to_history(settings)
+                else:
+                    print(f"🔍 APP: NOT calling add_query_to_history")
+                    # Fallback: If we're displaying a word but it's not in history, add it
+                    from utils.session_state import get_search_history_manager
+                    from src.models.search_history import SearchQuery
+                    
+                    history_manager = get_search_history_manager()
+                    current_query = SearchQuery.from_settings(settings)
+                    
+                    # Check if this exact query exists in history
+                    query_exists = any(q.get_hash() == current_query.get_hash() for q in history_manager.queries)
+                    
+                    if not query_exists and current_display_word:
+                        print(f"🔍 APP: Query not in history, adding as fallback")
+                        add_query_to_history(settings)
+                
+                # Show word information if requested (not applicable in synset mode)
+                if settings.get('show_info', False) and not synset_search_mode:
+                    render_word_information(current_display_word)
+                
+                # Build and display graph if requested
+                if settings.get('show_graph', True):
+                    render_graph_visualization(display_input, settings, explorer, synset_search_mode)
+            
+            except Exception as e:
+                st.error(f"Error: {e}")
+                if settings.get('synset_search_mode', False):
+                    st.error("Please check that you have entered a valid synset name (e.g., 'dog.n.01').")
+                else:
+                    st.error("Please check that you have entered a valid English word.")
+        
+        else:
+            # Show welcome screen
+            render_welcome_screen()
     
     # Display debug information if enabled
     session_manager.log_debug_info()
     
     # Render footer
     render_footer()
+
+
+def render_comparison_view(explorer):
+    """Render comparison view with merged graph."""
+    st.sidebar.markdown("## 📊 Comparison Mode")
+    
+    # Exit comparison mode button
+    if st.sidebar.button("← Back to Single View", key="exit_compare", type="primary"):
+        st.session_state.compare_mode = False
+        st.rerun()
+    
+    st.sidebar.markdown("---")
+    
+    # Get selected queries
+    from utils.session_state import get_search_history_manager
+    from src.models.search_history import SearchQuery
+    
+    history_manager = get_search_history_manager()
+    selected_hashes = st.session_state.get('selected_queries_for_comparison', set())
+    
+    # Find the actual query objects
+    selected_queries = []
+    for query in history_manager.queries:
+        if query.get_hash() in selected_hashes:
+            selected_queries.append(query)
+    
+    if not selected_queries:
+        st.warning("No queries selected for comparison. Please go back and select some queries.")
+        return
+    
+    st.markdown(f"### Comparing {len(selected_queries)} Word Graphs (Merged View)")
+    
+    # Show what's being compared
+    comparison_info = "**Comparing:** " + " | ".join([q.get_display_label() for q in selected_queries])
+    st.info(comparison_info)
+    
+    # Create a merged graph
+    merged_graph = nx.DiGraph()
+    merged_node_labels = {}
+    
+    # Track which queries contributed to each node
+    node_sources = {}  # node_id -> set of query labels
+    
+    # Build each individual graph and merge
+    with st.spinner("Building and merging graphs..."):
+        for query in selected_queries:
+            # Restore settings from query
+            from utils.session_state import restore_query_settings
+            settings = restore_query_settings(query)
+            
+            # Determine display input
+            display_input = query.word
+            synset_search_mode = query.synset_search_mode
+            
+            if synset_search_mode and query.sense_number:
+                from wordnet import get_synsets_for_word
+                synsets = get_synsets_for_word(query.word)
+                if synsets and 1 <= query.sense_number <= len(synsets):
+                    display_input = synsets[query.sense_number - 1].name()
+            
+            try:
+                # Build individual graph
+                if synset_search_mode:
+                    G, node_labels = explorer.explore_synset(
+                        synset_name=display_input,
+                        depth=settings['depth'],
+                        max_nodes=settings.get('max_nodes', 100),
+                        max_branches=settings.get('max_branches', 5),
+                        min_frequency=settings.get('min_frequency', 0),
+                        pos_filter=settings.get('pos_filter', ["Nouns", "Verbs", "Adjectives", "Adverbs"]),
+                        enable_clustering=settings.get('enable_clustering', False),
+                        enable_cross_connections=settings.get('enable_cross_connections', True),
+                        simplified_mode=settings.get('simplified_mode', False),
+                        **{k: v for k, v in settings.items() if k.startswith('show_')}
+                    )
+                else:
+                    G, node_labels = explorer.explore_word(
+                        word=query.word,
+                        depth=settings['depth'],
+                        sense_number=settings.get('parsed_sense_number'),
+                        max_nodes=settings.get('max_nodes', 100),
+                        max_branches=settings.get('max_branches', 5),
+                        min_frequency=settings.get('min_frequency', 0),
+                        pos_filter=settings.get('pos_filter', ["Nouns", "Verbs", "Adjectives", "Adverbs"]),
+                        enable_clustering=settings.get('enable_clustering', False),
+                        enable_cross_connections=settings.get('enable_cross_connections', True),
+                        simplified_mode=settings.get('simplified_mode', False),
+                        **{k: v for k, v in settings.items() if k.startswith('show_')}
+                    )
+                
+                # Merge into the combined graph
+                query_label = query.get_short_label()
+                
+                # Add nodes
+                for node in G.nodes():
+                    if node not in merged_graph:
+                        merged_graph.add_node(node)
+                        # Copy all node attributes
+                        for attr, value in G.nodes[node].items():
+                            merged_graph.nodes[node][attr] = value
+                        merged_node_labels[node] = node_labels.get(node, node)
+                        node_sources[node] = {query_label}
+                    else:
+                        # Node already exists - track that this query also has it
+                        node_sources[node].add(query_label)
+                        # Update node type to show it's shared
+                        if 'node_type' in merged_graph.nodes[node]:
+                            if merged_graph.nodes[node]['node_type'] != 'main':
+                                merged_graph.nodes[node]['node_type'] = 'shared'
+                
+                # Add edges
+                for u, v in G.edges():
+                    if not merged_graph.has_edge(u, v):
+                        merged_graph.add_edge(u, v)
+                        # Copy all edge attributes
+                        for attr, value in G.edges[u, v].items():
+                            merged_graph[u][v][attr] = value
+                    else:
+                        # Edge already exists - could update attributes if needed
+                        pass
+                
+            except Exception as e:
+                st.error(f"Error processing graph for {query.get_display_label()}: {e}")
+    
+    # Add source information to node labels
+    for node, sources in node_sources.items():
+        if len(sources) > 1:
+            # Node appears in multiple queries
+            merged_node_labels[node] = f"{merged_node_labels[node]} [{', '.join(sorted(sources))}]"
+    
+    # Display the merged graph
+    st.info(f"Merged graph contains {merged_graph.number_of_nodes()} nodes and {merged_graph.number_of_edges()} edges")
+    
+    # Use the first query's visualization settings as defaults
+    if selected_queries:
+        from utils.session_state import restore_query_settings
+        vis_settings = restore_query_settings(selected_queries[0])
+    else:
+        vis_settings = {}
+    
+    # Render the merged graph
+    display_html = explorer.visualize_graph(
+        merged_graph, 
+        merged_node_labels, 
+        "Comparison Graph",
+        save_path=None,
+        layout_type=vis_settings.get('layout_type', 'force'),
+        node_size_multiplier=vis_settings.get('node_size_multiplier', 1.0),
+        enable_physics=vis_settings.get('enable_physics', True),
+        spring_strength=vis_settings.get('spring_strength', 0.005),
+        central_gravity=vis_settings.get('central_gravity', 0.3),
+        show_labels=vis_settings.get('show_labels', True),
+        edge_width=vis_settings.get('edge_width', 1),
+        color_scheme=vis_settings.get('color_scheme', 'Default')
+    )
+    
+    if display_html:
+        # Display the HTML content directly
+        components.html(display_html, height=600, scrolling=True)
+        
+        # Show legend and controls
+        render_graph_legend_and_controls(merged_graph, vis_settings)
 
 
 if __name__ == "__main__":

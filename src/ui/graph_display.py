@@ -240,7 +240,7 @@ def prepare_download_content(explorer, G, node_labels, word, settings):
     return html_content, json_content, html_filename, json_filename
 
 
-def render_graph_visualization(word, settings, explorer=None, synset_search_mode=False):
+def render_graph_visualization(word, settings, explorer=None, synset_search_mode=False, container_key=None):
     """
     Render the complete graph visualization section.
     
@@ -249,6 +249,7 @@ def render_graph_visualization(word, settings, explorer=None, synset_search_mode
         settings (dict): Dictionary containing all graph settings
         explorer: WordNetExplorer instance (optional, will create if not provided)
         synset_search_mode (bool): Whether we're searching by synset instead of word
+        container_key (str): Unique key for the component container (for comparison mode)
     """
     st.markdown('<h2 class="sub-header">Relationship Graph</h2>', unsafe_allow_html=True)
     

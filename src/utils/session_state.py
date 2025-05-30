@@ -25,6 +25,8 @@ def initialize_session_state():
         st.session_state.previous_word_input = ''
     if 'last_processed_word_input' not in st.session_state:
         st.session_state.last_processed_word_input = ''
+    if 'selected_queries_for_comparison' not in st.session_state:
+        st.session_state.selected_queries_for_comparison = set()  # Set of query hashes
 
 
 def add_to_search_history(word):

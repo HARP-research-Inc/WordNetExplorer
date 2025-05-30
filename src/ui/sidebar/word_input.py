@@ -193,10 +193,19 @@ def render_search_history():
     
     if history_manager.queries:
         with st.expander("🔍 Search & Navigation History", expanded=False):
-            st.markdown("Click any query to explore it again:")
+            st.markdown("Click any query to explore it again, or select multiple to compare:")
             
             # Show info about hash codes at the top
             st.info("**Hash codes** (e.g., #12345678) uniquely identify each query configuration including all parameters")
+            
+            # Show compare button if any items are selected
+            selected_hashes = st.session_state.get('selected_queries_for_comparison', set())
+            if selected_hashes:
+                st.success(f"**{len(selected_hashes)} queries selected for comparison**")
+                if st.button("📊 Compare Selected Graphs", key="compare_selected", type="primary"):
+                    st.session_state.compare_mode = True
+                    st.rerun()
+                st.markdown("---")
             
             # Create container for history items
             # Group queries by word
@@ -208,43 +217,87 @@ def render_search_history():
                 # If only one query for this word, show it directly
                 if len(word_queries) == 1:
                     query = word_queries[0]
-                    if st.button(
-                        f"📝 {query.get_display_label()}", 
-                        key=f"query_{query.get_hash()}",
-                        help=query.get_tooltip()
-                    ):
-                        log_word_input_event("QUERY_BUTTON_CLICKED", word=query.word, hash=query.get_hash())
-                        st.session_state.selected_history_word = query.word
-                        st.session_state.selected_history_query = query
-                        log_word_input_event("SET_SELECTED_HISTORY_QUERY", word=query.word)
-                        st.rerun()
+                    query_hash = query.get_hash()
+                    
+                    # Create a container for the checkbox and button
+                    container = st.container()
+                    with container:
+                        # Checkbox for selection
+                        is_selected = query_hash in selected_hashes
+                        label = f"☐ {query.get_display_label()}" if not is_selected else f"☑ {query.get_display_label()}"
+                        
+                        if st.checkbox(
+                            label,
+                            key=f"select_{query_hash}", 
+                            value=is_selected,
+                            help=f"Select for comparison | {query.get_tooltip()}"
+                        ):
+                            selected_hashes.add(query_hash)
+                        else:
+                            selected_hashes.discard(query_hash)
+                        st.session_state.selected_queries_for_comparison = selected_hashes
+                        
+                        # Button to load this specific query
+                        if st.button(
+                            f"📝 Load '{query.word}'", 
+                            key=f"load_{query_hash}",
+                            help=f"Load this query | {query.get_tooltip()}"
+                        ):
+                            log_word_input_event("QUERY_BUTTON_CLICKED", word=query.word, hash=query_hash)
+                            st.session_state.selected_history_word = query.word
+                            st.session_state.selected_history_query = query
+                            log_word_input_event("SET_SELECTED_HISTORY_QUERY", word=query.word)
+                            st.rerun()
                 else:
                     # Multiple queries for this word - show them grouped
                     st.markdown(f"**📚 {word}** ({len(word_queries)} variations):")
                     for query in word_queries:
-                        # Use a styled button with padding for indentation
-                        if st.button(
-                            f"　　{query.get_display_label()}",  # Using ideographic space for indent
-                            key=f"query_{query.get_hash()}",
-                            help=query.get_tooltip()
+                        query_hash = query.get_hash()
+                        
+                        # Checkbox for selection with indent
+                        is_selected = query_hash in selected_hashes
+                        label = f"　☐ {query.get_display_label()}" if not is_selected else f"　☑ {query.get_display_label()}"
+                        
+                        if st.checkbox(
+                            label,
+                            key=f"select_{query_hash}", 
+                            value=is_selected,
+                            help=f"Select for comparison | {query.get_tooltip()}"
                         ):
-                            log_word_input_event("QUERY_BUTTON_CLICKED", word=query.word, hash=query.get_hash())
+                            selected_hashes.add(query_hash)
+                        else:
+                            selected_hashes.discard(query_hash)
+                        st.session_state.selected_queries_for_comparison = selected_hashes
+                        
+                        # Button to load this specific query
+                        if st.button(
+                            f"　📝 Load", 
+                            key=f"load_{query_hash}",
+                            help=f"Load this query | {query.get_tooltip()}"
+                        ):
+                            log_word_input_event("QUERY_BUTTON_CLICKED", word=query.word, hash=query_hash)
                             st.session_state.selected_history_word = query.word
                             st.session_state.selected_history_query = query
                             log_word_input_event("SET_SELECTED_HISTORY_QUERY", word=query.word)
                             st.rerun()
             
-            # Clear button at the bottom
+            # Clear buttons at the bottom
             st.markdown("---")
             if st.button("🗑️ Clear History", help="Clear search history", key="clear_search_history"):
                 log_word_input_event("CLEAR_HISTORY_CLICKED")
                 clear_search_history()
+                st.session_state.selected_queries_for_comparison = set()
+                st.rerun()
+                
+            if selected_hashes and st.button("❌ Clear Selection", help="Clear selected items", key="clear_selection"):
+                st.session_state.selected_queries_for_comparison = set()
                 st.rerun()
             
             # Add legend below
             st.markdown("---")
-            st.markdown("**📖 Hash Code Legend:**")
+            st.markdown("**📖 Legend:**")
             st.markdown("""
+            - ☐/☑ = Checkbox to select for comparison
             - **word** = Basic word query
             - **word.XX** = Specific sense (e.g., dog.01 = first sense)
             - **[S]** = Synset search mode enabled
