@@ -7,6 +7,7 @@ import streamlit.components.v1 as components
 from streamlit.runtime.scriptrunner import ScriptRunContext
 import os
 import shutil
+from datetime import datetime
 from config.settings import COLOR_SCHEMES, POS_COLORS
 from utils.helpers import ensure_downloads_directory, validate_filename
 
@@ -192,7 +193,7 @@ def render_exploration_tips():
 
 def prepare_download_content(explorer, G, node_labels, word, settings):
     """
-    Prepare download content for HTML and JSON based on button clicks.
+    Prepare download content for HTML and JSON based on session state requests.
     
     Args:
         explorer: WordNetExplorer instance
@@ -202,13 +203,19 @@ def prepare_download_content(explorer, G, node_labels, word, settings):
         settings: Settings dictionary containing download options
     
     Returns:
-        tuple: (html_content, json_content) where content is None if not requested
+        tuple: (html_content, json_content, html_filename, json_filename) where content is None if not requested
     """
     html_content = None
     json_content = None
+    html_filename = None
+    json_filename = None
     
-    # Prepare HTML content if button was clicked
-    if settings.get('save_html_button'):
+    # Generate timestamp for filenames
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    sense_num = settings.get('parsed_sense_number', 0) or 0  # Use 0 for all senses
+    
+    # Prepare HTML content if requested
+    if settings.get('download_html_requested'):
         # Generate HTML content
         html_content = explorer.visualize_graph(
             G, node_labels, word,
@@ -222,17 +229,22 @@ def prepare_download_content(explorer, G, node_labels, word, settings):
             edge_width=settings['edge_width'],
             color_scheme=settings['color_scheme']
         )
+        html_filename = f"wne-{word}-{sense_num}-{timestamp}.html"
+        # Clear the request flag
+        st.session_state.download_html_requested = False
     
-    # Prepare JSON content if button was clicked
-    if settings.get('export_json_button'):
+    # Prepare JSON content if requested
+    if settings.get('download_json_requested'):
         from src.graph import GraphSerializer
         serializer = GraphSerializer()
         
         # Add metadata
         metadata = {
             'word': word,
-            'description': f'WordNet graph for "{word}"',
+            'sense_number': sense_num,
+            'description': f'WordNet graph for "{word}" (sense {sense_num})',
             'version': '1.0',
+            'generated_at': timestamp,
             'visualization_config': {
                 'layout_type': settings['layout_type'],
                 'node_size_multiplier': settings['node_size_multiplier'],
@@ -247,8 +259,11 @@ def prepare_download_content(explorer, G, node_labels, word, settings):
         
         # Get JSON string
         json_content = serializer.serialize_graph(G, node_labels, metadata)
+        json_filename = f"wne-{word}-{sense_num}-{timestamp}.json"
+        # Clear the request flag
+        st.session_state.download_json_requested = False
     
-    return html_content, json_content
+    return html_content, json_content, html_filename, json_filename
 
 
 def render_graph_visualization(word, settings, explorer=None, synset_search_mode=False):
@@ -350,14 +365,14 @@ def render_graph_visualization(word, settings, explorer=None, synset_search_mode
             render_graph_legend_and_controls(G, settings, synset_search_mode)
             
             # Handle downloads if buttons were clicked
-            download_html, download_json = prepare_download_content(explorer, G, node_labels, word, settings)
+            download_html, download_json, html_filename, json_filename = prepare_download_content(explorer, G, node_labels, word, settings)
             
             # Show download buttons if content is ready
             if download_html:
                 st.download_button(
                     label="📥 Download HTML",
                     data=download_html,
-                    file_name=settings.get('html_filename', f"{word}_graph.html"),
+                    file_name=html_filename,
                     mime="text/html",
                     help="Download the interactive graph as an HTML file"
                 )
@@ -366,7 +381,7 @@ def render_graph_visualization(word, settings, explorer=None, synset_search_mode
                 st.download_button(
                     label="📥 Download JSON", 
                     data=download_json,
-                    file_name=settings.get('json_filename', f"{word}_graph.json"),
+                    file_name=json_filename,
                     mime="application/json",
                     help="Download the graph data as a JSON file"
                 )

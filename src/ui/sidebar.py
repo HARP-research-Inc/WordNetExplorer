@@ -735,30 +735,16 @@ def render_save_options():
     with st.expander("💾 Save Options"):
         # HTML export button
         st.markdown("#### HTML Export")
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            html_filename = st.text_input("HTML filename (without extension)", "wordnet_graph", key="html_filename")
-        with col2:
-            save_html_button = st.button("📥 Download HTML", help="Download the graph as an interactive HTML file")
-        
-        if not html_filename:
-            html_filename = "wordnet_graph"
-        if not html_filename.endswith(".html"):
-            html_filename += ".html"
+        st.markdown("*Filename will be auto-generated as: `wne-<word>-<sense>-<datetime>.html`*")
+        if st.button("📥 Download HTML", help="Download the graph as an interactive HTML file", use_container_width=True):
+            st.session_state.download_html_requested = True
         
         # JSON export button
         st.markdown("---")
         st.markdown("#### JSON Export")
-        col3, col4 = st.columns([2, 1])
-        with col3:
-            json_filename = st.text_input("JSON filename (without extension)", "wordnet_graph", key="json_filename")
-        with col4:
-            export_json_button = st.button("📥 Download JSON", help="Download the graph data as a JSON file")
-        
-        if not json_filename:
-            json_filename = "wordnet_graph"
-        if not json_filename.endswith(".json"):
-            json_filename += ".json"
+        st.markdown("*Filename will be auto-generated as: `wne-<word>-<sense>-<datetime>.json`*")
+        if st.button("📥 Download JSON", help="Download the graph data as a JSON file", use_container_width=True):
+            st.session_state.download_json_requested = True
         
         # JSON import
         st.markdown("---")
@@ -776,7 +762,11 @@ def render_save_options():
             except Exception as e:
                 st.error(f"❌ Error importing graph: {str(e)}")
     
-    return save_html_button, html_filename, export_json_button, json_filename, uploaded_file is not None
+    # Get download request states from session state
+    download_html_requested = st.session_state.get('download_html_requested', False)
+    download_json_requested = st.session_state.get('download_json_requested', False)
+    
+    return download_html_requested, download_json_requested, uploaded_file is not None
 
 
 def render_about_section():
@@ -885,7 +875,7 @@ def render_sidebar(session_manager):
         show_info, show_graph = render_display_options(session_manager)
         
         # Save options
-        save_html_button, html_filename, export_json_button, json_filename, uploaded_file = render_save_options()
+        download_html_requested, download_json_requested, uploaded_file = render_save_options()
         
         # About section
         render_about_section()
@@ -904,10 +894,8 @@ def render_sidebar(session_manager):
             'edge_width': edge_width,
             'show_info': show_info,
             'show_graph': show_graph,
-            'save_html_button': save_html_button,
-            'html_filename': html_filename,
-            'export_json_button': export_json_button,
-            'json_filename': json_filename,
+            'download_html_requested': download_html_requested,
+            'download_json_requested': download_json_requested,
             'uploaded_file': uploaded_file,
             'parsed_sense_number': parsed_sense_number,
             'synset_search_mode': synset_search_mode
