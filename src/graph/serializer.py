@@ -118,11 +118,12 @@ class GraphSerializer:
             attrs = edge['attributes']
             G.add_edge(source, target, **attrs)
         
-        # Extract visualization config if present
+        # Extract visualization config if present, but keep it in metadata
         metadata = serialized.metadata
         if 'visualization_config' in metadata:
-            config_dict = metadata.pop('visualization_config')
+            config_dict = metadata['visualization_config']
             self.visualization_config = VisualizationConfig(**config_dict)
+            # Keep the visualization_config in metadata for external use
         
         return G, serialized.node_labels, metadata
     

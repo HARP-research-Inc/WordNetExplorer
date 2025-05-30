@@ -847,6 +847,14 @@ def render_sidebar(session_manager):
     with st.sidebar:
         st.markdown("### Settings")
         
+        # Check if URL parameters have changed since last render
+        current_url_params = session_manager.get_query_params()
+        previous_url_params = st.session_state.get('previous_url_params', {})
+        url_params_changed = current_url_params != previous_url_params
+        
+        # Store current URL params for next comparison
+        st.session_state.previous_url_params = current_url_params
+        
         # Apply button at the top
         apply_clicked = st.button("🔄 Apply Settings", 
                                  help="Update the URL with current settings for sharing",
@@ -912,15 +920,37 @@ def render_sidebar(session_manager):
             'edge_width': edge_width,
             'show_info': show_info,
             'show_graph': show_graph,
-            'uploaded_file': uploaded_file
+            'uploaded_file': uploaded_file,
+            'parsed_sense_number': parsed_sense_number,
+            'synset_search_mode': synset_search_mode
         }
         
         # Add all relationship settings
         settings.update(relationship_settings)
         settings.update(advanced_settings)
         
-        # Update URL with current settings only when Apply is clicked or word changed (Enter pressed)
+        # Merge URL parameters into settings to ensure URL changes take effect
+        url_settings = session_manager.get_settings_from_url()
+        for key, value in url_settings.items():
+            if key in settings:
+                # Only override if the URL value is different from current
+                if settings[key] != value:
+                    settings[key] = value
+                    url_params_changed = True
+        
+        # Update URL with current settings only when Apply is clicked, word changed, or URL params changed
         should_update_url = apply_clicked or word_changed
+        
+        # Add URL parameter change detection for graph regeneration
+        if url_params_changed and not should_update_url:
+            # Clear any cached graph data to force regeneration
+            if 'html_content' in st.session_state:
+                del st.session_state.html_content
+            if 'graph_data' in st.session_state:
+                del st.session_state.graph_data
+            # Mark that settings have changed due to URL
+            settings['url_params_changed'] = True
+        
         session_manager.update_url_with_settings(settings, force_update=should_update_url)
         
         return settings 

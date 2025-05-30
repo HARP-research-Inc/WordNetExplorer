@@ -258,13 +258,20 @@ def render_graph_visualization(word, settings, explorer=None, synset_search_mode
         from src.wordnet_explorer import WordNetExplorer
         explorer = WordNetExplorer()
     
+    # Check if we should force regeneration due to URL parameter changes
+    force_regeneration = settings.get('url_params_changed', False)
+    
     # Check for imported graph
-    if 'imported_graph' in st.session_state:
+    if 'imported_graph' in st.session_state and not force_regeneration:
         G, node_labels, metadata = st.session_state.imported_graph
         # Update visualization settings from metadata if available
         if 'visualization_config' in metadata:
             settings.update(metadata['visualization_config'])
     else:
+        # Clear imported graph if we're forcing regeneration
+        if force_regeneration and 'imported_graph' in st.session_state:
+            del st.session_state.imported_graph
+        
         # Build the graph
         if synset_search_mode:
             G, node_labels = explorer.explore_synset(word)
@@ -273,6 +280,10 @@ def render_graph_visualization(word, settings, explorer=None, synset_search_mode
     
     if G.number_of_nodes() > 0:
         st.info(f"Graph created with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges")
+        
+        # Show URL parameter change indicator if applicable
+        if force_regeneration:
+            st.success("🔄 Graph updated from URL parameters")
         
         # Generate the interactive graph using the new modular explorer
         html_content = explorer.visualize_graph(
