@@ -76,15 +76,6 @@ class GraphSerializer:
         if metadata is None:
             metadata = {}
         
-        # Add search history if available (from Streamlit session state)
-        try:
-            import streamlit as st
-            if hasattr(st, 'session_state') and 'search_history' in st.session_state:
-                metadata['search_history'] = st.session_state.search_history
-        except ImportError:
-            # Streamlit not available (e.g., in standalone use)
-            pass
-        
         # Add visualization config to metadata
         metadata['visualization_config'] = asdict(self.visualization_config)
         

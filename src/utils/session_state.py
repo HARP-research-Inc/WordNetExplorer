@@ -21,46 +21,20 @@ def initialize_session_state():
         st.session_state.last_processed_word_input = ''
 
 
-def add_to_search_history(item):
-    """Add an item to search history, avoiding duplicates and maintaining order."""
-    if not item:
-        return
-    
-    # Handle both old format (string) and new format (dict)
-    if isinstance(item, str):
-        # Old format - convert to dict
-        word = item.strip().lower()
-        if not word:
-            return
-        search_item = {'word': word, 'timestamp': None}
-    else:
-        # New format - dict with query parameters
-        word = item.get('word', '').strip().lower()
-        if not word:
-            return
-        search_item = item.copy()
-        search_item['word'] = word  # Ensure lowercase
-    
-    # Remove duplicate entries based on word and sense number
-    word_to_match = search_item['word']
-    sense_to_match = search_item.get('sense_number')
-    
-    # Remove existing items with same word and sense combination
-    st.session_state.search_history = [
-        hist_item for hist_item in st.session_state.search_history
-        if not (
-            (isinstance(hist_item, str) and hist_item == word_to_match) or
-            (isinstance(hist_item, dict) and 
-             hist_item.get('word') == word_to_match and 
-             hist_item.get('sense_number') == sense_to_match)
-        )
-    ]
-    
-    # Add to the beginning of the list (most recent first)
-    st.session_state.search_history.insert(0, search_item)
-    
-    # Keep only the last 10 searches
-    st.session_state.search_history = st.session_state.search_history[:10]
+
+
+
+def add_to_search_history(word):
+    """Add a word to search history, avoiding duplicates and maintaining order."""
+    if word and word.strip():
+        word = word.strip().lower()
+        # Remove word if it already exists to avoid duplicates
+        if word in st.session_state.search_history:
+            st.session_state.search_history.remove(word)
+        # Add to the beginning of the list (most recent first)
+        st.session_state.search_history.insert(0, word)
+        # Keep only the last 10 searches
+        st.session_state.search_history = st.session_state.search_history[:10]
 
 
 def clear_search_history():
