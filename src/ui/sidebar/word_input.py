@@ -3,9 +3,16 @@ Word input components for the sidebar.
 """
 
 import streamlit as st
-from utils.session_state import add_to_search_history, clear_search_history
+from utils.session_state import (
+    add_to_search_history, 
+    clear_search_history, 
+    add_query_to_history,
+    get_search_history_manager,
+    restore_query_settings
+)
 from utils.debug_logger import log_word_input_event, log_session_state
 from wordnet import get_synsets_for_word
+from src.models.search_history import SearchQuery
 
 
 def get_url_default(session_manager, setting_key: str, default_value):
@@ -21,11 +28,17 @@ def render_word_input(session_manager):
     
     # Check if a history word was selected
     selected_word = st.session_state.get('selected_history_word', None)
+    selected_query = st.session_state.get('selected_history_query', None)
     log_word_input_event("SELECTED_WORD_CHECK", selected_word=selected_word)
     
     # Get word and search mode from URL if available
     url_word = get_url_default(session_manager, 'word', None)
     synset_search_mode = get_url_default(session_manager, 'synset_search_mode', False)
+    
+    # If a query was selected from history, use its settings
+    if selected_query:
+        url_word = selected_query.word
+        synset_search_mode = selected_query.synset_search_mode
     
     # Input label and help (will be updated after we have word and sense info)
     input_label = "Enter a word to explore"
@@ -44,9 +57,12 @@ def render_word_input(session_manager):
         placeholder=input_placeholder
     ).strip().lower()
     
-    # Get sense number from URL if available
-    url_sense = get_url_default(session_manager, 'sense_number', None)
-    sense_input_value = str(url_sense) if url_sense is not None else ""
+    # Get sense number from URL or selected query
+    if selected_query and selected_query.sense_number:
+        sense_input_value = str(selected_query.sense_number)
+    else:
+        url_sense = get_url_default(session_manager, 'sense_number', None)
+        sense_input_value = str(url_sense) if url_sense is not None else ""
     
     # Sense number input field
     sense_number = st.text_input(
@@ -100,10 +116,11 @@ def render_word_input(session_manager):
     log_word_input_event("TEXT_INPUT_RESULT", word=word, input_value=input_value)
     
     # Handle selected word from history
-    if selected_word:
+    if selected_word or selected_query:
         log_word_input_event("PROCESSING_SELECTED_WORD", selected_word=selected_word)
-        # Clear the selected history word
+        # Clear the selected history word/query
         st.session_state.selected_history_word = None
+        st.session_state.selected_history_query = None
         log_word_input_event("CLEARED_SELECTED_WORD")
         
         # Add to search history and update last searched word
@@ -157,31 +174,87 @@ def render_word_input(session_manager):
 
 
 def render_search_history():
-    """Render the search history in a collapsible expander."""
-    log_word_input_event("SEARCH_HISTORY_RENDER_START", history_length=len(st.session_state.get('search_history', [])))
+    """Render the enhanced search history with query details."""
+    history_manager = get_search_history_manager()
     
-    if st.session_state.search_history:
+    # Debug logging
+    log_word_input_event("SEARCH_HISTORY_RENDER_START", 
+                        history_length=len(history_manager.queries),
+                        manager_id=id(history_manager),
+                        has_queries=bool(history_manager.queries))
+    
+    # Also log the first few queries for debugging
+    if history_manager.queries:
+        for i, query in enumerate(history_manager.queries[:3]):
+            log_word_input_event(f"HISTORY_QUERY_{i}", 
+                               word=query.word, 
+                               hash=query.get_hash(),
+                               label=query.get_display_label())
+    
+    if history_manager.queries:
         with st.expander("🔍 Search & Navigation History", expanded=False):
-            st.markdown("Click any word to explore it again:")
+            st.markdown("Click any query to explore it again:")
+            
+            # Show info about hash codes at the top
+            st.info("**Hash codes** (e.g., #12345678) uniquely identify each query configuration including all parameters")
             
             # Create columns for history items and clear button
-            col1, col2 = st.columns([4, 1])
+            col1, col2 = st.columns([5, 1])
             
             with col1:
-                # Display search history as clickable buttons
-                for i, hist_word in enumerate(st.session_state.search_history):
-                    log_word_input_event("RENDERING_HISTORY_BUTTON", index=i, hist_word=hist_word, button_key=f"search_history_{i}")
-                    if st.button(f"📝 {hist_word}", key=f"search_history_{i}", help=f"Click to explore '{hist_word}'"):
-                        log_word_input_event("HISTORY_BUTTON_CLICKED", hist_word=hist_word, index=i)
-                        st.session_state.selected_history_word = hist_word
-                        log_word_input_event("SET_SELECTED_HISTORY_WORD", hist_word=hist_word)
-                        log_session_state("BEFORE_RERUN")
-                        st.rerun()
+                # Group queries by word
+                unique_words = history_manager.get_unique_words()
+                
+                for word in unique_words:
+                    word_queries = history_manager.get_queries_for_word(word)
+                    
+                    # If only one query for this word, show it directly
+                    if len(word_queries) == 1:
+                        query = word_queries[0]
+                        if st.button(
+                            f"📝 {query.get_display_label()}", 
+                            key=f"query_{query.get_hash()}",
+                            help=query.get_tooltip()
+                        ):
+                            log_word_input_event("QUERY_BUTTON_CLICKED", word=query.word, hash=query.get_hash())
+                            st.session_state.selected_history_word = query.word
+                            st.session_state.selected_history_query = query
+                            log_word_input_event("SET_SELECTED_HISTORY_QUERY", word=query.word)
+                            st.rerun()
+                    else:
+                        # Multiple queries for this word - show them grouped
+                        st.markdown(f"**📚 {word}** ({len(word_queries)} variations):")
+                        for query in word_queries:
+                            # Indent the query buttons
+                            col_indent, col_button = st.columns([0.5, 9.5])
+                            with col_button:
+                                if st.button(
+                                    f"{query.get_display_label()}", 
+                                    key=f"query_{query.get_hash()}",
+                                    help=query.get_tooltip()
+                                ):
+                                    log_word_input_event("QUERY_BUTTON_CLICKED", word=query.word, hash=query.get_hash())
+                                    st.session_state.selected_history_word = query.word
+                                    st.session_state.selected_history_query = query
+                                    log_word_input_event("SET_SELECTED_HISTORY_QUERY", word=query.word)
+                                    st.rerun()
             
             with col2:
                 if st.button("🗑️", help="Clear search history", key="clear_search_history"):
                     log_word_input_event("CLEAR_HISTORY_CLICKED")
                     clear_search_history()
                     st.rerun()
+            
+            # Add legend below (not in a nested expander)
+            st.markdown("---")
+            st.markdown("**📖 Hash Code Legend:**")
+            st.markdown("""
+            - **word** = Basic word query
+            - **word.XX** = Specific sense (e.g., dog.01 = first sense)
+            - **[S]** = Synset search mode enabled
+            - **#XXXXXXXX** = Unique 8-character hash of all parameters
+            
+            The hash includes: word, sense, depth, relationships, and all other settings.
+            """)
     else:
         log_word_input_event("NO_SEARCH_HISTORY_TO_RENDER") 

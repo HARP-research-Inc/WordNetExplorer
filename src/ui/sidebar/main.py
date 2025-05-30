@@ -9,6 +9,16 @@ from .exploration_settings import render_basic_settings
 from .visualization_settings import render_visual_options, render_display_options
 from .about import render_about_section
 
+# Fix import path - need to go up to src directory
+import sys
+import os
+current_dir = os.path.dirname(os.path.abspath(__file__))
+src_dir = os.path.dirname(os.path.dirname(current_dir))
+if src_dir not in sys.path:
+    sys.path.insert(0, src_dir)
+
+from utils.session_state import restore_query_settings
+
 
 def render_sidebar(session_manager):
     """
@@ -22,6 +32,19 @@ def render_sidebar(session_manager):
     """
     with st.sidebar:
         st.title("🔤 Word Explorer")
+        
+        # Check if a query was selected from history
+        selected_query = st.session_state.get('selected_history_query', None)
+        if selected_query:
+            # Restore settings from the selected query
+            restored_settings = restore_query_settings(selected_query)
+            
+            # Update session state with restored settings for various widgets
+            for key, value in restored_settings.items():
+                if key in ['depth', 'max_nodes', 'max_branches', 'min_frequency', 
+                          'enable_clustering', 'enable_cross_connections', 
+                          'simplified_mode', 'pos_filter']:
+                    st.session_state[key] = value
         
         # Word input section
         word, parsed_sense_number, word_changed, synset_search_mode = render_word_input(session_manager)
@@ -89,5 +112,9 @@ def render_sidebar(session_manager):
             'include_meronyms': basic_relationships.get('show_meronyms', False),
             'include_holonyms': basic_relationships.get('show_holonyms', False),
         }
+        
+        # If a query was selected, override with its settings
+        if selected_query:
+            settings.update(restored_settings)
         
         return settings 

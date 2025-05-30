@@ -35,6 +35,9 @@ from ui.word_info import render_word_information
 from ui.graph_display import render_graph_visualization
 from ui.welcome import render_welcome_screen
 
+# Import enhanced history functionality
+from utils.session_state import add_query_to_history, initialize_session_state
+
 
 def render_header():
     """Render the header with title."""
@@ -125,6 +128,9 @@ def main():
     # Set page configuration
     st.set_page_config(**PAGE_CONFIG)
     
+    # Initialize session state for enhanced history
+    initialize_session_state()
+    
     # Initialize core components
     session_manager = SessionManager()
     explorer = WordNetExplorer()
@@ -144,13 +150,30 @@ def main():
     # Determine the current word to display
     current_display_word = settings.get('word') or session_manager.get_current_word()
     
+    # Debug logging
+    print(f"🔍 APP: current_display_word='{current_display_word}', settings_word='{settings.get('word')}', current_word='{session_manager.get_current_word()}'")
+    print(f"🔍 APP: word_changed={settings.get('word_changed', False)}, parsed_sense={settings.get('parsed_sense_number')}")
+    
+    # Check if this is a new query that should be added to history
+    # This happens when word_changed is True OR when we have a word that's being displayed
+    should_add_to_history = False
+    
     # Update session state if this is a new word from input
     if settings.get('word') and settings['word'] != session_manager.get_current_word():
         # Update session state without modifying the widget
         st.session_state.current_word = settings['word']
         st.session_state.last_searched_word = settings['word']
         session_manager.add_to_history(settings['word'])
+        should_add_to_history = True
         current_display_word = settings['word']
+        print(f"🔍 APP: New word detected, should_add_to_history=True")
+    
+    # Also add to history if word_changed flag is set (user pressed Enter)
+    if settings.get('word_changed', False) and settings.get('word'):
+        should_add_to_history = True
+        print(f"🔍 APP: word_changed flag set, should_add_to_history=True")
+    
+    print(f"🔍 APP: Final should_add_to_history={should_add_to_history}")
     
     # Main content area
     if current_display_word:
@@ -170,6 +193,26 @@ def main():
                 else:
                     st.error(f"Invalid sense number {sense_number} for word '{current_display_word}'")
                     synset_search_mode = False  # Fall back to word mode
+            
+            # Add complete query to enhanced history if needed
+            if should_add_to_history:
+                print(f"🔍 APP: Calling add_query_to_history with settings")
+                add_query_to_history(settings)
+            else:
+                print(f"🔍 APP: NOT calling add_query_to_history")
+                # Fallback: If we're displaying a word but it's not in history, add it
+                from utils.session_state import get_search_history_manager
+                from src.models.search_history import SearchQuery
+                
+                history_manager = get_search_history_manager()
+                current_query = SearchQuery.from_settings(settings)
+                
+                # Check if this exact query exists in history
+                query_exists = any(q.get_hash() == current_query.get_hash() for q in history_manager.queries)
+                
+                if not query_exists and current_display_word:
+                    print(f"🔍 APP: Query not in history, adding as fallback")
+                    add_query_to_history(settings)
             
             # Show word information if requested (not applicable in synset mode)
             if settings.get('show_info', False) and not synset_search_mode:
