@@ -736,48 +736,13 @@ def render_save_options():
         # HTML export button
         st.markdown("#### HTML Export")
         st.markdown("*Filename will be auto-generated as: `wne-<word>-<sense>-<datetime>.html`*")
-        if st.button("📥 Download HTML", help="Download the graph as an interactive HTML file", use_container_width=True):
-            st.session_state.download_html_requested = True
-            from utils.debug_logger import log_word_input_event
-            log_word_input_event("DOWNLOAD_HTML_BUTTON_CLICKED", html_flag_set=True)
+        st.markdown("*Download button will appear below the graph when it's generated*")
         
         # JSON export button
         st.markdown("---")
         st.markdown("#### JSON Export")
         st.markdown("*Filename will be auto-generated as: `wne-<word>-<sense>-<datetime>.json`*")
-        if st.button("📥 Download JSON", help="Download the graph data as a JSON file", use_container_width=True):
-            st.session_state.download_json_requested = True
-            from utils.debug_logger import log_word_input_event
-            log_word_input_event("DOWNLOAD_JSON_BUTTON_CLICKED", json_flag_set=True)
-        
-        # JSON import
-        st.markdown("---")
-        st.markdown("#### Import Graph")
-        uploaded_file = st.file_uploader("Import JSON graph", type=['json'])
-        if uploaded_file is not None:
-            try:
-                import json
-                from src.graph import GraphSerializer
-                serializer = GraphSerializer()
-                json_str = uploaded_file.getvalue().decode('utf-8')
-                G, node_labels, metadata = serializer.deserialize_graph(json_str)
-                st.session_state.imported_graph = (G, node_labels, metadata)
-                st.success("✅ Graph imported successfully!")
-            except Exception as e:
-                st.error(f"❌ Error importing graph: {str(e)}")
-    
-    # Get download request states from session state
-    download_html_requested = st.session_state.get('download_html_requested', False)
-    download_json_requested = st.session_state.get('download_json_requested', False)
-    
-    # Terminal logging for session state
-    if download_html_requested or download_json_requested:
-        from utils.debug_logger import log_word_input_event
-        log_word_input_event("DOWNLOAD_SESSION_STATE_CHECK", 
-                            html_requested=download_html_requested, 
-                            json_requested=download_json_requested)
-    
-    return download_html_requested, download_json_requested, uploaded_file is not None
+        st.markdown("*Download button will appear below the graph when it's generated*")
 
 
 def render_about_section():
@@ -886,7 +851,7 @@ def render_sidebar(session_manager):
         show_info, show_graph = render_display_options(session_manager)
         
         # Save options
-        download_html_requested, download_json_requested, uploaded_file = render_save_options()
+        render_save_options()
         
         # About section
         render_about_section()
@@ -905,9 +870,6 @@ def render_sidebar(session_manager):
             'edge_width': edge_width,
             'show_info': show_info,
             'show_graph': show_graph,
-            'download_html_requested': download_html_requested,
-            'download_json_requested': download_json_requested,
-            'uploaded_file': uploaded_file,
             'parsed_sense_number': parsed_sense_number,
             'synset_search_mode': synset_search_mode
         }

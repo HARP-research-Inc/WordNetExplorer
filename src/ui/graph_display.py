@@ -8,8 +8,8 @@ from streamlit.runtime.scriptrunner import ScriptRunContext
 import os
 import shutil
 from datetime import datetime
-from config.settings import COLOR_SCHEMES, POS_COLORS
-from utils.helpers import ensure_downloads_directory, validate_filename
+from src.config.settings import COLOR_SCHEMES, POS_COLORS
+from src.utils.helpers import ensure_downloads_directory, validate_filename
 
 def render_color_legend(color_scheme, synset_search_mode=False):
     """
@@ -193,88 +193,54 @@ def render_exploration_tips():
 
 def prepare_download_content(explorer, G, node_labels, word, settings):
     """
-    Prepare download content for HTML and JSON based on session state requests.
+    Prepare download content for HTML and JSON.
     
     Args:
         explorer: WordNetExplorer instance
         G: NetworkX graph
         node_labels: Node labels dictionary
         word: The word being visualized
-        settings: Settings dictionary containing download options
+        settings: Settings dictionary
     
     Returns:
-        tuple: (html_content, json_content, html_filename, json_filename) where content is None if not requested
+        tuple: (html_content, json_content, html_filename, json_filename)
     """
-    html_content = None
-    json_content = None
-    html_filename = None
-    json_filename = None
-    
-    # Terminal logging
-    html_requested = settings.get('download_html_requested', False)
-    json_requested = settings.get('download_json_requested', False)
-    print(f"🔍 LOG: [DOWNLOAD_CONTENT_PREP] html_requested={html_requested} json_requested={json_requested} word='{word}'")
-    
     # Generate timestamp for filenames
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    sense_num = settings.get('parsed_sense_number', 0) or 0  # Use 0 for all senses
+    sense_number = settings.get('parsed_sense_number', 0)
+    if sense_number is None:
+        sense_number = 0
     
-    # Prepare HTML content if requested
-    if settings.get('download_html_requested'):
-        print("🔍 LOG: [DOWNLOAD_HTML_START] Preparing HTML content...")
-        # Generate HTML content
-        html_content = explorer.visualize_graph(
-            G, node_labels, word,
-            save_path=None,  # Don't save to file, get HTML content
-            layout_type=settings['layout_type'],
-            node_size_multiplier=settings['node_size_multiplier'],
-            enable_physics=settings['enable_physics'],
-            spring_strength=settings['spring_strength'],
-            central_gravity=settings['central_gravity'],
-            show_labels=settings['show_labels'],
-            edge_width=settings['edge_width'],
-            color_scheme=settings['color_scheme']
-        )
-        html_filename = f"wne-{word}-{sense_num}-{timestamp}.html"
-        print(f"🔍 LOG: [DOWNLOAD_HTML_GENERATED] filename='{html_filename}' content_length={len(html_content) if html_content else 0}")
-        # Clear the request flag
-        st.session_state.download_html_requested = False
-        print("🔍 LOG: [DOWNLOAD_HTML_FLAG_CLEARED]")
+    # Generate HTML content
+    print(f"🔍 LOG: [DOWNLOAD_HTML_START] Preparing HTML content for word '{word}'...")
+    html_content = explorer.visualize_graph(
+        G, node_labels, word,
+        save_path=None,  # Get content, don't save to file
+        layout_type=settings['layout_type'],
+        node_size_multiplier=settings['node_size_multiplier'],
+        enable_physics=settings['enable_physics'],
+        spring_strength=settings['spring_strength'],
+        central_gravity=settings['central_gravity'],
+        show_labels=settings['show_labels'],
+        edge_width=settings['edge_width'],
+        color_scheme=settings['color_scheme']
+    )
+    html_filename = f"wne-{word}-{sense_number}-{timestamp}.html"
+    print(f"🔍 LOG: [DOWNLOAD_HTML_GENERATED] filename='{html_filename}' content_length={len(html_content) if html_content else 0}")
     
-    # Prepare JSON content if requested
-    if settings.get('download_json_requested'):
-        print("🔍 LOG: [DOWNLOAD_JSON_START] Preparing JSON content...")
-        from src.graph import GraphSerializer
-        serializer = GraphSerializer()
-        
-        # Add metadata
-        metadata = {
-            'word': word,
-            'sense_number': sense_num,
-            'description': f'WordNet graph for "{word}" (sense {sense_num})',
-            'version': '1.0',
-            'generated_at': timestamp,
-            'visualization_config': {
-                'layout_type': settings['layout_type'],
-                'node_size_multiplier': settings['node_size_multiplier'],
-                'enable_physics': settings['enable_physics'],
-                'spring_strength': settings['spring_strength'],
-                'central_gravity': settings['central_gravity'],
-                'show_labels': settings['show_labels'],
-                'edge_width': settings['edge_width'],
-                'color_scheme': settings['color_scheme']
-            }
-        }
-        
-        # Get JSON string
-        json_content = serializer.serialize_graph(G, node_labels, metadata)
-        json_filename = f"wne-{word}-{sense_num}-{timestamp}.json"
-        print(f"🔍 LOG: [DOWNLOAD_JSON_GENERATED] filename='{json_filename}' content_length={len(json_content) if json_content else 0}")
-        # Clear the request flag
-        st.session_state.download_json_requested = False
-        print("🔍 LOG: [DOWNLOAD_JSON_FLAG_CLEARED]")
+    # Generate JSON content
+    print(f"🔍 LOG: [DOWNLOAD_JSON_START] Preparing JSON content for word '{word}'...")
+    from src.graph.serializer import GraphSerializer
+    serializer = GraphSerializer()
+    json_content = serializer.serialize_graph(G, node_labels, {
+        'word': word,
+        'sense_number': sense_number,
+        'timestamp': timestamp,
+        'settings': settings
+    })
+    json_filename = f"wne-{word}-{sense_number}-{timestamp}.json"
+    print(f"🔍 LOG: [DOWNLOAD_JSON_GENERATED] filename='{json_filename}' content_length={len(json_content) if json_content else 0}")
     
-    print(f"🔍 LOG: [DOWNLOAD_CONTENT_RETURN] html_ready={'Yes' if html_content else 'No'} json_ready={'Yes' if json_content else 'No'}")
     return html_content, json_content, html_filename, json_filename
 
 
@@ -371,38 +337,42 @@ def render_graph_visualization(word, settings, explorer=None, synset_search_mode
         
         if display_html:
             # Display the HTML content directly
-            components.html(display_html, height=600)
+            components.html(display_html, height=600, scrolling=True)
             
-            # Add comprehensive legend and controls
-            render_graph_legend_and_controls(G, settings, synset_search_mode)
-            
-            # Handle downloads if buttons were clicked
+            # Always prepare download content
+            print(f"🔍 LOG: [PREPARING_DOWNLOADS] Generating download content for word '{word}'...")
             download_html, download_json, html_filename, json_filename = prepare_download_content(explorer, G, node_labels, word, settings)
             
-            print(f"🔍 LOG: [DOWNLOAD_BUTTONS_CHECK] html_content={'Ready' if download_html else 'None'} json_content={'Ready' if download_json else 'None'}")
+            # Show download buttons with pre-generated content
+            st.markdown("---")
+            st.markdown("### 💾 Download Options")
             
-            # Show download buttons if content is ready
-            if download_html:
-                print(f"🔍 LOG: [DOWNLOAD_HTML_BUTTON_CREATE] Creating download button for '{html_filename}'")
-                st.download_button(
-                    label="📥 Download HTML",
-                    data=download_html,
-                    file_name=html_filename,
-                    mime="text/html",
-                    help="Download the interactive graph as an HTML file"
-                )
-                print("🔍 LOG: [DOWNLOAD_HTML_BUTTON_CREATED] HTML download button rendered successfully")
-            
-            if download_json:
-                print(f"🔍 LOG: [DOWNLOAD_JSON_BUTTON_CREATE] Creating download button for '{json_filename}'")
-                st.download_button(
-                    label="📥 Download JSON", 
-                    data=download_json,
-                    file_name=json_filename,
-                    mime="application/json",
-                    help="Download the graph data as a JSON file"
-                )
-                print("🔍 LOG: [DOWNLOAD_JSON_BUTTON_CREATED] JSON download button rendered successfully")
+            col1, col2 = st.columns(2)
+            with col1:
+                if download_html:
+                    print(f"🔍 LOG: [DOWNLOAD_HTML_BUTTON_CREATE] Creating download button for '{html_filename}'")
+                    st.download_button(
+                        label="📥 Download HTML",
+                        data=download_html,
+                        file_name=html_filename,
+                        mime="text/html",
+                        help="Download the interactive graph as an HTML file",
+                        use_container_width=True
+                    )
+                    print(f"🔍 LOG: [DOWNLOAD_HTML_BUTTON_CREATED] HTML download button rendered successfully")
+                
+            with col2:
+                if download_json:
+                    print(f"🔍 LOG: [DOWNLOAD_JSON_BUTTON_CREATE] Creating download button for '{json_filename}'")
+                    st.download_button(
+                        label="📥 Download JSON",
+                        data=download_json,
+                        file_name=json_filename,
+                        mime="application/json",
+                        help="Download the graph data as a JSON file",
+                        use_container_width=True
+                    )
+                    print(f"🔍 LOG: [DOWNLOAD_JSON_BUTTON_CREATED] JSON download button rendered successfully")
         else:
             st.error("Failed to generate graph visualization")
     else:
