@@ -738,6 +738,8 @@ def render_save_options():
         st.markdown("*Filename will be auto-generated as: `wne-<word>-<sense>-<datetime>.html`*")
         if st.button("📥 Download HTML", help="Download the graph as an interactive HTML file", use_container_width=True):
             st.session_state.download_html_requested = True
+            from utils.debug_logger import log_word_input_event
+            log_word_input_event("DOWNLOAD_HTML_BUTTON_CLICKED", html_flag_set=True)
         
         # JSON export button
         st.markdown("---")
@@ -745,6 +747,8 @@ def render_save_options():
         st.markdown("*Filename will be auto-generated as: `wne-<word>-<sense>-<datetime>.json`*")
         if st.button("📥 Download JSON", help="Download the graph data as a JSON file", use_container_width=True):
             st.session_state.download_json_requested = True
+            from utils.debug_logger import log_word_input_event
+            log_word_input_event("DOWNLOAD_JSON_BUTTON_CLICKED", json_flag_set=True)
         
         # JSON import
         st.markdown("---")
@@ -765,6 +769,13 @@ def render_save_options():
     # Get download request states from session state
     download_html_requested = st.session_state.get('download_html_requested', False)
     download_json_requested = st.session_state.get('download_json_requested', False)
+    
+    # Terminal logging for session state
+    if download_html_requested or download_json_requested:
+        from utils.debug_logger import log_word_input_event
+        log_word_input_event("DOWNLOAD_SESSION_STATE_CHECK", 
+                            html_requested=download_html_requested, 
+                            json_requested=download_json_requested)
     
     return download_html_requested, download_json_requested, uploaded_file is not None
 

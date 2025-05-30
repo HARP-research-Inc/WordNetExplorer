@@ -98,7 +98,6 @@ The visualizations are fully interactive and provide:
 - **Zoom**: Mouse wheel or pinch to zoom in/out
 - **Pan**: Click and drag to move around the graph
 - **Node Interaction**: Hover over nodes to see definitions and relationship types
-- **Double-click Navigation**: Click nodes to recenter and explore that concept
 - **Enhanced Console Logging**: Detailed logging of node interactions in browser console
 - **Physics Simulation**: Nodes automatically arrange themselves for optimal viewing
 - **Color Coding**: Different colors for each relationship type

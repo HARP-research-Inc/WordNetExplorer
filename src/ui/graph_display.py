@@ -210,12 +210,18 @@ def prepare_download_content(explorer, G, node_labels, word, settings):
     html_filename = None
     json_filename = None
     
+    # Terminal logging
+    html_requested = settings.get('download_html_requested', False)
+    json_requested = settings.get('download_json_requested', False)
+    print(f"🔍 LOG: [DOWNLOAD_CONTENT_PREP] html_requested={html_requested} json_requested={json_requested} word='{word}'")
+    
     # Generate timestamp for filenames
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     sense_num = settings.get('parsed_sense_number', 0) or 0  # Use 0 for all senses
     
     # Prepare HTML content if requested
     if settings.get('download_html_requested'):
+        print("🔍 LOG: [DOWNLOAD_HTML_START] Preparing HTML content...")
         # Generate HTML content
         html_content = explorer.visualize_graph(
             G, node_labels, word,
@@ -230,11 +236,14 @@ def prepare_download_content(explorer, G, node_labels, word, settings):
             color_scheme=settings['color_scheme']
         )
         html_filename = f"wne-{word}-{sense_num}-{timestamp}.html"
+        print(f"🔍 LOG: [DOWNLOAD_HTML_GENERATED] filename='{html_filename}' content_length={len(html_content) if html_content else 0}")
         # Clear the request flag
         st.session_state.download_html_requested = False
+        print("🔍 LOG: [DOWNLOAD_HTML_FLAG_CLEARED]")
     
     # Prepare JSON content if requested
     if settings.get('download_json_requested'):
+        print("🔍 LOG: [DOWNLOAD_JSON_START] Preparing JSON content...")
         from src.graph import GraphSerializer
         serializer = GraphSerializer()
         
@@ -260,9 +269,12 @@ def prepare_download_content(explorer, G, node_labels, word, settings):
         # Get JSON string
         json_content = serializer.serialize_graph(G, node_labels, metadata)
         json_filename = f"wne-{word}-{sense_num}-{timestamp}.json"
+        print(f"🔍 LOG: [DOWNLOAD_JSON_GENERATED] filename='{json_filename}' content_length={len(json_content) if json_content else 0}")
         # Clear the request flag
         st.session_state.download_json_requested = False
+        print("🔍 LOG: [DOWNLOAD_JSON_FLAG_CLEARED]")
     
+    print(f"🔍 LOG: [DOWNLOAD_CONTENT_RETURN] html_ready={'Yes' if html_content else 'No'} json_ready={'Yes' if json_content else 'No'}")
     return html_content, json_content, html_filename, json_filename
 
 
@@ -367,8 +379,11 @@ def render_graph_visualization(word, settings, explorer=None, synset_search_mode
             # Handle downloads if buttons were clicked
             download_html, download_json, html_filename, json_filename = prepare_download_content(explorer, G, node_labels, word, settings)
             
+            print(f"🔍 LOG: [DOWNLOAD_BUTTONS_CHECK] html_content={'Ready' if download_html else 'None'} json_content={'Ready' if download_json else 'None'}")
+            
             # Show download buttons if content is ready
             if download_html:
+                print(f"🔍 LOG: [DOWNLOAD_HTML_BUTTON_CREATE] Creating download button for '{html_filename}'")
                 st.download_button(
                     label="📥 Download HTML",
                     data=download_html,
@@ -376,8 +391,10 @@ def render_graph_visualization(word, settings, explorer=None, synset_search_mode
                     mime="text/html",
                     help="Download the interactive graph as an HTML file"
                 )
+                print("🔍 LOG: [DOWNLOAD_HTML_BUTTON_CREATED] HTML download button rendered successfully")
             
             if download_json:
+                print(f"🔍 LOG: [DOWNLOAD_JSON_BUTTON_CREATE] Creating download button for '{json_filename}'")
                 st.download_button(
                     label="📥 Download JSON", 
                     data=download_json,
@@ -385,6 +402,7 @@ def render_graph_visualization(word, settings, explorer=None, synset_search_mode
                     mime="application/json",
                     help="Download the graph data as a JSON file"
                 )
+                print("🔍 LOG: [DOWNLOAD_JSON_BUTTON_CREATED] JSON download button rendered successfully")
         else:
             st.error("Failed to generate graph visualization")
     else:
