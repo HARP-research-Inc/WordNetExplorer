@@ -538,9 +538,72 @@ def render_path_finding_view(explorer):
             # Add edge to previous node
             if i > 0:
                 prev_synset = best_path['path'][i-1]
+                
+                # Determine the actual relationship between these synsets
+                relationship_type = 'path'  # Default to generic path relationship
+                edge_color = '#888888'
+                
+                # Check if current is hypernym of previous (generalization)
+                if synset in prev_synset.hypernyms():
+                    relationship_type = 'hypernym'
+                    edge_color = '#FF4444'
+                # Check if current is hyponym of previous (specialization)
+                elif synset in prev_synset.hyponyms():
+                    relationship_type = 'hyponym'
+                    edge_color = '#4488FF'
+                # Check if previous is hypernym of current (reverse check)
+                elif prev_synset in synset.hypernyms():
+                    relationship_type = 'hyponym'  # From perspective of edge direction
+                    edge_color = '#4488FF'
+                # Check if previous is hyponym of current (reverse check)
+                elif prev_synset in synset.hyponyms():
+                    relationship_type = 'hypernym'  # From perspective of edge direction
+                    edge_color = '#FF4444'
+                # Check if they are sister terms (share a hypernym)
+                else:
+                    prev_hypernyms = set(prev_synset.hypernyms())
+                    curr_hypernyms = set(synset.hypernyms())
+                    common_hypernyms = prev_hypernyms & curr_hypernyms
+                    
+                    if common_hypernyms:
+                        relationship_type = 'sister_term'
+                        edge_color = '#AA44AA'
+                        # Get the most specific common hypernym for the edge title
+                        common_hypernym = list(common_hypernyms)[0]
+                        common_name = ', '.join(common_hypernym.lemma_names()[:2])
+                    # Check for meronym relationships
+                    elif synset in prev_synset.part_meronyms() or synset in prev_synset.substance_meronyms() or synset in prev_synset.member_meronyms():
+                        relationship_type = 'meronym'
+                        edge_color = '#44AA44'
+                    elif prev_synset in synset.part_meronyms() or prev_synset in synset.substance_meronyms() or prev_synset in synset.member_meronyms():
+                        relationship_type = 'holonym'  # Reverse of meronym
+                        edge_color = '#FFAA00'
+                    # Check for holonym relationships
+                    elif synset in prev_synset.part_holonyms() or synset in prev_synset.substance_holonyms() or synset in prev_synset.member_holonyms():
+                        relationship_type = 'holonym'
+                        edge_color = '#FFAA00'
+                    elif prev_synset in synset.part_holonyms() or prev_synset in synset.substance_holonyms() or prev_synset in synset.member_holonyms():
+                        relationship_type = 'meronym'  # Reverse of holonym
+                        edge_color = '#44AA44'
+                    # Check for other relationships
+                    elif synset in prev_synset.similar_tos():
+                        relationship_type = 'similar_to'
+                        edge_color = '#9999FF'
+                    elif synset in prev_synset.also_sees():
+                        relationship_type = 'also_see'
+                        edge_color = '#FF9999'
+                
                 path_graph.add_edge(prev_synset.name(), node_id)
-                path_graph.edges[prev_synset.name(), node_id]['relationship'] = 'path'
-                path_graph.edges[prev_synset.name(), node_id]['color'] = '#FF4444'
+                path_graph.edges[prev_synset.name(), node_id]['relationship'] = relationship_type
+                path_graph.edges[prev_synset.name(), node_id]['color'] = edge_color
+                
+                # Create more informative edge title
+                if relationship_type == 'sister_term' and 'common_name' in locals():
+                    edge_title = f"{relationship_type} (via {common_name})"
+                else:
+                    edge_title = relationship_type.replace('_', ' ').title()
+                
+                path_graph.edges[prev_synset.name(), node_id]['title'] = edge_title
         
         # Display the path graph
         st.info(f"Path visualization: {best_path['length']} nodes connected")
@@ -561,6 +624,26 @@ def render_path_finding_view(explorer):
         
         if display_html:
             components.html(display_html, height=600, scrolling=True)
+        
+        # Show path relationship legend
+        st.markdown("#### Path Relationship Types")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("""
+            - **Hypernym** (🔴): More general concept
+            - **Hyponym** (🔵): More specific concept  
+            - **Sister Term** (🟣): Share common parent
+            - **Meronym** (🟢): Part of
+            """)
+        
+        with col2:
+            st.markdown("""
+            - **Holonym** (🟠): Has as part
+            - **Similar To** (🔷): Similar meaning
+            - **Also See** (🔶): Related concept
+            - **Path** (⚫): Generic connection
+            """)
         
         # Show alternative paths if any
         if len(all_paths) > 1:
