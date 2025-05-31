@@ -46,7 +46,7 @@ def render_basic_settings(session_manager):
         max_nodes = st.number_input(
             "Maximum Nodes", 
             min_value=10, 
-            max_value=1000, 
+            max_value=100000, 
             value=get_url_default(session_manager, 'max_nodes', 100),
             step=10,
             help="Limit the total number of nodes in the graph to prevent performance issues"

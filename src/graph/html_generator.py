@@ -95,7 +95,7 @@ class GraphHTMLGenerator:
                 } else {
                     console.log('⚠️ Network not found, retrying...');
                     // Retry after a longer delay
-                    setTimeout(arguments.callee, 1000);
+                    setTimeout(arguments.callee, 100000);
                 }
             }, 500);
         });

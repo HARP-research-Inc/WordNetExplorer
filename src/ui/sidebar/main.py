@@ -1,5 +1,5 @@
 """
-Main sidebar module that orchestrates all sidebar components.
+Main sidebar component that orchestrates all sidebar sections.
 """
 
 import streamlit as st
@@ -22,16 +22,19 @@ from utils.session_state import restore_query_settings
 
 def render_sidebar(session_manager):
     """
-    Render the complete sidebar with all components.
+    Render the complete sidebar with all sections.
     
     Args:
-        session_manager: SessionManager instance for handling state
-        
+        session_manager: SessionManager instance for URL handling
+    
     Returns:
-        dict: All settings collected from sidebar components
+        dict: Dictionary containing all settings
     """
     with st.sidebar:
-        st.title("🔤 Word Explorer")
+        st.markdown('<h2 class="sidebar-header">🔤 Word Explorer</h2>', unsafe_allow_html=True)
+        
+        # Initialize settings dictionary
+        settings = {}
         
         # Check if a query was selected from history
         selected_query = st.session_state.get('selected_history_query', None)
@@ -48,6 +51,30 @@ def render_sidebar(session_manager):
         
         # Word input section
         word, parsed_sense_number, word_changed, synset_search_mode = render_word_input(session_manager)
+        settings['word'] = word
+        settings['parsed_sense_number'] = parsed_sense_number
+        settings['word_changed'] = word_changed
+        settings['synset_search_mode'] = synset_search_mode
+        
+        # Path Finding section
+        with st.expander("🛤️ Path Finder", expanded=False):
+            st.markdown("Find a path between two word senses:")
+            
+            st.markdown("**From:**")
+            from_word = st.text_input("From word", placeholder="e.g., cat", key="path_from_word", label_visibility="collapsed")
+            from_sense = st.number_input("From sense number", min_value=0, value=1, key="path_from_sense", help="0 for all senses")
+            
+            st.markdown("**To:**")
+            to_word = st.text_input("To word", placeholder="e.g., dog", key="path_to_word", label_visibility="collapsed")
+            to_sense = st.number_input("To sense number", min_value=0, value=1, key="path_to_sense", help="0 for all senses")
+            
+            if st.button("🔍 Find Path", key="find_path", type="primary", disabled=not (from_word and to_word)):
+                st.session_state.path_finding_mode = True
+                st.session_state.path_from = {'word': from_word.strip().lower(), 'sense': from_sense}
+                st.session_state.path_to = {'word': to_word.strip().lower(), 'sense': to_sense}
+                st.rerun()
+        
+        st.markdown("---")
         
         # Search history section
         render_search_history()

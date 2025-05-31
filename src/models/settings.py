@@ -87,8 +87,8 @@ class ExplorationSettings:
         if self.depth < 1 or self.depth > 10:
             errors.append(f"Depth must be between 1 and 10 (got {self.depth})")
         
-        if self.max_nodes < 1 or self.max_nodes > 1000:
-            errors.append(f"Max nodes must be between 1 and 1000 (got {self.max_nodes})")
+        if self.max_nodes < 1 or self.max_nodes > 100000:
+            errors.append(f"Max nodes must be between 1 and 100000 (got {self.max_nodes})")
         
         if self.max_branches < 1 or self.max_branches > 20:
             errors.append(f"Max branches must be between 1 and 20 (got {self.max_branches})")

@@ -145,8 +145,12 @@ def main():
     
     # Check if we're in comparison mode
     compare_mode = st.session_state.get('compare_mode', False)
+    path_finding_mode = st.session_state.get('path_finding_mode', False)
     
-    if compare_mode:
+    if path_finding_mode:
+        # Path finding mode
+        render_path_finding_view(explorer)
+    elif compare_mode:
         # Comparison mode - render merged graph
         render_comparison_view(explorer)
     else:
@@ -388,6 +392,16 @@ def render_comparison_view(explorer):
     else:
         vis_settings = {}
     
+    # Ensure default values for visualization settings
+    vis_settings.setdefault('color_scheme', 'Default')
+    vis_settings.setdefault('layout_type', 'force')
+    vis_settings.setdefault('node_size_multiplier', 1.0)
+    vis_settings.setdefault('enable_physics', True)
+    vis_settings.setdefault('spring_strength', 0.005)
+    vis_settings.setdefault('central_gravity', 0.3)
+    vis_settings.setdefault('show_labels', True)
+    vis_settings.setdefault('edge_width', 1)
+    
     # Render the merged graph
     display_html = explorer.visualize_graph(
         merged_graph, 
@@ -410,6 +424,157 @@ def render_comparison_view(explorer):
         
         # Show legend and controls
         render_graph_legend_and_controls(merged_graph, vis_settings)
+
+
+def render_path_finding_view(explorer):
+    """Render path finding view between two word senses."""
+    st.sidebar.markdown("## 🛤️ Path Finding Mode")
+    
+    # Exit path finding mode button
+    if st.sidebar.button("← Back to Single View", key="exit_path_finding", type="primary"):
+        st.session_state.path_finding_mode = False
+        st.rerun()
+    
+    st.sidebar.markdown("---")
+    
+    # Get path endpoints
+    path_from = st.session_state.get('path_from', {})
+    path_to = st.session_state.get('path_to', {})
+    
+    if not path_from or not path_to:
+        st.warning("Please specify both source and target words.")
+        return
+    
+    from_word = path_from.get('word', '')
+    from_sense = path_from.get('sense', 1)
+    to_word = path_to.get('word', '')
+    to_sense = path_to.get('sense', 1)
+    
+    st.markdown(f"### Finding Path: {from_word}.{from_sense if from_sense > 0 else 'all'} → {to_word}.{to_sense if to_sense > 0 else 'all'}")
+    
+    try:
+        # Import WordNet functions
+        from wordnet import get_synsets_for_word
+        from nltk.corpus import wordnet as wn
+        
+        # Get synsets for both words
+        from_synsets = get_synsets_for_word(from_word)
+        to_synsets = get_synsets_for_word(to_word)
+        
+        if not from_synsets:
+            st.error(f"No WordNet entries found for '{from_word}'")
+            return
+        if not to_synsets:
+            st.error(f"No WordNet entries found for '{to_word}'")
+            return
+        
+        # Select specific synsets or use all
+        if from_sense > 0 and from_sense <= len(from_synsets):
+            from_synsets = [from_synsets[from_sense - 1]]
+        elif from_sense > len(from_synsets):
+            st.error(f"'{from_word}' only has {len(from_synsets)} senses")
+            return
+            
+        if to_sense > 0 and to_sense <= len(to_synsets):
+            to_synsets = [to_synsets[to_sense - 1]]
+        elif to_sense > len(to_synsets):
+            st.error(f"'{to_word}' only has {len(to_synsets)} senses")
+            return
+        
+        # Try to find paths between all combinations
+        all_paths = []
+        
+        with st.spinner("Searching for paths..."):
+            for from_synset in from_synsets:
+                for to_synset in to_synsets:
+                    # Find path using hypernym relationships
+                    path = explorer.find_path_between_synsets(from_synset, to_synset)
+                    if path:
+                        all_paths.append({
+                            'from': from_synset,
+                            'to': to_synset,
+                            'path': path,
+                            'length': len(path)
+                        })
+        
+        if not all_paths:
+            st.warning("No path found between the specified word senses.")
+            st.info("Try using hypernym relationships or broader senses.")
+            return
+        
+        # Sort paths by length
+        all_paths.sort(key=lambda x: x['length'])
+        
+        # Display the shortest path
+        best_path = all_paths[0]
+        st.success(f"Found {len(all_paths)} path(s)! Showing the shortest path ({best_path['length']} steps):")
+        
+        # Build a graph for the path
+        path_graph = nx.DiGraph()
+        path_labels = {}
+        
+        # Add nodes and edges for the path
+        for i, synset in enumerate(best_path['path']):
+            node_id = synset.name()
+            path_graph.add_node(node_id)
+            
+            # Set node attributes
+            if i == 0:
+                path_graph.nodes[node_id]['node_type'] = 'main'
+                path_graph.nodes[node_id]['title'] = f"START: {synset.definition()}"
+            elif i == len(best_path['path']) - 1:
+                path_graph.nodes[node_id]['node_type'] = 'main'
+                path_graph.nodes[node_id]['title'] = f"END: {synset.definition()}"
+            else:
+                path_graph.nodes[node_id]['node_type'] = 'synset'
+                path_graph.nodes[node_id]['title'] = synset.definition()
+            
+            path_graph.nodes[node_id]['pos'] = synset.pos()
+            
+            # Add label
+            lemmas = ', '.join([l.name() for l in synset.lemmas()[:3]])
+            path_labels[node_id] = f"{lemmas}\n({synset.name()})"
+            
+            # Add edge to previous node
+            if i > 0:
+                prev_synset = best_path['path'][i-1]
+                path_graph.add_edge(prev_synset.name(), node_id)
+                path_graph.edges[prev_synset.name(), node_id]['relationship'] = 'path'
+                path_graph.edges[prev_synset.name(), node_id]['color'] = '#FF4444'
+        
+        # Display the path graph
+        st.info(f"Path visualization: {best_path['length']} nodes connected")
+        
+        # Generate visualization
+        display_html = explorer.visualize_graph(
+            path_graph,
+            path_labels,
+            f"Path: {from_word} → {to_word}",
+            save_path=None,
+            layout_type='hierarchical',  # Use hierarchical for clear path display
+            node_size_multiplier=1.5,
+            enable_physics=False,  # Disable physics for static path
+            show_labels=True,
+            edge_width=3,
+            color_scheme='Default'
+        )
+        
+        if display_html:
+            components.html(display_html, height=600, scrolling=True)
+        
+        # Show alternative paths if any
+        if len(all_paths) > 1:
+            with st.expander(f"Alternative paths ({len(all_paths) - 1} more)"):
+                for i, path_info in enumerate(all_paths[1:], 1):
+                    st.write(f"**Path {i+1}** ({path_info['length']} steps):")
+                    st.write(f"{path_info['from'].name()} → ... → {path_info['to'].name()}")
+                    path_str = " → ".join([s.name() for s in path_info['path']])
+                    st.code(path_str, language=None)
+        
+    except Exception as e:
+        st.error(f"Error finding path: {e}")
+        import traceback
+        st.code(traceback.format_exc())
 
 
 if __name__ == "__main__":
