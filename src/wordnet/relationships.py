@@ -257,51 +257,67 @@ def get_relationships(synset, config: RelationshipConfig) -> Dict[RelationshipTy
 
 
 def get_relationship_color(relationship_type: RelationshipType) -> str:
-    """Get the color code for a relationship type."""
+    """Get the color code for a relationship type.
+    
+    Color scheme organized by relationship families:
+    - Taxonomic: Red family (hypernyms/hyponyms)
+    - Part-Whole: Green family (meronyms/holonyms) 
+    - Opposition: Purple family (antonyms/similarity)
+    - Causation: Orange family (entailment/causation)
+    - Cross-Reference: Blue family (attributes/also_see)
+    - Verb Relations: Dark Green family
+    - Morphological: Pink family
+    - Domain: Grey family
+    """
     color_map = {
-        # Basic
-        RelationshipType.SENSE: '#666666',  # Grey
+        # Basic connection - neutral grey
+        RelationshipType.SENSE: '#666666',  # Medium grey
         
-        # Taxonomic Relations (Red/Blue family)
-        RelationshipType.HYPERNYM: '#FF4444',  # Red
-        RelationshipType.HYPONYM: '#4488FF',   # Blue
-        RelationshipType.INSTANCE_HYPERNYM: '#FF8888',  # Light red
-        RelationshipType.INSTANCE_HYPONYM: '#88AAFF',   # Light blue
+        # TAXONOMIC RELATIONS - Red family (warm, hierarchical feeling)
+        RelationshipType.HYPERNYM: '#DC143C',          # Crimson (primary taxonomic)
+        RelationshipType.HYPONYM: '#B22222',           # Fire brick (slightly darker red)
+        RelationshipType.INSTANCE_HYPERNYM: '#FF6347', # Tomato (lighter, more orange-red)
+        RelationshipType.INSTANCE_HYPONYM: '#CD5C5C',  # Indian red (muted red)
         
-        # Part-Whole Relations (Green/Orange family)
-        RelationshipType.MEMBER_HOLONYM: '#44AA44',   # Green
-        RelationshipType.SUBSTANCE_HOLONYM: '#66BB66', # Light green
-        RelationshipType.PART_HOLONYM: '#88CC88',     # Pale green
-        RelationshipType.MEMBER_MERONYM: '#FFAA00',   # Orange
-        RelationshipType.SUBSTANCE_MERONYM: '#FFCC44', # Light orange
-        RelationshipType.PART_MERONYM: '#FFDD88',     # Pale orange
+        # PART-WHOLE RELATIONS - Green family (natural, structural feeling)
+        # Holonyms (whole → part) - darker greens
+        RelationshipType.MEMBER_HOLONYM: '#228B22',     # Forest green (member holonym)
+        RelationshipType.SUBSTANCE_HOLONYM: '#32CD32',  # Lime green (substance holonym)  
+        RelationshipType.PART_HOLONYM: '#006400',       # Dark green (part holonym)
+        # Meronyms (part → whole) - lighter greens
+        RelationshipType.MEMBER_MERONYM: '#90EE90',     # Light green (member meronym)
+        RelationshipType.SUBSTANCE_MERONYM: '#98FB98',  # Pale green (substance meronym)
+        RelationshipType.PART_MERONYM: '#00FF7F',       # Spring green (part meronym)
         
-        # Antonymy & Similarity (Purple family)
-        RelationshipType.ANTONYM: '#AA44AA',   # Purple
-        RelationshipType.SIMILAR_TO: '#CC88CC', # Light purple
+        # OPPOSITION & SIMILARITY - Purple family (contrasting, complementary feeling)
+        RelationshipType.ANTONYM: '#8A2BE2',     # Blue violet (strong opposition)
+        RelationshipType.SIMILAR_TO: '#DA70D6', # Orchid (similar but distinct)
         
-        # Entailment & Causation (Brown family)
-        RelationshipType.ENTAILMENT: '#8B4513',  # Brown
-        RelationshipType.CAUSE: '#CD853F',      # Sandy brown
+        # CAUSATION & ENTAILMENT - Orange family (dynamic, action-oriented)
+        RelationshipType.ENTAILMENT: '#FF8C00', # Dark orange (logical entailment)
+        RelationshipType.CAUSE: '#FF4500',      # Orange red (direct causation)
         
-        # Attributes & Cross-References (Teal family)
-        RelationshipType.ATTRIBUTE: '#20B2AA',  # Light sea green
-        RelationshipType.ALSO_SEE: '#48D1CC',   # Medium turquoise
+        # CROSS-REFERENCE & ATTRIBUTES - Blue family (informational, linking)
+        RelationshipType.ATTRIBUTE: '#4169E1',  # Royal blue (attributes)
+        RelationshipType.ALSO_SEE: '#6495ED',   # Cornflower blue (see also)
         
-        # Verb-Specific (Dark green family)
-        RelationshipType.VERB_GROUP: '#006400',         # Dark green
-        RelationshipType.PARTICIPLE_OF_VERB: '#228B22', # Forest green
+        # VERB-SPECIFIC RELATIONS - Dark Green family (action-oriented)
+        RelationshipType.VERB_GROUP: '#2F4F4F',         # Dark slate grey (verb groups)
+        RelationshipType.PARTICIPLE_OF_VERB: '#708090', # Slate grey (participles)
         
-        # Morphological (Pink family)
-        RelationshipType.DERIVATIONALLY_RELATED_FORM: '#FF69B4', # Hot pink
-        RelationshipType.PERTAINYM: '#FFB6C1',                  # Light pink
-        RelationshipType.DERIVED_FROM: '#FFC0CB',               # Pink
+        # MORPHOLOGICAL & DERIVATIONAL - Pink family (linguistic transformation)
+        RelationshipType.DERIVATIONALLY_RELATED_FORM: '#FF1493', # Deep pink (derivational)
+        RelationshipType.PERTAINYM: '#FF69B4',                  # Hot pink (pertainyms)
+        RelationshipType.DERIVED_FROM: '#FFB6C1',               # Light pink (derived from)
         
-        # Domain Labels (Grey family)
+        # DOMAIN LABELS - Grey family (categorical, organizational)
+        # Topic domains - blue-greys
         RelationshipType.DOMAIN_OF_SYNSET_TOPIC: '#708090',     # Slate grey
         RelationshipType.MEMBER_OF_DOMAIN_TOPIC: '#778899',     # Light slate grey
+        # Region domains - neutral greys  
         RelationshipType.DOMAIN_OF_SYNSET_REGION: '#696969',    # Dim grey
         RelationshipType.MEMBER_OF_DOMAIN_REGION: '#808080',    # Grey
+        # Usage domains - lighter greys
         RelationshipType.DOMAIN_OF_SYNSET_USAGE: '#A9A9A9',     # Dark grey
         RelationshipType.MEMBER_OF_DOMAIN_USAGE: '#C0C0C0',     # Silver
     }
@@ -310,9 +326,48 @@ def get_relationship_color(relationship_type: RelationshipType) -> str:
 
 def get_relationship_properties(relationship_type: RelationshipType) -> Dict[str, Any]:
     """Get display properties for a relationship type."""
+    # Define arrow directions for different relationship types
+    arrow_direction_map = {
+        # Basic - no specific direction
+        RelationshipType.SENSE: 'to',
+        
+        # Taxonomic Relations - hypernyms point up (to more general), hyponyms point down (to more specific)
+        RelationshipType.HYPERNYM: 'to',  # points from specific to general
+        RelationshipType.HYPONYM: 'from',  # points from general to specific (reverse direction)
+        RelationshipType.INSTANCE_HYPERNYM: 'to',
+        RelationshipType.INSTANCE_HYPONYM: 'from',
+        
+        # Part-Whole Relations - meronyms point up (to whole), holonyms point down (to parts)
+        RelationshipType.MEMBER_HOLONYM: 'from',  # points from part to whole (reverse direction)
+        RelationshipType.SUBSTANCE_HOLONYM: 'from',
+        RelationshipType.PART_HOLONYM: 'from',
+        RelationshipType.MEMBER_MERONYM: 'to',  # points from whole to part
+        RelationshipType.SUBSTANCE_MERONYM: 'to',
+        RelationshipType.PART_MERONYM: 'to',
+        
+        # Default direction for all others
+        RelationshipType.ANTONYM: 'to',
+        RelationshipType.SIMILAR_TO: 'to',
+        RelationshipType.ENTAILMENT: 'to',
+        RelationshipType.CAUSE: 'to',
+        RelationshipType.ATTRIBUTE: 'to',
+        RelationshipType.ALSO_SEE: 'to',
+        RelationshipType.VERB_GROUP: 'to',
+        RelationshipType.PARTICIPLE_OF_VERB: 'to',
+        RelationshipType.DERIVATIONALLY_RELATED_FORM: 'to',
+        RelationshipType.PERTAINYM: 'to',
+        RelationshipType.DERIVED_FROM: 'to',
+        RelationshipType.DOMAIN_OF_SYNSET_TOPIC: 'to',
+        RelationshipType.MEMBER_OF_DOMAIN_TOPIC: 'to',
+        RelationshipType.DOMAIN_OF_SYNSET_REGION: 'to',
+        RelationshipType.MEMBER_OF_DOMAIN_REGION: 'to',
+        RelationshipType.DOMAIN_OF_SYNSET_USAGE: 'to',
+        RelationshipType.MEMBER_OF_DOMAIN_USAGE: 'to',
+    }
+    
     return {
         'color': get_relationship_color(relationship_type),
-        'arrow_direction': 'to',
+        'arrow_direction': arrow_direction_map.get(relationship_type, 'to'),
         'relation': relationship_type.value
     }
 

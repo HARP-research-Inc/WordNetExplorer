@@ -4,10 +4,13 @@ Graph display components for WordNet Explorer.
 
 import streamlit as st
 import streamlit.components.v1 as components
+from streamlit.runtime.scriptrunner import ScriptRunContext
 import os
 import shutil
+from datetime import datetime
 from src.config.settings import COLOR_SCHEMES, POS_COLORS
 from src.utils.helpers import ensure_downloads_directory, validate_filename
+
 def render_color_legend(color_scheme, synset_search_mode=False):
     """
     Render the color legend for the graph.
@@ -96,24 +99,25 @@ def render_color_legend(color_scheme, synset_search_mode=False):
     <div style="margin-top: 15px;">
         <strong>Edge Colors & Relationships:</strong>
         <div style="margin-left: 10px; margin-top: 5px;">
-            <div style="margin: 3px 0;"><span style="color: #FF4444; font-weight: bold;">→</span> <strong>Hypernym</strong> - "is a type of" (more general)</div>
-            <div style="margin: 3px 0;"><span style="color: #4488FF; font-weight: bold;">→</span> <strong>Hyponym</strong> - "type includes" (more specific)</div>
-            <div style="margin: 3px 0;"><span style="color: #44AA44; font-weight: bold;">→</span> <strong>Meronym</strong> - "has part"</div>
-            <div style="margin: 3px 0;"><span style="color: #FFAA00; font-weight: bold;">→</span> <strong>Holonym</strong> - "part of"</div>
-            <div style="margin: 3px 0;"><span style="color: #666666; font-weight: bold;">→</span> <strong>Sense</strong> - connects word to its meanings</div>
+            <div style="margin: 3px 0;"><span style="color: #FF4444; font-weight: bold;">→</span> <strong>Taxonomic Relations (Red)</strong> - Classification relationships</div>
+            <div style="margin: 3px 0; margin-left: 15px;">• <strong>Hypernym arrows</strong> point from specific to general (\"femtosecond → time_unit\")</div>
+            <div style="margin: 3px 0; margin-left: 15px;">• <strong>Hyponym arrows</strong> point from general to specific (\"time_unit → femtosecond\")</div>
+            <div style="margin: 3px 0;"><span style="color: #44AA44; font-weight: bold;">→</span> <strong>Part-Whole Relations (Green)</strong> - Compositional relationships</div>
+            <div style="margin: 3px 0; margin-left: 15px;">• <strong>Meronym arrows</strong> point from part to whole (\"wheel → car\")</div>
+            <div style="margin: 3px 0; margin-left: 15px;">• <strong>Holonym arrows</strong> point from whole to part (\"car → wheel\")</div>
+            <div style="margin: 3px 0;"><span style="color: #666666; font-weight: bold;">→</span> <strong>Word Sense (Gray)</strong> - connects word senses to synsets</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
 
-def render_interactive_controls(G, depth, enable_physics):
+def render_interactive_controls(G, settings):
     """
     Render the interactive controls information.
     
     Args:
         G: The NetworkX graph
-        depth (int): The exploration depth
-        enable_physics (bool): Whether physics is enabled
+        settings (dict): Dictionary containing all graph settings including advanced options
     """
     st.markdown(f"""
     <div class="legend-container">
@@ -130,10 +134,13 @@ def render_interactive_controls(G, depth, enable_physics):
         <div style="margin-bottom: 8px;">
             <strong style="color: #333;">📊 Graph Info:</strong>
             <ul style="margin: 5px 0; padding-left: 20px; color: #333;">
-                <li><strong>Nodes:</strong> {G.number_of_nodes()}</li>
+                <li><strong>Nodes:</strong> {G.number_of_nodes()}{f" (max: {settings.get('max_nodes', 100)})" if settings.get('max_nodes', 100) != 100 else ""}</li>
                 <li><strong>Edges:</strong> {G.number_of_edges()}</li>
-                <li><strong>Depth:</strong> {depth} level(s)</li>
-                <li><strong>Physics:</strong> {'Enabled' if enable_physics else 'Disabled'}</li>
+                <li><strong>Depth:</strong> {settings.get('depth', 1)} level(s)</li>
+                <li><strong>Max Branches:</strong> {settings.get('max_branches', 5)} per node</li>
+                <li><strong>Physics:</strong> {'Enabled' if settings.get('enable_physics', True) else 'Disabled'}</li>
+                {f"<li><strong>POS Filter:</strong> {', '.join(settings.get('pos_filter', ['All']))}</li>" if settings.get('pos_filter') and len(settings.get('pos_filter', [])) < 4 else ""}
+                {f"<li><strong>Simplified Mode:</strong> {'Yes' if settings.get('simplified_mode', False) else 'No'}</li>" if settings.get('simplified_mode', False) else ""}
             </ul>
         </div>
     </div>
@@ -184,7 +191,56 @@ def render_exploration_tips():
         """, unsafe_allow_html=True)
 
 
-def render_graph_visualization(word, settings, explorer=None, synset_search_mode=False):
+def prepare_download_content(explorer, G, node_labels, word, settings):
+    """
+    Prepare download content for HTML and JSON.
+    
+    Args:
+        explorer: WordNetExplorer instance
+        G: NetworkX graph
+        node_labels: Node labels dictionary
+        word: The word being visualized
+        settings: Settings dictionary
+    
+    Returns:
+        tuple: (html_content, json_content, html_filename, json_filename)
+    """
+    # Generate timestamp for filenames
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    sense_number = settings.get('parsed_sense_number', 0)
+    if sense_number is None:
+        sense_number = 0
+    
+    # Generate HTML content
+    html_content = explorer.visualize_graph(
+        G, node_labels, word,
+        save_path=None,  # Get content, don't save to file
+        layout_type=settings['layout_type'],
+        node_size_multiplier=settings['node_size_multiplier'],
+        enable_physics=settings['enable_physics'],
+        spring_strength=settings['spring_strength'],
+        central_gravity=settings['central_gravity'],
+        show_labels=settings['show_labels'],
+        edge_width=settings['edge_width'],
+        color_scheme=settings['color_scheme']
+    )
+    html_filename = f"wne-{word}-{sense_number}-{timestamp}.html"
+    
+    # Generate JSON content
+    from src.graph.serializer import GraphSerializer
+    serializer = GraphSerializer()
+    json_content = serializer.serialize_graph(G, node_labels, {
+        'word': word,
+        'sense_number': sense_number,
+        'timestamp': timestamp,
+        'settings': settings
+    })
+    json_filename = f"wne-{word}-{sense_number}-{timestamp}.json"
+    
+    return html_content, json_content, html_filename, json_filename
+
+
+def render_graph_visualization(word, settings, explorer=None, synset_search_mode=False, container_key=None):
     """
     Render the complete graph visualization section.
     
@@ -193,43 +249,77 @@ def render_graph_visualization(word, settings, explorer=None, synset_search_mode
         settings (dict): Dictionary containing all graph settings
         explorer: WordNetExplorer instance (optional, will create if not provided)
         synset_search_mode (bool): Whether we're searching by synset instead of word
+        container_key (str): Unique key for the component container (for comparison mode)
     """
     st.markdown('<h2 class="sub-header">Relationship Graph</h2>', unsafe_allow_html=True)
     
-    # Show navigation info - different message for synset mode
-    if synset_search_mode:
-        st.info(f"💡 **Synset Mode**: Exploring synset `{word}` and its word senses. **Double-click any node** to explore further!")
+    # Check for imported graph
+    if 'imported_graph' in st.session_state:
+        G, node_labels, metadata = st.session_state.imported_graph
+        st.info("📥 Using imported graph data")
+        
+        # Apply visualization settings from metadata if available
+        if 'visualization_config' in metadata:
+            vis_config = metadata['visualization_config']
+            settings.update({
+                'layout_type': vis_config.get('layout_type', settings['layout_type']),
+                'node_size_multiplier': vis_config.get('node_size_multiplier', settings['node_size_multiplier']),
+                'enable_physics': vis_config.get('enable_physics', settings['enable_physics']),
+                'spring_strength': vis_config.get('spring_strength', settings['spring_strength']),
+                'central_gravity': vis_config.get('central_gravity', settings['central_gravity']),
+                'show_labels': vis_config.get('show_labels', settings['show_labels']),
+                'edge_width': vis_config.get('edge_width', settings['edge_width']),
+                'color_scheme': vis_config.get('color_scheme', settings['color_scheme'])
+            })
     else:
-        st.info("💡 **Double-click any node** to explore that concept! Your navigation history is saved above.")
-    
-    # Create explorer if not provided
-    if explorer is None:
-        from src.core import WordNetExplorer
-        explorer = WordNetExplorer()
-    
-    if synset_search_mode:
-        with st.spinner(f"Building WordNet graph for synset '{word}'..."):
-            # Build synset-focused graph - pass all relationship settings
-            G, node_labels = explorer.explore_synset(
-                synset_name=word, 
-                depth=settings['depth'],
-                **{k: v for k, v in settings.items() if k.startswith('show_')}
-            )
-    else:
-        with st.spinner(f"Building WordNet graph for '{word}'..."):
-            # Build the graph using the new modular explorer - pass all relationship settings
-            G, node_labels = explorer.explore_word(
-                word=word, 
-                depth=settings['depth'],
-                sense_number=settings.get('parsed_sense_number'),
-                **{k: v for k, v in settings.items() if k.startswith('show_')}
-            )
+        # Show navigation info - different message for synset mode
+        if synset_search_mode:
+            st.info(f"💡 **Synset Mode**: Exploring synset `{word}` and its word senses. **Double-click any node** to explore further!")
+        else:
+            st.info("💡 **Double-click any node** to explore that concept! Your navigation history is saved above.")
+        
+        # Create explorer if not provided
+        if explorer is None:
+            from src.core import WordNetExplorer
+            explorer = WordNetExplorer()
+        
+        if synset_search_mode:
+            with st.spinner(f"Building WordNet graph for synset '{word}'..."):
+                # Build synset-focused graph - pass all relationship settings and advanced settings
+                G, node_labels = explorer.explore_synset(
+                    synset_name=word, 
+                    depth=settings['depth'],
+                    max_nodes=settings.get('max_nodes', 100),
+                    max_branches=settings.get('max_branches', 5),
+                    min_frequency=settings.get('min_frequency', 0),
+                    pos_filter=settings.get('pos_filter', ["Nouns", "Verbs", "Adjectives", "Adverbs"]),
+                    enable_clustering=settings.get('enable_clustering', False),
+                    enable_cross_connections=settings.get('enable_cross_connections', True),
+                    simplified_mode=settings.get('simplified_mode', False),
+                    **{k: v for k, v in settings.items() if k.startswith('show_')}
+                )
+        else:
+            with st.spinner(f"Building WordNet graph for '{word}'..."):
+                # Build the graph using the new modular explorer - pass all relationship settings and advanced settings
+                G, node_labels = explorer.explore_word(
+                    word=word, 
+                    depth=settings['depth'],
+                    sense_number=settings.get('parsed_sense_number'),
+                    max_nodes=settings.get('max_nodes', 100),
+                    max_branches=settings.get('max_branches', 5),
+                    min_frequency=settings.get('min_frequency', 0),
+                    pos_filter=settings.get('pos_filter', ["Nouns", "Verbs", "Adjectives", "Adverbs"]),
+                    enable_clustering=settings.get('enable_clustering', False),
+                    enable_cross_connections=settings.get('enable_cross_connections', True),
+                    simplified_mode=settings.get('simplified_mode', False),
+                    **{k: v for k, v in settings.items() if k.startswith('show_')}
+                )
     
     if G.number_of_nodes() > 0:
         st.info(f"Graph created with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges")
         
-        # Generate the interactive graph using the new modular explorer
-        html_content = explorer.visualize_graph(
+        # Generate the interactive graph for display
+        display_html = explorer.visualize_graph(
             G, node_labels, word,
             save_path=None,  # Don't save to file, get HTML content
             layout_type=settings['layout_type'],
@@ -242,16 +332,39 @@ def render_graph_visualization(word, settings, explorer=None, synset_search_mode
             color_scheme=settings['color_scheme']
         )
         
-        if html_content:
+        if display_html:
             # Display the HTML content directly
-            components.html(html_content, height=600)
+            components.html(display_html, height=600, scrolling=True)
             
-            # Add comprehensive legend and controls
-            render_graph_legend_and_controls(G, settings, synset_search_mode)
+            # Always prepare download content
+            download_html, download_json, html_filename, json_filename = prepare_download_content(explorer, G, node_labels, word, settings)
             
-            # Save the graph if requested
-            if settings['save_graph']:
-                save_graph_to_file(explorer, G, node_labels, word, settings)
+            # Show download buttons with pre-generated content
+            st.markdown("---")
+            st.markdown("### 💾 Download Options")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if download_html:
+                    st.download_button(
+                        label="📥 Download HTML",
+                        data=download_html,
+                        file_name=html_filename,
+                        mime="text/html",
+                        help="Download the interactive graph as an HTML file",
+                        use_container_width=True
+                    )
+                
+            with col2:
+                if download_json:
+                    st.download_button(
+                        label="📥 Download JSON",
+                        data=download_json,
+                        file_name=json_filename,
+                        mime="application/json",
+                        help="Download the graph data as a JSON file",
+                        use_container_width=True
+                    )
         else:
             st.error("Failed to generate graph visualization")
     else:
@@ -282,40 +395,8 @@ def render_graph_legend_and_controls(G, settings, synset_search_mode=False):
     
     with col2:
         st.markdown("#### 🎮 Interactive Controls")
-        render_interactive_controls(G, settings['depth'], settings['enable_physics'])
+        render_interactive_controls(G, settings)
     
     # Additional info section
     st.markdown("#### 💡 Tips for Exploration")
-    render_exploration_tips()
-
-
-def save_graph_to_file(explorer, G, node_labels, word, settings):
-    """
-    Save the graph HTML file to the downloads directory.
-    
-    Args:
-        explorer: WordNetExplorer instance
-        G: NetworkX graph
-        node_labels: Node labels dictionary
-        word: The word being visualized
-        settings: Settings dictionary containing filename and other options
-    """
-    downloads_dir = ensure_downloads_directory()
-    validated_filename = validate_filename(settings['filename'], ".html")
-    save_path = downloads_dir / validated_filename
-    
-    # Generate HTML and save to file
-    explorer.visualize_graph(
-        G, node_labels, word,
-        save_path=str(save_path),
-        layout_type=settings['layout_type'],
-        node_size_multiplier=settings['node_size_multiplier'],
-        enable_physics=settings['enable_physics'],
-        spring_strength=settings['spring_strength'],
-        central_gravity=settings['central_gravity'],
-        show_labels=settings['show_labels'],
-        edge_width=settings['edge_width'],
-        color_scheme=settings['color_scheme']
-    )
-    
-    st.success(f"Interactive graph saved to: {save_path}") 
+    render_exploration_tips() 

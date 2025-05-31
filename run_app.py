@@ -10,10 +10,14 @@ import os
 current_dir = os.path.dirname(os.path.abspath(__file__))
 src_dir = os.path.join(current_dir, 'src')
 if src_dir not in sys.path:
-    sys.path.insert(0, current_dir)
+    sys.path.insert(0, src_dir)
+
+# Initialize Streamlit
+import streamlit as st
+from streamlit.runtime.scriptrunner import ScriptRunContext
 
 # Import and run the main app
-from src.app import main
+from app import main
 
 if __name__ == "__main__":
     main()

@@ -3,7 +3,7 @@ Navigation components for WordNet Explorer.
 """
 
 import streamlit as st
-from ..utils.session_state import add_to_search_history
+from utils.session_state import add_to_search_history
 
 
 def handle_url_navigation():

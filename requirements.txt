@@ -1,5 +1,7 @@
-streamlit
-nltk
-networkx
-matplotlib
-pyvis
+streamlit>=1.28.0
+nltk>=3.8
+networkx>=3.0
+matplotlib>=3.6.0
+pyvis>=0.3.2
+pytest>=7.0.0
+pytest-dependency>=0.5.1

@@ -5,9 +5,9 @@ This module provides backward compatibility for existing code while
 using the new modular architecture under the hood.
 """
 
-from .core import WordNetExplorer as _WordNetExplorer
-from .wordnet import download_nltk_data, get_synsets_for_word
-from .wordnet.relationships import RelationshipConfig
+from core import WordNetExplorer as _WordNetExplorer
+from wordnet import download_nltk_data, get_synsets_for_word
+from wordnet.relationships import RelationshipConfig
 
 # Create a global instance for backward compatibility
 _explorer = _WordNetExplorer()

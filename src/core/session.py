@@ -6,6 +6,7 @@ Handles Streamlit session state management for the WordNet Explorer application.
 
 from typing import List, Optional, Any, Dict
 import streamlit as st
+from streamlit.runtime.scriptrunner import ScriptRunContext
 from urllib.parse import urlencode
 
 
@@ -206,7 +207,7 @@ class SessionManager:
         reverse_mappings = {
             'word': 'word',
             'depth': 'depth',
-            'parsed_sense_number': 'sense',
+            'sense_number': 'sense',
             'show_hypernyms': 'hypernyms',
             'show_hyponyms': 'hyponyms',
             'show_meronyms': 'meronyms',

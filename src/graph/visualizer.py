@@ -313,26 +313,72 @@ class GraphVisualizer:
     
     def _add_edges(self, net: Network, G: nx.Graph):
         """Add edges to the pyvis network."""
-        edge_colors = {
-            'sense': '#666666',
-            'hypernym': '#FF4444',
-            'hyponym': '#4488FF',
-            'meronym': '#44AA44',
-            'holonym': '#FFAA00'
-        }
+        # Import here to avoid circular imports
+        from src.wordnet.relationships import get_relationship_color, RelationshipType
         
-        relation_descriptions = {
-            'sense': 'Word sense connection',
-            'hypernym': 'Is a type of (more general)',
-            'hyponym': 'Type includes (more specific)',
-            'meronym': 'Has part',
-            'holonym': 'Part of'
-        }
+        # Create mapping from relationship strings to colors
+        edge_colors = {}
+        for rel_type in RelationshipType:
+            edge_colors[rel_type.value] = get_relationship_color(rel_type)
+        
+        # Add fallback colors for any unmapped relationships
+        edge_colors.update({
+            'sense': '#666666',
+            'unknown': '#888888'
+        })
         
         for source, target, edge_data in G.edges(data=True):
             relation = edge_data.get('relation', 'unknown')
             color = edge_data.get('color', edge_colors.get(relation, '#888888'))
-            description = relation_descriptions.get(relation, relation)
+            arrow_direction = edge_data.get('arrow_direction', 'to')
+            
+            # Initialize actual_source and actual_target for all cases
+            actual_source, actual_target = source, target
+            
+            # For taxonomic relationships, ensure consistent direction: specific → general
+            if relation in ['hypernym', 'hyponym']:
+                # Always make taxonomic arrows go specific → general (consistent direction)
+                if relation == 'hypernym':
+                    # Hypernym means source is more specific than target
+                    # So arrow should go source → target (specific → general)
+                    actual_source, actual_target = source, target
+                elif relation == 'hyponym':
+                    # Hyponym means source is more general than target
+                    # So arrow should go target → source (specific → general)
+                    actual_source, actual_target = target, source
+            else:
+                # For non-taxonomic relationships, handle reverse arrow direction normally
+                if arrow_direction == 'from':
+                    actual_source, actual_target = target, source
+                else:
+                    actual_source, actual_target = source, target
+            
+            # Create accurate tooltip based on the VISUAL arrow direction
+            source_name = actual_source.split('.')[0] if '.' in actual_source else actual_source.split('_')[-1]
+            target_name = actual_target.split('.')[0] if '.' in actual_target else actual_target.split('_')[-1]
+            
+            # Generate semantic description based on the visual arrow direction
+            if relation == 'sense':
+                description = f"Word sense connection: {source_name} → {target_name}"
+            elif relation in ['hypernym', 'hyponym']:
+                # Both hypernyms and hyponyms now have consistent visual direction: specific → general
+                description = f"Is-a relationship: {source_name} is a type of {target_name}"
+            elif relation in ['member_meronym', 'substance_meronym', 'part_meronym']:
+                description = f"Part-of relationship: {source_name} is part of {target_name}"
+            elif relation in ['member_holonym', 'substance_holonym', 'part_holonym']:
+                description = f"Has-part relationship: {source_name} has part {target_name}"
+            elif relation == 'similar_to':
+                description = f"Similar to: {source_name} is similar to {target_name}"
+            elif relation == 'antonym':
+                description = f"Opposite of: {source_name} is opposite to {target_name}"
+            elif relation == 'also_see':
+                description = f"Related to: {source_name} is also related to {target_name}"
+            elif relation in ['entailment', 'entails']:
+                description = f"Entails: {source_name} entails {target_name}"
+            elif relation in ['cause', 'causes']:
+                description = f"Causes: {source_name} causes {target_name}"
+            else:
+                description = f"{relation.replace('_', ' ').title()}: {source_name} → {target_name}"
             
             edge_config = {
                 'color': color,
@@ -341,7 +387,7 @@ class GraphVisualizer:
                 'arrows': 'to'
             }
             
-            net.add_edge(source, target, **edge_config)
+            net.add_edge(actual_source, actual_target, **edge_config)
     
     def _add_navigation_js(self, net: Network):
         """Add JavaScript for double-click navigation with enhanced console logging."""
@@ -422,7 +468,7 @@ class GraphVisualizer:
                 } else {
                     console.log('⚠️ Network not found, retrying...');
                     // Retry after a longer delay
-                    setTimeout(arguments.callee, 1000);
+                    setTimeout(arguments.callee, 100000);
                 }
             }, 500);
         });
@@ -432,21 +478,35 @@ class GraphVisualizer:
     
     def _draw_colored_edges(self, G: nx.Graph, pos: Dict):
         """Draw edges with different colors based on relationship type."""
-        edge_colors = {
+        # Import here to avoid circular imports
+        from src.wordnet.relationships import get_relationship_color, RelationshipType
+        
+        # Create mapping from relationship strings to colors
+        edge_colors = {}
+        for rel_type in RelationshipType:
+            edge_colors[rel_type.value] = get_relationship_color(rel_type)
+        
+        # Add fallback colors for any unmapped relationships
+        edge_colors.update({
             'sense': '#666666',
-            'hypernym': '#FF4444',
-            'hyponym': '#4488FF',
-            'meronym': '#44AA44',
-            'holonym': '#FFAA00'
-        }
+            'unknown': '#888888'
+        })
         
         # Group edges by relationship type
         edges_by_type = {}
         for source, target, data in G.edges(data=True):
             relation = data.get('relation', 'unknown')
+            arrow_direction = data.get('arrow_direction', 'to')
+            
+            # Handle reverse arrow direction by swapping source and target
+            if arrow_direction == 'from':
+                actual_edge = (target, source)
+            else:
+                actual_edge = (source, target)
+                
             if relation not in edges_by_type:
                 edges_by_type[relation] = []
-            edges_by_type[relation].append((source, target))
+            edges_by_type[relation].append(actual_edge)
         
         # Draw each group with its color
         for relation, edges in edges_by_type.items():
