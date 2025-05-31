@@ -114,16 +114,18 @@ def create_radar_chart(word: str, sense_scores: List[SenseScore], settings: Dict
         st.info("No senses meet the minimum similarity threshold.")
         return None
     
-    # Prepare data
+    # Set up the categories (metrics)
     categories = []
-    def_scores = []
-    ctx_scores = []
+    if settings['use_definition']:
+        categories.append('Definition\nSimilarity')
+    if settings['use_context']:
+        categories.append('Context\nSimilarity')
+    if settings['use_definition'] and settings['use_context']:
+        categories.append('Combined\nScore')
     
-    for score in filtered_scores:
-        sense_num = score.synset_name.split('.')[-1].lstrip('0')
-        categories.append(f'Sense {sense_num}')
-        def_scores.append(score.definition_score if score.definition_score is not None else 0)
-        ctx_scores.append(score.context_score if score.context_score is not None else 0)
+    if not categories:
+        st.warning("Please enable at least one scoring method.")
+        return None
     
     # Number of variables
     N = len(categories)
@@ -136,29 +138,46 @@ def create_radar_chart(word: str, sense_scores: List[SenseScore], settings: Dict
     fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(projection='polar'))
     
     # Draw one axis per variable and add labels
-    plt.xticks(angles[:-1], categories, size=12)
+    plt.xticks(angles[:-1], categories, size=14)
     
     # Draw ylabels
     ax.set_rlabel_position(0)
     plt.yticks([0.2, 0.4, 0.6, 0.8, 1.0], ["0.2", "0.4", "0.6", "0.8", "1.0"], size=10)
     plt.ylim(0, 1)
     
-    # Plot data
-    if settings['use_definition']:
-        def_scores += def_scores[:1]  # Complete the circle
-        ax.plot(angles, def_scores, 'o-', linewidth=2, label='Definition Similarity', color='green')
-        ax.fill(angles, def_scores, alpha=0.25, color='green')
+    # Plot data for each sense
+    colors = plt.get_cmap('viridis')(np.linspace(0, 1, len(filtered_scores)))
     
-    if settings['use_context']:
-        ctx_scores += ctx_scores[:1]  # Complete the circle
-        ax.plot(angles, ctx_scores, 'o-', linewidth=2, label='Context Similarity', color='blue')
-        ax.fill(angles, ctx_scores, alpha=0.25, color='blue')
+    for i, score in enumerate(filtered_scores):
+        sense_num = score.synset_name.split('.')[-1].lstrip('0')
+        
+        # Prepare values for this sense
+        values = []
+        if settings['use_definition']:
+            values.append(score.definition_score if score.definition_score is not None else 0)
+        if settings['use_context']:
+            values.append(score.context_score if score.context_score is not None else 0)
+        if settings['use_definition'] and settings['use_context']:
+            def_score = score.definition_score if score.definition_score is not None else 0
+            ctx_score = score.context_score if score.context_score is not None else 0
+            combined = np.sqrt(def_score**2 + ctx_score**2) / np.sqrt(2)
+            values.append(combined)
+        
+        values += values[:1]  # Complete the circle
+        
+        # Plot the polygon for this sense
+        ax.plot(angles, values, 'o-', linewidth=2, label=f'Sense {sense_num}: {score.definition[:30]}...', 
+                color=colors[i], markersize=8)
+        ax.fill(angles, values, alpha=0.25, color=colors[i])
     
     # Add legend
-    plt.legend(loc='upper right', bbox_to_anchor=(1.2, 1.1))
+    plt.legend(loc='upper right', bbox_to_anchor=(1.3, 1.1), fontsize=10)
     
     # Add title
     plt.title(f'Sense Similarity Radar for "{word}"', size=16, fontweight='bold', pad=20)
+    
+    # Add grid
+    ax.grid(True, alpha=0.5, linestyle='--')
     
     return fig
 
@@ -311,11 +330,14 @@ def render_sense_graph_visualization(
         elif viz_type == "Radar Chart":
             st.markdown("""
             **Radar Chart Guide:**
-            - Each axis represents a different sense of the word
-            - **Green area**: Definition similarity scores
-            - **Blue area**: Context similarity scores
-            - **Larger area**: Better match
-            - **Perfect match**: Would fill the entire chart (score of 1.0 on all axes)
+            - Each **colored polygon** represents a different sense of the word
+            - **Axes** show different similarity metrics:
+              - **Definition Similarity**: How well your definition matches this sense
+              - **Context Similarity**: How well your context sentence matches this sense  
+              - **Combined Score**: Overall similarity (if both metrics are enabled)
+            - **Larger polygon area**: Better overall match for that sense
+            - **Perfect match**: Would extend to the outer edge (1.0) on all axes
+            - **Compare senses**: Look for which polygon extends furthest on the metrics that matter to you
             """)
         else:  # Bar Chart
             st.markdown("""
