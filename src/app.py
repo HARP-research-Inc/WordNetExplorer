@@ -3,10 +3,11 @@
 WordNet Explorer - Streamlit UI (Refactored Modular Version)
 
 A web-based interface for exploring WordNet semantic relationships
-using Streamlit with a clean, modular architecture.
+using Streamlit with a clean, modular architecture. 
 """
 
 import streamlit as st
+
 import streamlit.components.v1 as components
 import sys
 import os
