@@ -9,7 +9,7 @@ from src.models.settings import VisualizationSettings
 from src.graph.node_builder import NodeBuilder
 from src.graph.edge_builder import EdgeBuilder
 from src.graph.html_generator import GraphHTMLGenerator
-from src.graph.visualizer import visualize_graph as legacy_visualize
+from src.wordnet_explorer import visualize_graph as legacy_visualize
 
 
 class VisualizationService:

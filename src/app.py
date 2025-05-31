@@ -63,33 +63,94 @@ def render_sense_sidebar():
         
         st.markdown("---")
         
-        # Placeholder content for sense tab
-        st.markdown("### 🎯 Sense Tools")
-        st.markdown(
-            """
-            <div style="padding: 20px; background-color: #f0f2f6; border-radius: 10px;">
-                <p style="color: #666; margin: 0;">
-                    Sense disambiguation and exploration tools will appear here.
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True
+        # Word input
+        st.markdown("### 📝 Input Word")
+        word = st.text_input(
+            "Enter a word to analyze",
+            placeholder="e.g., bank",
+            key="sense_word_input",
+            help="Enter the word whose senses you want to disambiguate"
         )
         
         st.markdown("---")
         
-        # About section for Sense tab
-        with st.expander("ℹ️ About Sense Explorer"):
+        # Definition input
+        st.markdown("### 📖 Definition Matching")
+        definition_sentence = st.text_area(
+            "Enter a definition",
+            placeholder="e.g., A financial institution that accepts deposits",
+            key="sense_definition_input",
+            height=100,
+            help="Provide a definition to match against WordNet sense definitions"
+        )
+        
+        st.markdown("---")
+        
+        # Context sentence input
+        st.markdown("### 💬 Context Matching")
+        context_sentence = st.text_area(
+            "Enter usage in context",
+            placeholder="e.g., I need to go to the bank to deposit my check",
+            key="sense_context_input",
+            height=100,
+            help="Provide a sentence using the word in context"
+        )
+        
+        st.markdown("---")
+        
+        # Scoring options
+        st.markdown("### ⚙️ Scoring Options")
+        use_definition = st.checkbox("Use Definition Similarity", value=True, key="use_definition_score")
+        use_context = st.checkbox("Use Context Similarity", value=True, key="use_context_score")
+        
+        # Visualization options
+        st.markdown("### 🎨 Visualization Options")
+        show_top_n = st.slider(
+            "Show top N senses",
+            min_value=1,
+            max_value=10,
+            value=5,
+            key="sense_top_n",
+            help="Number of top-scoring senses to display"
+        )
+        
+        min_score = st.slider(
+            "Minimum similarity score",
+            min_value=0.0,
+            max_value=1.0,
+            value=0.1,
+            step=0.05,
+            key="sense_min_score",
+            help="Hide senses with similarity below this threshold"
+        )
+        
+        st.markdown("---")
+        
+        # About section
+        with st.expander("ℹ️ How it works"):
             st.markdown("""
-            The Sense Explorer will provide tools for:
-            - Word sense disambiguation
-            - Sense frequency analysis
-            - Cross-lingual sense mapping
-            - And more!
+            **Definition Matching**: Compares your definition against WordNet definitions using semantic embeddings.
+            
+            **Context Matching**: Analyzes how well each sense fits in your example sentence.
+            
+            **Similarity Scores**: Range from 0 (no similarity) to 1 (perfect match).
+            
+            **Edge Colors**:
+            - 🟢 Green: Definition similarity
+            - 🔵 Blue: Context similarity
+            - 🟣 Purple: Combined score
             """)
     
-    # Return empty settings for now
-    return {}
+    # Return settings
+    return {
+        'word': word.strip().lower() if word else None,
+        'definition_sentence': definition_sentence.strip() if definition_sentence else None,
+        'context_sentence': context_sentence.strip() if context_sentence else None,
+        'use_definition': use_definition,
+        'use_context': use_context,
+        'show_top_n': show_top_n,
+        'min_score': min_score
+    }
 
 
 def render_search_content(explorer, session_manager, settings):
@@ -146,7 +207,7 @@ def render_search_content(explorer, session_manager, settings):
                 
                 # If in synset search mode, convert word+sense to synset name
                 if synset_search_mode and settings.get('parsed_sense_number'):
-                    from wordnet import get_synsets_for_word
+                    from src.wordnet import get_synsets_for_word
                     synsets = get_synsets_for_word(current_display_word)
                     sense_number = settings['parsed_sense_number']
                     if synsets and 1 <= sense_number <= len(synsets):
@@ -163,7 +224,7 @@ def render_search_content(explorer, session_manager, settings):
                 else:
                     print(f"🔍 APP: NOT calling add_query_to_history")
                     # Fallback: If we're displaying a word but it's not in history, add it
-                    from utils.session_state import get_search_history_manager
+                    from src.utils.session_state import get_search_history_manager
                     from src.models.search_history import SearchQuery
                     
                     history_manager = get_search_history_manager()
@@ -198,21 +259,118 @@ def render_search_content(explorer, session_manager, settings):
 
 def render_sense_content(explorer, session_manager, settings):
     """Render the content for the Sense tab."""
-    st.markdown(
-        """
-        <div style="text-align: center; padding: 50px;">
-            <h2>🚧 Under Construction 🚧</h2>
-            <p style="font-size: 18px; color: #666;">
-                The Sense tab is coming soon! This will feature advanced sense disambiguation 
-                and exploration tools.
-            </p>
-            <p style="font-size: 16px; color: #888; margin-top: 20px;">
-                Check out the sidebar for a preview of upcoming features!
-            </p>
-        </div>
-        """,
-        unsafe_allow_html=True
-    )
+    
+    # Check if we have the required inputs
+    if not settings.get('word'):
+        st.markdown(
+            """
+            <div style="text-align: center; padding: 50px;">
+                <h2>👋 Welcome to Sense Explorer</h2>
+                <p style="font-size: 18px; color: #666;">
+                    Enter a word in the sidebar to begin exploring its different senses.
+                </p>
+                <p style="font-size: 16px; color: #888; margin-top: 20px;">
+                    You can provide a definition or usage context to find the most relevant sense.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        return
+    
+    # Check if at least one input method is selected
+    if not settings['use_definition'] and not settings['use_context']:
+        st.warning("Please select at least one scoring method (Definition or Context) in the sidebar.")
+        return
+    
+    # Check if we have input for the selected methods
+    if settings['use_definition'] and not settings.get('definition_sentence'):
+        st.info("Please enter a definition in the sidebar to use definition matching.")
+        return
+    
+    if settings['use_context'] and not settings.get('context_sentence'):
+        st.info("Please enter a context sentence in the sidebar to use context matching.")
+        return
+    
+    # Import required modules
+    try:
+        from src.wordnet import get_synsets_for_word
+        from src.services.sense_similarity import get_sense_similarity_calculator
+        from src.ui.sense_graph import render_sense_graph_visualization
+    except ImportError as e:
+        st.error(f"Error importing required modules: {e}")
+        return
+    
+    # Get synsets for the word
+    word = settings['word']
+    
+    with st.spinner(f"Loading senses for '{word}'..."):
+        try:
+            synsets = get_synsets_for_word(word)
+            
+            if not synsets:
+                st.warning(f"No senses found for '{word}'. Please check the spelling or try a different word.")
+                return
+            
+            st.success(f"Found {len(synsets)} senses for '{word}'")
+            
+        except Exception as e:
+            st.error(f"Error retrieving senses: {e}")
+            return
+    
+    # Calculate similarities
+    with st.spinner("Calculating similarities..."):
+        try:
+            calculator = get_sense_similarity_calculator()
+            
+            sense_scores = calculator.calculate_sense_similarities(
+                word=word,
+                synsets=synsets,
+                definition_input=settings.get('definition_sentence'),
+                context_input=settings.get('context_sentence')
+            )
+            
+        except Exception as e:
+            st.error(f"Error calculating similarities: {e}")
+            st.exception(e)
+            return
+    
+    # Display input information
+    st.markdown("### 📊 Analysis Summary")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if settings.get('definition_sentence'):
+            st.markdown("**Your Definition:**")
+            st.info(settings['definition_sentence'])
+    
+    with col2:
+        if settings.get('context_sentence'):
+            st.markdown("**Your Context:**")
+            st.info(settings['context_sentence'])
+    
+    st.markdown("---")
+    
+    # Display the sense similarity graph
+    st.markdown("### 🕸️ Sense Similarity Network")
+    
+    render_sense_graph_visualization(word, sense_scores, settings)
+    
+    # Display additional insights
+    st.markdown("---")
+    st.markdown("### 💡 Insights")
+    
+    if sense_scores and sense_scores[0].max_score >= 0.7:
+        st.success(f"**Best Match**: Sense {sense_scores[0].synset_name.split('.')[-1].lstrip('0')} "
+                  f"with {sense_scores[0].max_score:.1%} similarity")
+        st.markdown(f"*Definition*: {sense_scores[0].definition}")
+    elif sense_scores and sense_scores[0].max_score >= 0.4:
+        st.info(f"**Likely Match**: Sense {sense_scores[0].synset_name.split('.')[-1].lstrip('0')} "
+               f"with {sense_scores[0].max_score:.1%} similarity")
+        st.markdown(f"*Definition*: {sense_scores[0].definition}")
+    else:
+        st.warning("No strong matches found. Try providing more specific definitions or context.")
 
 
 # Tab Configuration - Add new tabs here!

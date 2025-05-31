@@ -3,12 +3,12 @@ Graph service for building and manipulating WordNet graphs.
 """
 
 from typing import Optional, Set, Dict, Any
+import networkx as nx
+
 from src.models.graph_data import GraphData, NodeData, EdgeData, NodeType, EdgeType
 from src.models.settings import AppSettings
 from src.services.wordnet_service import WordNetService
-from src.graph.builder import Builder
-from src.core.graph import build_graph as legacy_build_graph
-import networkx as nx
+from src.graph.builder import GraphBuilder
 
 
 class GraphService:
@@ -17,7 +17,7 @@ class GraphService:
     def __init__(self, wordnet_service: Optional[WordNetService] = None):
         """Initialize the graph service."""
         self.wordnet_service = wordnet_service or WordNetService()
-        self.builder = Builder()
+        self.builder = GraphBuilder()
     
     def build_graph(self, settings: AppSettings) -> GraphData:
         """
@@ -29,11 +29,13 @@ class GraphService:
         Returns:
             GraphData object containing the built graph
         """
-        # For backward compatibility, convert to dictionary
-        settings_dict = settings.to_dict()
+        # Get the word from settings
+        word = settings.exploration.word if hasattr(settings, 'exploration') else None
+        if not word:
+            return GraphData(graph=nx.Graph())
         
-        # Use legacy builder for now
-        G, node_labels = legacy_build_graph(settings_dict)
+        # Use GraphBuilder to build the graph
+        G, node_labels = self.builder.build_graph(word)
         
         # Convert to GraphData
         return GraphData.from_tuple(G, node_labels)

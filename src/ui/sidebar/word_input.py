@@ -3,15 +3,21 @@ Word input components for the sidebar.
 """
 
 import streamlit as st
-from utils.session_state import (
+from typing import Tuple, Dict, Optional
+import re
+from src.utils.session_state import (
+    get_current_word,
+    set_current_word,
+    add_to_history,
+    update_url_with_word,
+    get_search_history_manager,
     add_to_search_history, 
     clear_search_history, 
     add_query_to_history,
-    get_search_history_manager,
     restore_query_settings
 )
-from utils.debug_logger import log_word_input_event, log_session_state
-from wordnet import get_synsets_for_word
+from src.utils.debug_logger import log_word_input_event, log_session_state
+from src.wordnet import get_synsets_for_word
 from src.models.search_history import SearchQuery
 
 
