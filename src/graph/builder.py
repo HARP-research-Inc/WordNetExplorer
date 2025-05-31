@@ -36,6 +36,7 @@ class GraphConfig:
     enable_clustering: bool = False
     enable_cross_connections: bool = True
     simplified_mode: bool = False
+    show_word_senses: bool = True  # Add option to show word senses for synsets
     
     def __post_init__(self):
         if self.relationship_config is None:
@@ -267,6 +268,56 @@ class GraphBuilder:
             node_labels[synset_node] = create_synset_label(synset)
             self.created_synsets.add(synset)
         
+        # Add word senses (lemmas) for this synset if enabled and not at focus word level
+        if self.config.show_word_senses and current_depth > 0:
+            # Add word sense nodes for all lemmas in this synset
+            lemmas_to_process = synset.lemmas()[:self.config.max_branches]  # Limit branches
+            for lemma in lemmas_to_process:
+                if not self._should_add_node():  # Check node limit
+                    break
+                    
+                lemma_word = lemma.name().replace('_', ' ')
+                
+                # Create a unique word sense node for this lemma
+                word_sense_node = create_node_id(NodeType.WORD_SENSE, f"{lemma_word}_{synset.name()}")
+                
+                # Skip if this word sense already exists
+                if word_sense_node in G.nodes():
+                    continue
+                
+                # Find the sense number for this specific word
+                word_synsets = get_synsets_for_word(lemma_word)
+                word_sense_number = None
+                for i, word_synset in enumerate(word_synsets, 1):
+                    if word_synset.name() == synset.name():
+                        word_sense_number = i
+                        break
+                
+                if word_sense_number is None:
+                    # Fallback if we can't find the sense number
+                    word_sense_number = 1
+                
+                # Create word sense attributes
+                sense_attrs = create_node_attributes(
+                    NodeType.WORD_SENSE,
+                    word=lemma_word,
+                    synset_name=synset.name(),
+                    definition=synset_info['definition'] if 'synset_info' in locals() else G.nodes[synset_node].get('definition', ''),
+                    pos=synset_info['pos'] if 'synset_info' in locals() else G.nodes[synset_node].get('pos', 'n'),
+                    pos_label=synset_info['pos_label'] if 'synset_info' in locals() else G.nodes[synset_node].get('pos_label', 'noun'),
+                    sense_number=word_sense_number
+                )
+                
+                # Use the new node adding method
+                if self._add_node_with_limit(G, word_sense_node, **sense_attrs):
+                    # Create label for word sense
+                    from .nodes import create_node_label
+                    node_labels[word_sense_node] = create_node_label(NodeType.WORD_SENSE, sense_attrs)
+                    
+                    # Connect word sense to synset
+                    sense_props = get_relationship_properties(RelationshipType.SENSE)
+                    G.add_edge(word_sense_node, synset_node, **sense_props)
+        
         # For the first level (current_depth == 0), this is a sense of the focus word
         if current_depth == 0 and focus_word:
             # Find the actual sense number for this word (position in the synsets list)
@@ -339,8 +390,11 @@ class GraphBuilder:
         target_info = get_synset_info(target_synset)
         target_node = create_node_id(NodeType.SYNSET, target_synset.name())
         
+        # Track if we're creating a new node
+        creating_new_node = target_node not in G.nodes()
+        
         # Create target node if it doesn't exist
-        if target_node not in G.nodes():
+        if creating_new_node:
             # Prepare node attributes
             target_attrs = create_node_attributes(NodeType.SYNSET, **target_info)
             target_attrs['synset_name'] = target_synset.name()
@@ -350,6 +404,56 @@ class GraphBuilder:
                 return  # Node was filtered out or limit reached
                 
             node_labels[target_node] = create_synset_label(target_synset)
+            
+            # Add word senses for this new synset if enabled
+            if self.config.show_word_senses and current_depth > 0:
+                # Add word sense nodes for all lemmas in this synset
+                lemmas_to_process = target_synset.lemmas()[:self.config.max_branches]  # Limit branches
+                for lemma in lemmas_to_process:
+                    if not self._should_add_node():  # Check node limit
+                        break
+                        
+                    lemma_word = lemma.name().replace('_', ' ')
+                    
+                    # Create a unique word sense node for this lemma
+                    word_sense_node = create_node_id(NodeType.WORD_SENSE, f"{lemma_word}_{target_synset.name()}")
+                    
+                    # Skip if this word sense already exists
+                    if word_sense_node in G.nodes():
+                        continue
+                    
+                    # Find the sense number for this specific word
+                    word_synsets = get_synsets_for_word(lemma_word)
+                    word_sense_number = None
+                    for i, word_synset in enumerate(word_synsets, 1):
+                        if word_synset.name() == target_synset.name():
+                            word_sense_number = i
+                            break
+                    
+                    if word_sense_number is None:
+                        # Fallback if we can't find the sense number
+                        word_sense_number = 1
+                    
+                    # Create word sense attributes
+                    sense_attrs = create_node_attributes(
+                        NodeType.WORD_SENSE,
+                        word=lemma_word,
+                        synset_name=target_synset.name(),
+                        definition=target_info['definition'],
+                        pos=target_info['pos'],
+                        pos_label=target_info['pos_label'],
+                        sense_number=word_sense_number
+                    )
+                    
+                    # Use the new node adding method
+                    if self._add_node_with_limit(G, word_sense_node, **sense_attrs):
+                        # Create label for word sense
+                        from .nodes import create_node_label
+                        node_labels[word_sense_node] = create_node_label(NodeType.WORD_SENSE, sense_attrs)
+                        
+                        # Connect word sense to synset
+                        sense_props = get_relationship_properties(RelationshipType.SENSE)
+                        G.add_edge(word_sense_node, target_node, **sense_props)
         
         # Add edge with relationship properties, respecting arrow direction
         rel_props = get_relationship_properties(rel_type)

@@ -15,13 +15,23 @@ def get_url_default(session_manager, setting_key: str, default_value):
 
 def render_basic_settings(session_manager):
     """Render basic exploration settings."""
-    depth = st.slider(
-        "Exploration depth", 
-        min_value=1, 
-        max_value=3, 
-        value=get_url_default(session_manager, 'depth', DEFAULT_SETTINGS['depth']), 
-        help="How deep to explore relationships (higher values create larger graphs)"
+    # Basic Settings
+    st.markdown("##### Basic Settings")
+    
+    depth = st.slider("Exploration depth", 0, 3, 
+                     get_url_default(session_manager, 'depth', DEFAULT_SETTINGS['depth']),
+                     help="How many levels deep to explore")
+    
+    # Word Senses Display Option (NEW)
+    show_word_senses = st.checkbox(
+        "Show word senses", 
+        value=st.session_state.get('show_word_senses', True),
+        key="show_word_senses",
+        help="Display all word forms (lemmas) connected to each synset"
     )
+    
+    # Advanced settings toggle
+    show_advanced = st.checkbox("Show advanced settings", value=False)
     
     # Advanced Options
     with st.expander("⚙️ Advanced Options", expanded=False):
@@ -124,7 +134,8 @@ def render_basic_settings(session_manager):
             'pos_filter': pos_filter,
             'enable_clustering': enable_clustering,
             'enable_cross_connections': enable_cross_connections,
-            'simplified_mode': simplified_mode
+            'simplified_mode': simplified_mode,
+            'show_word_senses': show_word_senses
         }
         
         # Include advanced relationship settings

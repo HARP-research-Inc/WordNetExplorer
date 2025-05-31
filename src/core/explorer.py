@@ -39,6 +39,7 @@ class WordNetExplorer:
                     enable_clustering: bool = False,
                     enable_cross_connections: bool = True,
                     simplified_mode: bool = False,
+                    show_word_senses: bool = True,
                     **relationship_kwargs) -> Tuple[nx.Graph, Dict]:
         """
         Explore a word and build its relationship graph.
@@ -54,6 +55,7 @@ class WordNetExplorer:
             enable_clustering: Whether to enable node clustering
             enable_cross_connections: Whether to find cross-connections between nodes
             simplified_mode: Whether to use simplified rendering
+            show_word_senses: Whether to show word senses (lemmas) for synsets
             **relationship_kwargs: Relationship configuration (show_hypernyms, etc.)
             
         Returns:
@@ -73,7 +75,8 @@ class WordNetExplorer:
             pos_filter=pos_filter,
             enable_clustering=enable_clustering,
             enable_cross_connections=enable_cross_connections,
-            simplified_mode=simplified_mode
+            simplified_mode=simplified_mode,
+            show_word_senses=show_word_senses
         )
         
         # Build and return the graph
@@ -89,6 +92,7 @@ class WordNetExplorer:
                       enable_clustering: bool = False,
                       enable_cross_connections: bool = True,
                       simplified_mode: bool = False,
+                      show_word_senses: bool = True,
                       **relationship_kwargs) -> Tuple[nx.Graph, Dict]:
         """
         Explore a synset and build its relationship graph, focusing on the synset node.
@@ -103,6 +107,7 @@ class WordNetExplorer:
             enable_clustering: Whether to enable node clustering
             enable_cross_connections: Whether to find cross-connections between nodes
             simplified_mode: Whether to use simplified rendering
+            show_word_senses: Whether to show word senses (lemmas) for synsets
             **relationship_kwargs: Relationship configuration (show_hypernyms, etc.)
             
         Returns:
@@ -122,7 +127,8 @@ class WordNetExplorer:
             pos_filter=pos_filter,
             enable_clustering=enable_clustering,
             enable_cross_connections=enable_cross_connections,
-            simplified_mode=simplified_mode
+            simplified_mode=simplified_mode,
+            show_word_senses=show_word_senses
         )
         
         # Build and return the graph
