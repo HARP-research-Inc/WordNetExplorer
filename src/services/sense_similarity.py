@@ -78,24 +78,116 @@ class SenseSimilarityCalculator:
         
         return float(dot_product / (norm1 * norm2))
     
+    def _detect_pos_from_context(self, word: str, context: str) -> Optional[str]:
+        """Detect the part of speech of a word in context using simple heuristics."""
+        try:
+            import nltk
+            from nltk import pos_tag, word_tokenize
+            
+            # Try to download required data
+            try:
+                nltk.data.find('tokenizers/punkt')
+            except LookupError:
+                nltk.download('punkt', quiet=True)
+            
+            try:
+                nltk.data.find('taggers/averaged_perceptron_tagger')
+            except LookupError:
+                nltk.download('averaged_perceptron_tagger', quiet=True)
+            
+            # Tokenize and tag the context
+            tokens = word_tokenize(context.lower())
+            pos_tags = pos_tag(tokens)
+            
+            # Find the word in the context and get its POS tag
+            word_lower = word.lower()
+            for token, pos_tag_result in pos_tags:
+                if token == word_lower or token.replace('_', ' ') == word_lower:
+                    # Map NLTK POS tags to WordNet POS
+                    if pos_tag_result.startswith('NN'):  # Noun
+                        return 'n'
+                    elif pos_tag_result.startswith('VB'):  # Verb
+                        return 'v'
+                    elif pos_tag_result.startswith('JJ'):  # Adjective
+                        return 'a'
+                    elif pos_tag_result.startswith('RB'):  # Adverb
+                        return 'r'
+            
+            return None
+            
+        except Exception:
+            # Fallback: return None if POS tagging fails
+            return None
+    
+    def _filter_synsets_by_pos(self, synsets: List, limit_pos_to_context: bool, selected_pos: List[str], context_input: Optional[str], word: str) -> List:
+        """Filter synsets based on part of speech settings."""
+        if not synsets:
+            return synsets
+        
+        # Create mapping from UI options to WordNet POS codes
+        pos_mapping = {
+            'Nouns': 'n',
+            'Verbs': 'v', 
+            'Adjectives': ['a', 's'],  # Both regular and satellite adjectives
+            'Adverbs': 'r'
+        }
+        
+        # Get allowed POS codes from selected_pos
+        allowed_pos_codes = set()
+        if selected_pos:
+            for pos_name in selected_pos:
+                pos_codes = pos_mapping.get(pos_name, [])
+                if isinstance(pos_codes, str):
+                    pos_codes = [pos_codes]
+                allowed_pos_codes.update(pos_codes)
+        else:
+            # If no specific POS selected, allow all
+            allowed_pos_codes = {'n', 'v', 'a', 's', 'r'}
+        
+        # If limit_pos_to_context is enabled, detect POS from context
+        context_pos = None
+        if limit_pos_to_context and context_input:
+            context_pos = self._detect_pos_from_context(word, context_input)
+            if context_pos:
+                # Only keep synsets that match the detected POS
+                allowed_pos_codes = {context_pos}
+        
+        # Filter synsets
+        filtered_synsets = []
+        for synset in synsets:
+            synset_pos = synset.pos()
+            if synset_pos in allowed_pos_codes:
+                filtered_synsets.append(synset)
+        
+        return filtered_synsets
+    
     def calculate_sense_similarities(
         self, 
         word: str,
         synsets: List,
         definition_input: Optional[str] = None,
-        context_input: Optional[str] = None
+        context_input: Optional[str] = None,
+        limit_pos_to_context: bool = False,
+        selected_pos: List[str] = None
     ) -> List[SenseScore]:
         """Calculate similarity scores for all senses of a word."""
         if not synsets:
             return []
         
+        # Filter synsets based on part of speech settings
+        filtered_synsets = self._filter_synsets_by_pos(synsets, limit_pos_to_context, selected_pos, context_input, word)
+        
+        if not filtered_synsets:
+            return []
+        
         # Extract synset information
         synset_info = []
-        for synset in synsets:
+        for synset in filtered_synsets:
             synset_info.append({
                 'name': synset.name(),
                 'definition': synset.definition(),
-                'examples': synset.examples()
+                'examples': synset.examples(),
+                'pos': synset.pos()
             })
         
         scores = []
@@ -162,7 +254,6 @@ class SenseSimilarityCalculator:
         return scores
 
 
-@st.cache_resource
 def get_sense_similarity_calculator():
     """Get or create a cached instance of the similarity calculator."""
     return SenseSimilarityCalculator() 

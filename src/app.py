@@ -103,6 +103,24 @@ def render_sense_sidebar():
         use_definition = st.checkbox("Use Definition Similarity", value=True, key="use_definition_score")
         use_context = st.checkbox("Use Context Similarity", value=True, key="use_context_score")
         
+        # Part of speech filtering options
+        st.markdown("### 🔤 Part of Speech Filtering")
+        limit_pos_to_context = st.checkbox(
+            "Limit part of speech to context",
+            value=False,
+            key="limit_pos_to_context",
+            help="Only consider senses that match the part of speech used in your context sentence"
+        )
+        
+        pos_filter_options = ["Nouns", "Verbs", "Adjectives", "Adverbs"]
+        selected_pos = st.multiselect(
+            "Limit to specific parts of speech",
+            options=pos_filter_options,
+            default=pos_filter_options,  # All selected by default
+            key="sense_pos_filter",
+            help="Select which parts of speech to include in the analysis. Leave all selected to include everything."
+        )
+        
         # Visualization options
         st.markdown("### 🎨 Visualization Options")
         show_top_n = st.slider(
@@ -133,9 +151,13 @@ def render_sense_sidebar():
             
             **Context Matching**: Analyzes how well each sense fits in your example sentence.
             
+            **Part of Speech Filtering**:
+            - **Limit to context**: Automatically detects the part of speech used in your context sentence and only shows matching senses
+            - **Manual selection**: Choose specific parts of speech (nouns, verbs, etc.) to include in the analysis
+            
             **Similarity Scores**: Range from 0 (no similarity) to 1 (perfect match).
             
-            **Edge Colors**:
+            **Visualization Types**:
             - 🟢 Green: Definition similarity
             - 🔵 Blue: Context similarity
             - 🟣 Purple: Combined score
@@ -148,6 +170,8 @@ def render_sense_sidebar():
         'context_sentence': context_sentence.strip() if context_sentence else None,
         'use_definition': use_definition,
         'use_context': use_context,
+        'limit_pos_to_context': limit_pos_to_context,
+        'selected_pos': selected_pos,
         'show_top_n': show_top_n,
         'min_score': min_score
     }
@@ -318,6 +342,13 @@ def render_sense_content(explorer, session_manager, settings):
             st.error(f"Error retrieving senses: {e}")
             return
     
+    # Show filtering information
+    if settings.get('limit_pos_to_context') and settings.get('context_sentence'):
+        st.info("🔤 **Part of Speech Filtering**: Limiting to senses that match the detected part of speech in your context sentence")
+    elif settings.get('selected_pos') and len(settings.get('selected_pos', [])) < 4:
+        selected_pos_str = ", ".join(settings.get('selected_pos', []))
+        st.info(f"🔤 **Part of Speech Filtering**: Limiting to {selected_pos_str}")
+    
     # Calculate similarities
     with st.spinner("Calculating similarities..."):
         try:
@@ -327,8 +358,21 @@ def render_sense_content(explorer, session_manager, settings):
                 word=word,
                 synsets=synsets,
                 definition_input=settings.get('definition_sentence'),
-                context_input=settings.get('context_sentence')
+                context_input=settings.get('context_sentence'),
+                limit_pos_to_context=settings.get('limit_pos_to_context', False),
+                selected_pos=settings.get('selected_pos', ['Nouns', 'Verbs', 'Adjectives', 'Adverbs'])
             )
+            
+            # Check if filtering removed all senses
+            if not sense_scores:
+                if settings.get('limit_pos_to_context') and settings.get('context_sentence'):
+                    st.warning("⚠️ No senses found matching the detected part of speech from your context sentence. Try disabling 'Limit part of speech to context' or check your context sentence.")
+                elif settings.get('selected_pos') and len(settings.get('selected_pos', [])) < 4:
+                    selected_pos_str = ", ".join(settings.get('selected_pos', []))
+                    st.warning(f"⚠️ No senses found for the selected parts of speech ({selected_pos_str}). Try selecting additional parts of speech.")
+                else:
+                    st.warning("⚠️ No senses found after filtering.")
+                return
             
         except Exception as e:
             st.error(f"Error calculating similarities: {e}")

@@ -114,20 +114,15 @@ def create_radar_chart(word: str, sense_scores: List[SenseScore], settings: Dict
         st.info("No senses meet the minimum similarity threshold.")
         return None
     
-    # Set up the categories (metrics)
+    # Set up the categories (one for each sense)
     categories = []
-    if settings['use_definition']:
-        categories.append('Definition\nSimilarity')
-    if settings['use_context']:
-        categories.append('Context\nSimilarity')
-    if settings['use_definition'] and settings['use_context']:
-        categories.append('Combined\nScore')
+    for score in filtered_scores:
+        sense_num = score.synset_name.split('.')[-1].lstrip('0')
+        # Truncate definition for cleaner labels
+        short_def = score.definition[:25] + '...' if len(score.definition) > 25 else score.definition
+        categories.append(f'Sense {sense_num}\n{short_def}')
     
-    if not categories:
-        st.warning("Please enable at least one scoring method.")
-        return None
-    
-    # Number of variables
+    # Number of variables (senses)
     N = len(categories)
     
     # Compute angle for each axis
@@ -138,46 +133,61 @@ def create_radar_chart(word: str, sense_scores: List[SenseScore], settings: Dict
     fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(projection='polar'))
     
     # Draw one axis per variable and add labels
-    plt.xticks(angles[:-1], categories, size=14)
+    plt.xticks(angles[:-1], categories, size=10)
     
     # Draw ylabels
     ax.set_rlabel_position(0)
     plt.yticks([0.2, 0.4, 0.6, 0.8, 1.0], ["0.2", "0.4", "0.6", "0.8", "1.0"], size=10)
     plt.ylim(0, 1)
     
-    # Plot data for each sense
-    colors = plt.get_cmap('viridis')(np.linspace(0, 1, len(filtered_scores)))
-    
-    for i, score in enumerate(filtered_scores):
-        sense_num = score.synset_name.split('.')[-1].lstrip('0')
+    # Prepare data for each similarity type
+    if settings['use_definition']:
+        def_values = []
+        for score in filtered_scores:
+            def_values.append(score.definition_score if score.definition_score is not None else 0)
+        def_values += def_values[:1]  # Complete the circle
         
-        # Prepare values for this sense
-        values = []
-        if settings['use_definition']:
-            values.append(score.definition_score if score.definition_score is not None else 0)
-        if settings['use_context']:
-            values.append(score.context_score if score.context_score is not None else 0)
-        if settings['use_definition'] and settings['use_context']:
+        # Plot definition similarity
+        ax.plot(angles, def_values, 'o-', linewidth=2, label='Definition Similarity', 
+                color='green', markersize=8)
+        ax.fill(angles, def_values, alpha=0.25, color='green')
+    
+    if settings['use_context']:
+        ctx_values = []
+        for score in filtered_scores:
+            ctx_values.append(score.context_score if score.context_score is not None else 0)
+        ctx_values += ctx_values[:1]  # Complete the circle
+        
+        # Plot context similarity
+        ax.plot(angles, ctx_values, 'o-', linewidth=2, label='Context Similarity', 
+                color='blue', markersize=8)
+        ax.fill(angles, ctx_values, alpha=0.25, color='blue')
+    
+    if settings['use_definition'] and settings['use_context']:
+        combined_values = []
+        for score in filtered_scores:
             def_score = score.definition_score if score.definition_score is not None else 0
             ctx_score = score.context_score if score.context_score is not None else 0
             combined = np.sqrt(def_score**2 + ctx_score**2) / np.sqrt(2)
-            values.append(combined)
+            combined_values.append(combined)
+        combined_values += combined_values[:1]  # Complete the circle
         
-        values += values[:1]  # Complete the circle
-        
-        # Plot the polygon for this sense
-        ax.plot(angles, values, 'o-', linewidth=2, label=f'Sense {sense_num}: {score.definition[:30]}...', 
-                color=colors[i], markersize=8)
-        ax.fill(angles, values, alpha=0.25, color=colors[i])
+        # Plot combined score
+        ax.plot(angles, combined_values, 'o-', linewidth=2, label='Combined Score', 
+                color='purple', markersize=8)
+        ax.fill(angles, combined_values, alpha=0.25, color='purple')
     
     # Add legend
-    plt.legend(loc='upper right', bbox_to_anchor=(1.3, 1.1), fontsize=10)
+    plt.legend(loc='upper right', bbox_to_anchor=(1.3, 1.1), fontsize=12)
     
     # Add title
     plt.title(f'Sense Similarity Radar for "{word}"', size=16, fontweight='bold', pad=20)
     
     # Add grid
     ax.grid(True, alpha=0.5, linestyle='--')
+    
+    # Wrap long labels
+    ax.tick_params(axis='x', pad=10)
     
     return fig
 
@@ -330,14 +340,14 @@ def render_sense_graph_visualization(
         elif viz_type == "Radar Chart":
             st.markdown("""
             **Radar Chart Guide:**
-            - Each **colored polygon** represents a different sense of the word
-            - **Axes** show different similarity metrics:
-              - **Definition Similarity**: How well your definition matches this sense
-              - **Context Similarity**: How well your context sentence matches this sense  
-              - **Combined Score**: Overall similarity (if both metrics are enabled)
-            - **Larger polygon area**: Better overall match for that sense
-            - **Perfect match**: Would extend to the outer edge (1.0) on all axes
-            - **Compare senses**: Look for which polygon extends furthest on the metrics that matter to you
+            - Each **axis** represents a different sense of the word
+            - **Colored lines** show different similarity metrics:
+              - 🟢 **Green line**: Definition similarity scores
+              - 🔵 **Blue line**: Context similarity scores  
+              - 🟣 **Purple line**: Combined scores (if both metrics are enabled)
+            - **Higher values** (further from center): Better match for that sense
+            - **Peak points**: The sense(s) where each line reaches furthest indicate the best matches
+            - **Compare lines**: See which similarity metric best identifies your intended sense
             """)
         else:  # Bar Chart
             st.markdown("""
