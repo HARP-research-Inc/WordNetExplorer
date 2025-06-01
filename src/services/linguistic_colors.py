@@ -70,7 +70,8 @@ class LinguisticColors:
         'verb_head': '#FFB347',   # Light orange - verb head
         'particle': '#DDA0DD',    # Plum - particle
         'obj_group': '#98FB98',   # Pale green - object group
-        'part': '#F0E68C'        # Khaki - part of group
+        'part': '#F0E68C',       # Khaki - part of group
+        'core': '#87CEEB'        # Sky blue - core of phrase
     }
     
     # Node colors for syntactic tree

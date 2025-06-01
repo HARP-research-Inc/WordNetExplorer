@@ -39,50 +39,161 @@ class PhraseBuilder:
         noun_token = tokens[noun_idx]
         indices_in_phrase = {noun_idx}
         
-        # Collect modifiers of this noun
-        modifiers = []
+        # Collect modifiers of this noun by type
+        adjectives = []  # amod
+        determiners = []  # det
+        possessives = []  # poss
+        numerals = []    # nummod
+        compounds = []   # compound
         
-        # Look for adjectives, determiners, etc. that modify this noun
+        # Look for modifiers that directly modify this noun
         for idx in clause_indices:
             if idx == noun_idx:
                 continue
             
             token = tokens[idx]
             # Check if this token modifies our noun
-            if token.head == noun_idx and token.dep in ['amod', 'det', 'nummod', 'poss', 'compound']:
-                modifiers.append((idx, token))
-                indices_in_phrase.add(idx)
+            if token.head == noun_idx:
+                if token.dep == 'amod':
+                    adjectives.append((idx, token))
+                    indices_in_phrase.add(idx)
+                elif token.dep == 'det':
+                    determiners.append((idx, token))
+                    indices_in_phrase.add(idx)
+                elif token.dep == 'poss':
+                    possessives.append((idx, token))
+                    indices_in_phrase.add(idx)
+                elif token.dep == 'nummod':
+                    numerals.append((idx, token))
+                    indices_in_phrase.add(idx)
+                elif token.dep == 'compound':
+                    compounds.append((idx, token))
+                    indices_in_phrase.add(idx)
         
         # If no modifiers, just return the noun node
-        if not modifiers:
+        if not any([adjectives, determiners, possessives, numerals, compounds]):
             return token_nodes[noun_idx], indices_in_phrase
         
-        # Create noun phrase node
-        all_indices = sorted(indices_in_phrase)
-        phrase_text = ' '.join([tokens[i].text for i in all_indices])
-        
-        np_node = SyntacticNode(
+        # Build hierarchical structure
+        # Start with the noun as the innermost element
+        # Create a fresh word node for the noun (don't reuse token_nodes which might have children)
+        noun_node = SyntacticNode(
             node_id=self._get_node_id(),
-            node_type='phrase',
-            text=phrase_text
+            node_type='word',
+            text=noun_token.text,
+            token_info=noun_token
         )
+        current_node = noun_node
         
-        # Add noun as head
-        np_node.add_child(token_nodes[noun_idx], 'head')
-        
-        # Add modifiers in order
-        for mod_idx, mod_token in sorted(modifiers):
-            edge_label = {
-                'amod': 'adj',
-                'det': 'det',
-                'nummod': 'num',
-                'poss': 'poss',
-                'compound': 'compound'
-            }.get(mod_token.dep, mod_token.dep)
+        # Layer 1: Add compounds and adjectives closest to the noun
+        if compounds or adjectives:
+            # Create phrase for noun + its immediate modifiers
+            immediate_indices = {noun_idx}
+            immediate_parts = []
             
-            np_node.add_child(token_nodes[mod_idx], edge_label)
+            # Add compounds (they come before the noun)
+            for comp_idx, _ in sorted(compounds):
+                immediate_indices.add(comp_idx)
+            
+            # Add adjectives
+            for adj_idx, _ in sorted(adjectives):
+                immediate_indices.add(adj_idx)
+            
+            # Build text for this sub-phrase
+            for idx in sorted(immediate_indices):
+                immediate_parts.append(tokens[idx].text)
+            
+            immediate_text = ' '.join(immediate_parts)
+            
+            # Create sub-phrase node
+            immediate_np = SyntacticNode(
+                node_id=self._get_node_id(),
+                node_type='phrase',
+                text=immediate_text
+            )
+            
+            # Add compounds in order
+            for comp_idx, _ in sorted(compounds):
+                immediate_np.add_child(token_nodes[comp_idx], 'compound')
+            
+            # Add adjectives in order
+            for adj_idx, _ in sorted(adjectives):
+                immediate_np.add_child(token_nodes[adj_idx], 'adj')
+            
+            # Add noun as head
+            immediate_np.add_child(current_node, 'head')
+            
+            current_node = immediate_np
         
-        return np_node, indices_in_phrase
+        # Layer 2: Add possessives and numerals
+        if possessives or numerals:
+            # Get all indices including what we have so far
+            outer_indices = set()
+            
+            # Add all indices from current node
+            if current_node.node_type == 'phrase':
+                # Extract indices from the phrase text
+                for token in tokens:
+                    if token.text in current_node.text.split():
+                        outer_indices.add(tokens.index(token))
+            else:
+                outer_indices.add(noun_idx)
+            
+            # Add possessives and numerals
+            for poss_idx, _ in possessives:
+                outer_indices.add(poss_idx)
+            for num_idx, _ in numerals:
+                outer_indices.add(num_idx)
+            
+            # Build text
+            outer_parts = []
+            for idx in sorted(outer_indices):
+                outer_parts.append(tokens[idx].text)
+            
+            outer_text = ' '.join(outer_parts)
+            
+            # Create outer phrase
+            outer_np = SyntacticNode(
+                node_id=self._get_node_id(),
+                node_type='phrase',
+                text=outer_text
+            )
+            
+            # Add possessives first
+            for poss_idx, _ in sorted(possessives):
+                outer_np.add_child(token_nodes[poss_idx], 'poss')
+            
+            # Add numerals
+            for num_idx, _ in sorted(numerals):
+                outer_np.add_child(token_nodes[num_idx], 'num')
+            
+            # Add the inner phrase
+            outer_np.add_child(current_node, 'head' if current_node.node_type == 'word' else 'core')
+            
+            current_node = outer_np
+        
+        # Layer 3: Add determiners last (outermost)
+        if determiners:
+            # Build final phrase with determiners
+            all_indices = sorted(indices_in_phrase)
+            final_text = ' '.join([tokens[i].text for i in all_indices])
+            
+            final_np = SyntacticNode(
+                node_id=self._get_node_id(),
+                node_type='phrase',
+                text=final_text
+            )
+            
+            # Add determiners first
+            for det_idx, _ in sorted(determiners):
+                final_np.add_child(token_nodes[det_idx], 'det')
+            
+            # Add the rest of the phrase
+            final_np.add_child(current_node, 'head' if current_node.node_type == 'word' else 'core')
+            
+            return final_np, indices_in_phrase
+        
+        return current_node, indices_in_phrase
     
     def build_prep_phrase(self, prep_idx: int, tokens: List[TokenInfo], 
                          token_nodes: Dict[int, SyntacticNode], 
