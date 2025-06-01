@@ -417,6 +417,206 @@ def render_sense_content(explorer, session_manager, settings):
         st.warning("No strong matches found. Try providing more specific definitions or context.")
 
 
+def render_sentence_sidebar():
+    """Render the sidebar for the Sentence Explorer tab."""
+    with st.sidebar:
+        st.markdown('<h2 class="sidebar-header">🔤 Sentence Explorer</h2>', unsafe_allow_html=True)
+        
+        st.markdown("---")
+        
+        # Sentence input
+        st.markdown("### 📝 Input Sentence")
+        sentence = st.text_area(
+            "Enter a sentence to analyze",
+            placeholder="e.g., The quick brown fox jumps over the lazy dog.",
+            key="sentence_input",
+            height=100,
+            help="Enter a complete sentence to analyze its grammatical structure and word senses"
+        )
+        
+        st.markdown("---")
+        
+        # Visualization options
+        st.markdown("### 🎨 Visualization Options")
+        
+        show_synsets = st.checkbox(
+            "Show WordNet synsets",
+            value=True,
+            key="sentence_show_synsets",
+            help="Display WordNet word senses for each word"
+        )
+        
+        if show_synsets:
+            synset_limit = st.slider(
+                "Max synsets per word",
+                min_value=1,
+                max_value=5,
+                value=3,
+                key="sentence_synset_limit",
+                help="Maximum number of synsets to show for each word"
+            )
+        else:
+            synset_limit = 0
+        
+        show_synset_details = st.checkbox(
+            "Show synset details",
+            value=True,
+            key="sentence_show_details",
+            help="Show expandable details for each synset"
+        )
+        
+        st.markdown("---")
+        
+        # Advanced options
+        with st.expander("⚙️ Advanced Options"):
+            enable_physics = st.checkbox(
+                "Enable physics simulation",
+                value=True,
+                key="sentence_enable_physics",
+                help="Enable interactive physics for node positioning"
+            )
+            
+            disambiguate_senses = st.checkbox(
+                "Auto-disambiguate senses",
+                value=False,
+                key="sentence_disambiguate",
+                help="Automatically select the most likely sense for each word (experimental)"
+            )
+        
+        st.markdown("---")
+        
+        # About section
+        with st.expander("ℹ️ How it works"):
+            st.markdown("""
+            **Sentence Explorer** analyzes the grammatical structure of your sentence and connects it to WordNet:
+            
+            1. **Dependency Parsing**: Shows how words relate to each other grammatically
+            2. **Part-of-Speech Tagging**: Identifies the grammatical role of each word
+            3. **WordNet Integration**: Links each word to its possible meanings (synsets)
+            
+            **The visualization shows:**
+            - Words as nodes (colored by part of speech)
+            - Grammatical dependencies as arrows
+            - WordNet synsets as connected boxes
+            
+            **Interactive features:**
+            - Hover over nodes for detailed information
+            - Drag nodes to rearrange the layout
+            - Zoom and pan to explore the graph
+            """)
+    
+    # Return settings
+    return {
+        'sentence': sentence.strip() if sentence else None,
+        'show_synsets': show_synsets,
+        'synset_limit': synset_limit,
+        'show_synset_details': show_synset_details,
+        'enable_physics': enable_physics,
+        'disambiguate_senses': disambiguate_senses
+    }
+
+
+def render_sentence_content(explorer, session_manager, settings):
+    """Render the content for the Sentence Explorer tab."""
+    
+    # Check if we have input
+    if not settings.get('sentence'):
+        st.markdown(
+            """
+            <div style="text-align: center; padding: 50px;">
+                <h2>👋 Welcome to Sentence Explorer!</h2>
+                <p style="font-size: 18px; color: #666;">
+                    Enter a sentence in the sidebar to begin analyzing its structure.
+                </p>
+                <p style="font-size: 16px; color: #888; margin-top: 20px;">
+                    This tool combines grammatical analysis with WordNet to show how words relate to each other and their meanings.
+                </p>
+                <div style="margin-top: 30px;">
+                    <h3>Example sentences to try:</h3>
+                    <ul style="text-align: left; display: inline-block;">
+                        <li>"The bank near the river has beautiful flowers."</li>
+                        <li>"She will bank on her experience to solve the problem."</li>
+                        <li>"The pilot flies planes across the ocean every week."</li>
+                        <li>"Time flies when you're having fun at the party."</li>
+                    </ul>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        return
+    
+    # Import required modules
+    try:
+        from src.services.sentence_analyzer import SentenceAnalyzer
+        from src.ui.sentence_graph import render_sentence_graph_visualization, render_sentence_legend
+    except ImportError as e:
+        st.error(f"Error importing required modules: {e}")
+        return
+    
+    # Analyze the sentence
+    sentence = settings['sentence']
+    
+    with st.spinner(f"Analyzing sentence..."):
+        try:
+            analyzer = SentenceAnalyzer()
+            analysis = analyzer.analyze_sentence(sentence)
+            
+            st.success(f"Analyzed sentence with {len(analysis.tokens)} tokens")
+            
+        except Exception as e:
+            st.error(f"Error analyzing sentence: {e}")
+            if "spacy" in str(e).lower():
+                st.info("💡 **Tip**: Make sure spaCy is installed with: `pip install spacy`")
+                st.info("Then download the English model: `python -m spacy download en_core_web_sm`")
+            return
+    
+    # Display the analysis
+    st.markdown("### 📊 Analysis Summary")
+    
+    # Show sentence with POS tags
+    pos_tagged = " ".join([f"{token.text}_{token.tag}" for token in analysis.tokens])
+    st.code(pos_tagged, language="text")
+    
+    # If auto-disambiguation is enabled, try to disambiguate
+    if settings.get('disambiguate_senses', False):
+        with st.spinner("Disambiguating word senses..."):
+            for token in analysis.tokens:
+                if token.synsets:
+                    # Simple disambiguation - just use first synset for now
+                    # In a real implementation, we'd use context-based disambiguation
+                    token.selected_sense = analyzer.disambiguate_token(token, sentence)
+    
+    st.markdown("---")
+    
+    # Render the visualization
+    render_sentence_graph_visualization(analysis, settings)
+    
+    # Render the legend
+    st.markdown("---")
+    st.markdown("### 🗝️ Graph Legend")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        render_sentence_legend()
+    
+    with col2:
+        st.markdown("""
+        <div class="legend-container">
+            <h4>💡 Tips</h4>
+            <ul>
+                <li><strong>Hover</strong> over nodes to see detailed information</li>
+                <li><strong>Drag</strong> nodes to rearrange the layout</li>
+                <li><strong>Zoom</strong> with mouse wheel to see details</li>
+                <li>The <strong>root word</strong> (star shape) is the main verb</li>
+                <li><strong>Arrows</strong> show grammatical dependencies</li>
+                <li><strong>Boxes</strong> represent possible word meanings from WordNet</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+
+
 # Tab Configuration - Add new tabs here!
 TAB_CONFIG = {
     'search': {
@@ -430,6 +630,12 @@ TAB_CONFIG = {
         'sidebar_function': render_sense_sidebar,
         'content_function': render_sense_content,
         'description': 'Advanced sense disambiguation and analysis'
+    },
+    'sentence': {
+        'label': '🔤 Sentence Explorer',
+        'sidebar_function': render_sentence_sidebar,
+        'content_function': render_sentence_content,
+        'description': 'Analyze sentence structure with WordNet integration'
     },
     # Future tabs can be added here easily:
     # 'analysis': {
