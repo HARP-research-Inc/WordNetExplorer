@@ -10,9 +10,76 @@ from typing import Dict, List, Optional, Tuple
 import json
 
 
+def create_syntactic_graph(analysis, settings: Dict) -> nx.DiGraph:
+    """
+    Create a NetworkX graph from syntactic tree.
+    
+    Args:
+        analysis: SentenceAnalysis object with syntactic tree
+        settings: Visualization settings
+        
+    Returns:
+        NetworkX directed graph
+    """
+    G = nx.DiGraph()
+    
+    if not analysis.syntactic_tree:
+        # Fallback to simple token graph if no syntactic tree
+        return create_sentence_graph(analysis, settings)
+    
+    # Build graph from syntactic tree
+    def add_node_recursive(node, parent_id=None):
+        # Create node attributes based on node type
+        if node.node_type == 'word' and node.token_info:
+            # Word node with synset information
+            token = node.token_info
+            
+            # Create simple tooltip with synset info
+            if token.best_synset:
+                synset_name, definition = token.best_synset
+                # Extract just the sense number from synset name (e.g., "bank.n.01" -> "1")
+                sense_num = synset_name.split('.')[-1].lstrip('0')
+                tooltip = f"{node.text}.{sense_num}: {definition}"
+            else:
+                tooltip = node.text
+            
+            node_attrs = {
+                'label': node.text,
+                'title': tooltip,
+                'node_type': 'word',
+                'pos': token.pos,
+                'tag': token.tag,
+                'has_synset': bool(token.synsets)
+            }
+        else:
+            # Clause or sentence node - just show the text
+            node_attrs = {
+                'label': node.text if len(node.text) < 50 else node.text[:47] + '...',
+                'title': node.text,
+                'node_type': node.node_type,
+                'full_text': node.text
+            }
+        
+        # Add node to graph
+        G.add_node(node.node_id, **node_attrs)
+        
+        # Add edge from parent if exists
+        if parent_id and node.edge_label:
+            G.add_edge(parent_id, node.node_id, label=node.edge_label)
+        
+        # Recursively add children
+        for child in node.children:
+            add_node_recursive(child, node.node_id)
+    
+    # Start building from root
+    add_node_recursive(analysis.syntactic_tree)
+    
+    return G
+
+
 def create_sentence_graph(analysis, settings: Dict) -> nx.DiGraph:
     """
-    Create a NetworkX graph from sentence analysis.
+    Create a NetworkX graph from sentence analysis (fallback method).
     
     Args:
         analysis: SentenceAnalysis object
@@ -25,14 +92,18 @@ def create_sentence_graph(analysis, settings: Dict) -> nx.DiGraph:
     
     # Add nodes for each token
     for i, token in enumerate(analysis.tokens):
+        # Create simple tooltip
+        if token.best_synset:
+            synset_name, definition = token.best_synset
+            sense_num = synset_name.split('.')[-1].lstrip('0')
+            tooltip = f"{token.text}.{sense_num}: {definition}"
+        else:
+            tooltip = token.text
+        
         # Node attributes
         node_attrs = {
             'label': f"{token.text}\n{token.tag}",
-            'title': f"<b>{token.text}</b><br>"
-                    f"Lemma: {token.lemma}<br>"
-                    f"POS: {token.pos} ({token.tag})<br>"
-                    f"Dependency: {token.dep}<br>"
-                    f"Synsets: {', '.join(token.synsets[:3]) if token.synsets else 'None'}",
+            'title': tooltip,
             'pos': token.pos,
             'tag': token.tag,
             'dep': token.dep,
@@ -55,48 +126,12 @@ def create_sentence_graph(analysis, settings: Dict) -> nx.DiGraph:
                 dep=token.dep
             )
     
-    # Add synset nodes if enabled
-    if settings.get('show_synsets', True) and settings.get('synset_limit', 3) > 0:
-        for i, token in enumerate(analysis.tokens):
-            # Only add synsets for content words (nouns, verbs, adjectives, adverbs)
-            if token.pos in ['NOUN', 'VERB', 'ADJ', 'ADV'] and token.synsets:
-                synsets_to_show = token.synsets[:settings.get('synset_limit', 3)]
-                
-                for j, synset_name in enumerate(synsets_to_show):
-                    synset_id = f"synset_{i}_{j}"
-                    
-                    # Get synset info
-                    try:
-                        from nltk.corpus import wordnet as wn
-                        synset = wn.synset(synset_name)
-                        definition = synset.definition()
-                        examples = synset.examples()
-                    except:
-                        definition = "Definition not available"
-                        examples = []
-                    
-                    # Add synset node
-                    G.add_node(synset_id, 
-                        label=synset_name.split('.')[0],
-                        title=f"<b>{synset_name}</b><br>"
-                              f"Definition: {definition}<br>"
-                              f"Examples: {'; '.join(examples[:2]) if examples else 'None'}",
-                        is_synset=True,
-                        synset_name=synset_name,
-                        pos=synset_name.split('.')[1] if '.' in synset_name else 'n'
-                    )
-                    
-                    # Add edge from token to synset
-                    G.add_edge(f"token_{i}", synset_id, 
-                              label="sense", 
-                              edge_type="synset_link")
-    
     return G
 
 
-def visualize_sentence_graph(G, analysis, settings: Dict) -> str:
+def visualize_syntactic_graph(G, analysis, settings: Dict) -> str:
     """
-    Create PyVis visualization of the sentence graph.
+    Create PyVis visualization of the syntactic graph.
     
     Args:
         G: NetworkX graph
@@ -115,16 +150,16 @@ def visualize_sentence_graph(G, analysis, settings: Dict) -> str:
         directed=True
     )
     
-    # Configure physics
+    # Configure physics for hierarchical layout
     if settings.get('enable_physics', True):
         net.set_options(json.dumps({
             "physics": {
                 "enabled": True,
                 "hierarchicalRepulsion": {
                     "centralGravity": 0.0,
-                    "springLength": 100,
+                    "springLength": 150,
                     "springConstant": 0.01,
-                    "nodeDistance": 120,
+                    "nodeDistance": 200,
                     "damping": 0.09
                 },
                 "solver": "hierarchicalRepulsion",
@@ -137,11 +172,12 @@ def visualize_sentence_graph(G, analysis, settings: Dict) -> str:
             "layout": {
                 "hierarchical": {
                     "enabled": True,
-                    "direction": "UD",  # Up-Down for dependency trees
+                    "direction": "UD",  # Up-Down for tree
                     "sortMethod": "directed",
-                    "levelSeparation": 100,
-                    "nodeSpacing": 150,
-                    "treeSpacing": 200
+                    "levelSeparation": 120,
+                    "nodeSpacing": 200,
+                    "treeSpacing": 250,
+                    "parentCentralization": True
                 }
             },
             "nodes": {
@@ -153,7 +189,8 @@ def visualize_sentence_graph(G, analysis, settings: Dict) -> str:
             "edges": {
                 "smooth": {
                     "type": "cubicBezier",
-                    "forceDirection": "vertical"
+                    "forceDirection": "vertical",
+                    "roundness": 0.4
                 },
                 "arrows": {
                     "to": {
@@ -163,7 +200,8 @@ def visualize_sentence_graph(G, analysis, settings: Dict) -> str:
                 },
                 "font": {
                     "size": 12,
-                    "align": "middle"
+                    "align": "middle",
+                    "background": "rgba(0,0,0,0.7)"
                 }
             },
             "interaction": {
@@ -182,16 +220,39 @@ def visualize_sentence_graph(G, analysis, settings: Dict) -> str:
     
     # Add nodes
     for node_id, attrs in G.nodes(data=True):
-        if attrs.get('is_synset'):
-            # Synset node styling
-            color = get_synset_color(attrs.get('pos', 'n'))
-            shape = "box"
-            size = 20
+        node_type = attrs.get('node_type', 'word')
+        
+        if node_type == 'sentence':
+            # Sentence node - root
+            color = '#FFD700'  # Gold
+            shape = 'box'
+            size = 40
+            font_size = 16
+        elif node_type == 'clause':
+            # Clause node
+            color = '#87CEEB'  # Sky blue
+            shape = 'ellipse'
+            size = 35
+            font_size = 14
+        elif node_type == 'word':
+            # Word node
+            if attrs.get('pos'):
+                color = analyzer.get_pos_color(attrs.get('tag', ''))
+            else:
+                color = '#D5D8DC'
+            shape = 'dot'
+            size = 25
+            font_size = 12
+            
+            # Highlight words with synsets
+            if attrs.get('has_synset'):
+                shape = 'diamond'
         else:
-            # Token node styling
-            color = analyzer.get_pos_color(attrs.get('tag', ''))
-            shape = "ellipse" if not attrs.get('is_root') else "star"
-            size = 30 if not attrs.get('is_root') else 40
+            # Default
+            color = '#B8B8B8'
+            shape = 'dot'
+            size = 20
+            font_size = 12
         
         net.add_node(
             node_id,
@@ -200,113 +261,116 @@ def visualize_sentence_graph(G, analysis, settings: Dict) -> str:
             color=color,
             shape=shape,
             size=size,
-            font={'size': 14 if not attrs.get('is_root') else 16}
+            font={'size': font_size, 'color': 'white'}
         )
     
-    # Add edges
+    # Add edges with custom styling
+    edge_colors = {
+        'sconj': '#FF6B6B',      # Red - subordinating conjunction
+        'iclause': '#4ECDC4',    # Teal - independent clause
+        'dclause': '#95E1D3',    # Mint - dependent clause
+        'tverb': '#FFD93D',      # Gold - main verb
+        'subj': '#FF8B94',       # Pink - subject
+        'obj': '#6BCB77',        # Green - object
+        'adv': '#BB8FCE',        # Purple - adverb
+        'adj': '#F7DC6F',        # Yellow - adjective
+        'prep': '#F8C471',       # Orange - preposition
+        'det': '#85C1E2',        # Light blue - determiner
+        'aux': '#ABEBC6',        # Light green - auxiliary
+    }
+    
     for source, target, attrs in G.edges(data=True):
-        if attrs.get('edge_type') == 'synset_link':
-            # Synset connection styling
-            color = "#666666"
-            width = 1
-            dashes = True
-        else:
-            # Dependency edge styling
-            dep = attrs.get('dep', '')
-            color = analyzer.get_dependency_color(dep)
-            width = 2
-            dashes = False
+        edge_label = attrs.get('label', '')
+        color = edge_colors.get(edge_label, '#888888')
         
         net.add_edge(
             source,
             target,
-            label=attrs.get('label', ''),
+            label=edge_label,
             color=color,
-            width=width,
-            dashes=dashes
+            width=2,
+            font={'size': 10, 'color': color}
         )
     
     # Generate HTML
     return net.generate_html()
 
 
-def get_synset_color(pos: str) -> str:
-    """Get color for synset based on POS."""
-    pos_colors = {
-        'n': '#FFB6C1',  # Pink for nouns
-        'v': '#98D8C8',  # Mint for verbs
-        'a': '#F7DC6F',  # Yellow for adjectives
-        's': '#F7DC6F',  # Yellow for satellite adjectives
-        'r': '#BB8FCE'   # Purple for adverbs
-    }
-    return pos_colors.get(pos, '#D5D8DC')
-
-
 def render_sentence_graph_visualization(analysis, settings: Dict):
     """
-    Render the sentence dependency graph with WordNet connections.
+    Render the sentence syntactic graph.
     
     Args:
         analysis: SentenceAnalysis object
         settings: Visualization settings
     """
-    # Create the graph
-    G = create_sentence_graph(analysis, settings)
+    # Create the graph - use syntactic tree if available
+    if analysis.syntactic_tree:
+        G = create_syntactic_graph(analysis, settings)
+    else:
+        G = create_sentence_graph(analysis, settings)
     
     if G.number_of_nodes() == 0:
         st.warning("No tokens found in the sentence.")
         return
     
     # Generate visualization
-    html_content = visualize_sentence_graph(G, analysis, settings)
+    html_content = visualize_syntactic_graph(G, analysis, settings)
     
     # Display the graph
-    st.markdown("### 🌳 Dependency Tree with WordNet Synsets")
+    st.markdown("### 🌳 Syntactic Tree with WordNet Senses")
     
     # Info about the visualization
-    token_count = len([n for n in G.nodes() if not G.nodes[n].get('is_synset', False)])
-    synset_count = len([n for n in G.nodes() if G.nodes[n].get('is_synset', False)])
+    node_types = {}
+    for _, attrs in G.nodes(data=True):
+        node_type = attrs.get('node_type', 'unknown')
+        node_types[node_type] = node_types.get(node_type, 0) + 1
     
-    st.info(f"📊 Showing {token_count} tokens and {synset_count} synsets")
+    info_parts = []
+    if 'sentence' in node_types:
+        info_parts.append(f"{node_types['sentence']} sentence")
+    if 'clause' in node_types:
+        info_parts.append(f"{node_types['clause']} clause(s)")
+    if 'word' in node_types:
+        info_parts.append(f"{node_types['word']} words")
+    
+    st.info(f"📊 Showing {' • '.join(info_parts)}")
     
     # Render the interactive graph
     components.html(html_content, height=600, scrolling=True)
     
-    # Display token details
-    st.markdown("---")
-    st.markdown("### 📝 Token Analysis")
-    
-    # Create columns for token cards
-    cols = st.columns(3)
-    
-    for i, token in enumerate(analysis.tokens):
-        col_idx = i % 3
-        with cols[col_idx]:
-            # Token card
-            st.markdown(f"""
-            <div style="border: 1px solid #444; border-radius: 8px; padding: 10px; margin-bottom: 10px;">
-                <h4 style="margin-top: 0;">{token.text}</h4>
-                <p><strong>Lemma:</strong> {token.lemma}</p>
-                <p><strong>POS:</strong> {token.pos} ({token.tag})</p>
-                <p><strong>Dependency:</strong> {token.dep}</p>
-                <p><strong>Synsets:</strong> {len(token.synsets) if token.synsets else 0}</p>
-            </div>
-            """, unsafe_allow_html=True)
-            
-            # Show synset details if available
-            if token.synsets and settings.get('show_synset_details', True):
-                with st.expander(f"View synsets for '{token.text}'"):
-                    for synset_name in token.synsets[:3]:
-                        try:
-                            from nltk.corpus import wordnet as wn
-                            synset = wn.synset(synset_name)
-                            st.markdown(f"**{synset_name}**")
-                            st.markdown(f"*{synset.definition()}*")
-                            if synset.examples():
-                                st.markdown(f"Example: {synset.examples()[0]}")
-                            st.markdown("---")
-                        except:
-                            st.markdown(f"**{synset_name}** - *Definition not available*")
+    # Display token details if we have them
+    if hasattr(analysis, 'tokens') and analysis.tokens:
+        st.markdown("---")
+        st.markdown("### 📝 Word Analysis")
+        
+        # Create columns for token cards
+        cols = st.columns(3)
+        
+        for i, token in enumerate(analysis.tokens):
+            col_idx = i % 3
+            with cols[col_idx]:
+                # Token card with synset info
+                synset_info = ""
+                if token.best_synset:
+                    synset_name, definition = token.best_synset
+                    synset_info = f"""
+                    <div style="margin-top: 8px; padding: 8px; background-color: rgba(255,255,255,0.1); border-radius: 4px;">
+                        <p style="margin: 0;"><strong>Synset:</strong> {synset_name}</p>
+                        <p style="margin: 0; font-size: 0.9em; font-style: italic;">{definition[:100]}{'...' if len(definition) > 100 else ''}</p>
+                    </div>
+                    """
+                
+                st.markdown(f"""
+                <div style="border: 1px solid #444; border-radius: 8px; padding: 10px; margin-bottom: 10px;">
+                    <h4 style="margin-top: 0;">{token.text}</h4>
+                    <p><strong>Lemma:</strong> {token.lemma}</p>
+                    <p><strong>POS:</strong> {token.pos} ({token.tag})</p>
+                    <p><strong>Dependency:</strong> {token.dep}</p>
+                    <p><strong>Synsets:</strong> {len(token.synsets) if token.synsets else 0}</p>
+                    {synset_info}
+                </div>
+                """, unsafe_allow_html=True)
 
 
 def render_sentence_legend():
@@ -318,30 +382,35 @@ def render_sentence_legend():
         <div style="margin-bottom: 15px;">
             <strong>Node Types:</strong>
             <ul style="list-style: none; padding-left: 0;">
-                <li>⭐ <strong>Star</strong> - Root word of the sentence</li>
-                <li>⭕ <strong>Ellipse</strong> - Other words in the sentence</li>
-                <li>📦 <strong>Box</strong> - WordNet synsets (word senses)</li>
+                <li>📦 <strong>Box (Gold)</strong> - Complete sentence</li>
+                <li>⭕ <strong>Ellipse (Blue)</strong> - Clauses</li>
+                <li>💎 <strong>Diamond</strong> - Words with synsets</li>
+                <li>⚫ <strong>Dot</strong> - Other words</li>
             </ul>
         </div>
         
         <div style="margin-bottom: 15px;">
-            <strong>Part of Speech Colors:</strong>
+            <strong>Edge Labels & Colors:</strong>
             <ul style="list-style: none; padding-left: 0;">
-                <li><span style="color: #FFB6C1;">●</span> Nouns (person, place, thing)</li>
-                <li><span style="color: #98D8C8;">●</span> Verbs (actions, states)</li>
-                <li><span style="color: #F7DC6F;">●</span> Adjectives (descriptive words)</li>
-                <li><span style="color: #BB8FCE;">●</span> Adverbs (modifiers)</li>
-                <li><span style="color: #85C1E2;">●</span> Determiners/Pronouns</li>
-                <li><span style="color: #F8C471;">●</span> Prepositions</li>
-                <li><span style="color: #ABEBC6;">●</span> Conjunctions</li>
+                <li><span style="color: #FF6B6B;">●</span> <strong>sconj</strong> - Subordinating conjunction</li>
+                <li><span style="color: #4ECDC4;">●</span> <strong>iclause</strong> - Independent clause</li>
+                <li><span style="color: #95E1D3;">●</span> <strong>dclause</strong> - Dependent clause</li>
+                <li><span style="color: #FFD93D;">●</span> <strong>tverb</strong> - Main (tensed) verb</li>
+                <li><span style="color: #FF8B94;">●</span> <strong>subj</strong> - Subject</li>
+                <li><span style="color: #6BCB77;">●</span> <strong>obj</strong> - Object</li>
+                <li><span style="color: #BB8FCE;">●</span> <strong>adv</strong> - Adverb/Adverbial</li>
+                <li><span style="color: #F7DC6F;">●</span> <strong>adj</strong> - Adjective</li>
+                <li><span style="color: #F8C471;">●</span> <strong>prep</strong> - Preposition</li>
             </ul>
         </div>
         
-        <div>
-            <strong>Edge Types:</strong>
+        <div style="margin-bottom: 15px;">
+            <strong>Part of Speech Colors (Words):</strong>
             <ul style="list-style: none; padding-left: 0;">
-                <li>➡️ <strong>Solid arrows</strong> - Dependency relations between words</li>
-                <li>- - <strong>Dashed lines</strong> - Links to WordNet synsets</li>
+                <li><span style="color: #FFB6C1;">●</span> Nouns</li>
+                <li><span style="color: #98D8C8;">●</span> Verbs</li>
+                <li><span style="color: #F7DC6F;">●</span> Adjectives</li>
+                <li><span style="color: #BB8FCE;">●</span> Adverbs</li>
             </ul>
         </div>
     </div>

@@ -490,17 +490,26 @@ def render_sentence_sidebar():
             st.markdown("""
             **Sentence Explorer** analyzes the grammatical structure of your sentence and connects it to WordNet:
             
-            1. **Dependency Parsing**: Shows how words relate to each other grammatically
+            1. **Syntactic Analysis**: Shows how words and clauses relate hierarchically
             2. **Part-of-Speech Tagging**: Identifies the grammatical role of each word
-            3. **WordNet Integration**: Links each word to its possible meanings (synsets)
+            3. **WordNet Integration**: Links each word to its best matching sense
             
             **The visualization shows:**
-            - Words as nodes (colored by part of speech)
-            - Grammatical dependencies as arrows
-            - WordNet synsets as connected boxes
+            - Complete sentence as the root node
+            - Clauses as intermediate nodes
+            - Words as leaf nodes with synset information
+            - Labeled edges showing grammatical relationships
+            
+            **Edge labels:**
+            - **sconj**: Subordinating conjunction
+            - **iclause/dclause**: Independent/dependent clause
+            - **tverb**: Main (tensed) verb
+            - **subj/obj**: Subject/object
+            - **adv/adj**: Adverb/adjective modifier
             
             **Interactive features:**
             - Hover over nodes for detailed information
+            - Words with synsets show definitions in tooltips
             - Drag nodes to rearrange the layout
             - Zoom and pan to explore the graph
             """)
@@ -609,9 +618,10 @@ def render_sentence_content(explorer, session_manager, settings):
                 <li><strong>Hover</strong> over nodes to see detailed information</li>
                 <li><strong>Drag</strong> nodes to rearrange the layout</li>
                 <li><strong>Zoom</strong> with mouse wheel to see details</li>
-                <li>The <strong>root word</strong> (star shape) is the main verb</li>
-                <li><strong>Arrows</strong> show grammatical dependencies</li>
-                <li><strong>Boxes</strong> represent possible word meanings from WordNet</li>
+                <li>The <strong>sentence root</strong> shows the complete text</li>
+                <li><strong>Clauses</strong> break down complex sentences</li>
+                <li><strong>Words</strong> show synset definitions on hover</li>
+                <li><strong>Edge labels</strong> describe grammatical relationships</li>
             </ul>
         </div>
         """, unsafe_allow_html=True)
