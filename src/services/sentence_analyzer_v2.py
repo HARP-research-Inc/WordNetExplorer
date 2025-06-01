@@ -120,6 +120,10 @@ class SentenceAnalyzerV2:
             logger.debug("Applying lemma decomposition")
             self._apply_lemma_decomposition(syntactic_tree)
         
+        # Generate and log list-based parse
+        list_parse = self.generate_list_parse(syntactic_tree)
+        logger.info(f"List-based parse: {list_parse}")
+        
         logger.info("Sentence analysis complete")
         return SentenceAnalysis(
             text=sentence,
@@ -372,6 +376,63 @@ class SentenceAnalyzerV2:
         
         # Apply lemma decomposition
         processor.decompose_lemmas(syntactic_tree)
+    
+    def generate_list_parse(self, node: SyntacticNode) -> str:
+        """Generate a list-based parsing tree representation.
+        
+        Example: 'She should have been being watched carefully.' 
+        Output: [[She] [should have been being watched carefully] [.]]
+        """
+        # Handle leaf nodes (words)
+        if node.node_type == 'word':
+            return node.text
+        
+        # For phrases, return the whole text as a unit unless it's the root
+        if node.node_type == 'phrase' and node.edge_label is not None:
+            # Check if this is a simple verb phrase that should be kept together
+            if node.edge_label in ['verb', 'tverb']:
+                # Get the actual phrase text, handling nested structures
+                return f"[{node.text}]"
+            
+        # Handle other nodes by processing children
+        children_repr = []
+        
+        for child in node.children:
+            if child.edge_label == 'punct':
+                # Punctuation gets its own bracket
+                children_repr.append(f"[{child.text}]")
+            elif child.node_type == 'word' and child.edge_label in ['subj', 'obj', 'nsubj']:
+                # Subject/object words get their own bracket
+                children_repr.append(f"[{child.text}]")
+            elif child.node_type == 'phrase':
+                # For phrases, decide based on type
+                if child.edge_label in ['verb', 'tverb']:
+                    # Keep verb phrases together
+                    children_repr.append(f"[{child.text}]")
+                elif child.edge_label == 'vocative':
+                    # Keep vocatives together
+                    children_repr.append(f"[{child.text}]")
+                else:
+                    # Recursively process other phrases
+                    child_repr = self.generate_list_parse(child)
+                    if child_repr.startswith('['):
+                        children_repr.append(child_repr)
+                    else:
+                        children_repr.append(f"[{child_repr}]")
+            else:
+                # Default handling
+                child_repr = self.generate_list_parse(child)
+                if child_repr and not child_repr.startswith('['):
+                    children_repr.append(f"[{child_repr}]")
+                elif child_repr:
+                    children_repr.append(child_repr)
+        
+        # For the root node, just return the children
+        if node.edge_label is None:  # root
+            return " ".join(children_repr)
+        
+        # For other nodes, join children
+        return " ".join(children_repr)
 
 
 class ClauseIdentifier:
@@ -936,10 +997,18 @@ class ClauseBuilder:
                 # Check if this is a modifier of a verb (like adverbs)
                 if token.head < len(tokens) and token.head in clause_indices and tokens[token.head].pos == 'VERB':
                     verb_idx = token.head
-                    # Adverbs should be attached at clause level, not in verb phrase
+                    # Adverbs: decide placement based on position relative to verb
                     if token.pos == 'ADV':
-                        # Attach adverb to parent (clause) directly
-                        self._assign_child(parent_node, token_nodes[idx], 'adv_mod')
+                        # If adverb comes after the verb, include it in the verb phrase
+                        # If it comes before, attach at clause level
+                        if idx > verb_idx:
+                            # Post-verbal adverb - include in verb phrase
+                            if verb_idx not in verb_arguments:
+                                verb_arguments[verb_idx] = []
+                            verb_arguments[verb_idx].append((token_nodes[idx], 'adv_mod', idx))
+                        else:
+                            # Pre-verbal adverb - attach to clause
+                            self._assign_child(parent_node, token_nodes[idx], 'adv_mod')
                     else:
                         # Other modifiers go with the verb
                         if verb_idx not in verb_arguments:
@@ -1019,9 +1088,12 @@ class ClauseBuilder:
                     self._assign_child(verb_phrase, phrasal_verb_phrase, 'verb')
                     
                     # Add other arguments
-                    for arg_node, edge_label, _ in arguments:
-                        if edge_label != 'subj':
-                            self._assign_child(verb_phrase, arg_node, edge_label)
+                    for arg_node, label, arg_idx in arguments:
+                        if label not in ['subj', 'aux']:
+                            # Skip post-verbal adverbs if we have auxiliaries (they're in the aux+verb phrase)
+                            if all_aux_nodes and label == 'adv_mod' and arg_idx > verb_idx:
+                                continue
+                            all_elements.append((arg_idx, arg_node, label))
                 else:
                     # No arguments, use the phrasal verb phrase as is
                     verb_phrase = phrasal_verb_phrase
@@ -1066,6 +1138,11 @@ class ClauseBuilder:
                     aux_verb_elements = []
                     aux_verb_elements.extend([(idx, node, 'aux') for idx, node in all_aux_nodes])
                     aux_verb_elements.append((verb_idx, token_nodes[verb_idx], 'verb_head'))
+                    
+                    # Add post-verbal adverbs that modify this verb
+                    for arg_node, label, arg_idx in arguments:
+                        if label == 'adv_mod' and arg_idx > verb_idx:
+                            aux_verb_elements.append((arg_idx, arg_node, 'adv_mod'))
                     
                     # Sort by index to preserve order
                     aux_verb_elements.sort(key=lambda x: x[0])
@@ -1116,6 +1193,9 @@ class ClauseBuilder:
                 # Add other arguments
                 for arg_node, label, arg_idx in arguments:
                     if label not in ['subj', 'aux']:
+                        # Skip post-verbal adverbs if we have auxiliaries (they're in the aux+verb phrase)
+                        if all_aux_nodes and label == 'adv_mod' and arg_idx > verb_idx:
+                            continue
                         all_elements.append((arg_idx, arg_node, label))
                 
                 # Process xcomp arguments specially
