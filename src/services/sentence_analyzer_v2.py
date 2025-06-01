@@ -789,12 +789,11 @@ class ClauseBuilder:
                             elif token.pos == 'ADP' and token.head == xcomp_idx:
                                 # Build prep phrase
                                 pp_indices = [idx]
-                                # Find all dependents of this preposition
-                                for i in all_xcomp_indices:
-                                    if tokens[i].head == idx or (tokens[i].head < len(all_xcomp_indices) and 
-                                                                 all_xcomp_indices[tokens[i].head] == idx):
-                                        if i not in pp_indices:
-                                            pp_indices.append(i)
+                                
+                                # Recursively find all dependents of this preposition
+                                pp_deps = find_dependents(idx)
+                                pp_indices.extend(pp_deps)
+                                pp_indices = list(set(pp_indices))  # Remove duplicates
                                 
                                 pp_indices.sort()
                                 pp_text = ' '.join([tokens[i].text for i in pp_indices])
