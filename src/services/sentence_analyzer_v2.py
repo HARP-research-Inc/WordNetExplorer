@@ -924,6 +924,11 @@ class ClauseBuilder:
                             verb_arguments[head_verb_idx] = []
                         # We'll process this as a special 'xcomp' argument
                         verb_arguments[head_verb_idx].append((idx, 'xcomp', idx))
+                elif token.dep == 'xcomp' and token.head < len(tokens) and token.head not in clause_indices:
+                    # This is an xcomp verb whose head is OUTSIDE this clause (e.g., in quoted speech)
+                    # Treat it as a main verb within this clause context
+                    logger.debug(f"  Processing xcomp verb '{token.text}' as main verb (head outside clause)")
+                    # Don't skip it - let it be processed normally as a verb
             else:
                 processed.add(idx)
                 edge_label = self._edge_mapper.get_edge_label(token)
@@ -960,7 +965,10 @@ class ClauseBuilder:
             
             # Skip xcomp verbs - they're handled as arguments of their head verb
             if tokens[verb_idx].dep == 'xcomp':
-                continue
+                # But only skip if the head verb is within this clause
+                if tokens[verb_idx].head < len(tokens) and tokens[verb_idx].head in clause_indices:
+                    continue
+                # Otherwise, treat it as a main verb in this clause context
                 
             # Get or create verb phrase node
             if verb_idx in verb_phrase_nodes and verb_phrase_nodes[verb_idx] is not None:
