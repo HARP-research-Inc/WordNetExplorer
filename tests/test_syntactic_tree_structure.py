@@ -239,6 +239,40 @@ class TestSyntacticTreeStructure(unittest.TestCase):
         # Should have verb phrase
         verb_phrases = self.find_verb_phrases(analysis.syntactic_tree)
         self.assertGreater(len(verb_phrases), 0, "Should have verb phrase")
+    
+    def test_adverb_placement_above_verb_phrase(self):
+        """Test that adverbs modifying verbs are placed at clause level, not in verb phrase."""
+        analysis = self.analyzer.analyze_sentence("I gleefully gave my friend a gift.")
+        
+        # Find the verb phrase
+        verb_phrases = self.find_verb_phrases(analysis.syntactic_tree)
+        vp_with_subject = None
+        for vp in verb_phrases:
+            child_labels = self.get_child_edge_labels(vp)
+            if 'subj' in child_labels:
+                vp_with_subject = vp
+                break
+        
+        self.assertIsNotNone(vp_with_subject, "Should find verb phrase with subject")
+        
+        # The verb phrase text should NOT include "gleefully"
+        self.assertNotIn('gleefully', vp_with_subject.text.lower(), 
+                        "Verb phrase should not contain the adverb")
+        
+        # Find the parent of the verb phrase (should be clause or sentence)
+        parent = vp_with_subject.parent
+        self.assertIsNotNone(parent, "Verb phrase should have a parent")
+        
+        # The parent should have the adverb as a separate child
+        adverb_found = False
+        for child in parent.children:
+            if child.node_type == 'word' and child.text.lower() == 'gleefully':
+                adverb_found = True
+                self.assertEqual(child.edge_label, 'adv_mod', 
+                               "Adverb should have 'adv_mod' edge label")
+                break
+        
+        self.assertTrue(adverb_found, "Adverb should be a sibling of verb phrase at clause level")
 
 
 if __name__ == '__main__':

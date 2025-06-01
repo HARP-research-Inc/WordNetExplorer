@@ -409,9 +409,15 @@ class ClauseBuilder:
                 # Check if this is a modifier of a verb (like adverbs)
                 if token.head < len(tokens) and token.head in clause_indices and tokens[token.head].pos == 'VERB':
                     verb_idx = token.head
-                    if verb_idx not in verb_arguments:
-                        verb_arguments[verb_idx] = []
-                    verb_arguments[verb_idx].append((token_nodes[idx], edge_label, idx))  # Add index for ordering
+                    # Adverbs should be attached at clause level, not in verb phrase
+                    if token.pos == 'ADV':
+                        # Attach adverb to parent (clause) directly
+                        self._assign_child(parent_node, token_nodes[idx], 'adv_mod')
+                    else:
+                        # Other modifiers go with the verb
+                        if verb_idx not in verb_arguments:
+                            verb_arguments[verb_idx] = []
+                        verb_arguments[verb_idx].append((token_nodes[idx], edge_label, idx))  # Add index for ordering
                 # Also check for auxiliary verbs (AUX modifying VERB)
                 elif (token.pos == 'AUX' and 
                       token.head < len(tokens) and 
