@@ -64,7 +64,13 @@ class LinguisticColors:
         'pobj': '#00CED1',       # Dark turquoise - object of preposition
         'num': '#FF69B4',        # Hot pink - numeral
         'poss': '#9370DB',       # Medium purple - possessive
-        'compound': '#20B2AA'    # Light sea green - compound
+        'compound': '#20B2AA',   # Light sea green - compound
+        'adv_mod': '#E6E6FA',    # Lavender - adverb modifier
+        'main_clause': '#87CEFA', # Light sky blue - main clause
+        'verb_head': '#FFB347',   # Light orange - verb head
+        'particle': '#DDA0DD',    # Plum - particle
+        'obj_group': '#98FB98',   # Pale green - object group
+        'part': '#F0E68C'        # Khaki - part of group
     }
     
     # Node colors for syntactic tree
