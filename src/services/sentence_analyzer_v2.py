@@ -378,61 +378,31 @@ class SentenceAnalyzerV2:
         processor.decompose_lemmas(syntactic_tree)
     
     def generate_list_parse(self, node: SyntacticNode) -> str:
-        """Generate a list-based parsing tree representation.
+        """Generate a fully nested list-based parsing tree representation.
         
         Example: 'She should have been being watched carefully.' 
-        Output: [[She] [should have been being watched carefully] [.]]
+        Output: [[[She] [[should] [have] [been] [being] [watched] [carefully]] [.]]]
+        
+        Each node in the tree gets its own bracket level.
         """
         # Handle leaf nodes (words)
         if node.node_type == 'word':
-            return node.text
+            return f"[{node.text}]"
         
-        # For phrases, return the whole text as a unit unless it's the root
-        if node.node_type == 'phrase' and node.edge_label is not None:
-            # Check if this is a simple verb phrase that should be kept together
-            if node.edge_label in ['verb', 'tverb']:
-                # Get the actual phrase text, handling nested structures
-                return f"[{node.text}]"
-            
-        # Handle other nodes by processing children
+        # Handle nodes with children
         children_repr = []
-        
         for child in node.children:
-            if child.edge_label == 'punct':
-                # Punctuation gets its own bracket
-                children_repr.append(f"[{child.text}]")
-            elif child.node_type == 'word' and child.edge_label in ['subj', 'obj', 'nsubj']:
-                # Subject/object words get their own bracket
-                children_repr.append(f"[{child.text}]")
-            elif child.node_type == 'phrase':
-                # For phrases, decide based on type
-                if child.edge_label in ['verb', 'tverb']:
-                    # Keep verb phrases together
-                    children_repr.append(f"[{child.text}]")
-                elif child.edge_label == 'vocative':
-                    # Keep vocatives together
-                    children_repr.append(f"[{child.text}]")
-                else:
-                    # Recursively process other phrases
-                    child_repr = self.generate_list_parse(child)
-                    if child_repr.startswith('['):
-                        children_repr.append(child_repr)
-                    else:
-                        children_repr.append(f"[{child_repr}]")
-            else:
-                # Default handling
-                child_repr = self.generate_list_parse(child)
-                if child_repr and not child_repr.startswith('['):
-                    children_repr.append(f"[{child_repr}]")
-                elif child_repr:
-                    children_repr.append(child_repr)
+            children_repr.append(self.generate_list_parse(child))
         
-        # For the root node, just return the children
+        # Join children
+        content = " ".join(children_repr)
+        
+        # For root node (sentence), return just the bracketed content
         if node.edge_label is None:  # root
-            return " ".join(children_repr)
+            return f"[{content}]"
         
-        # For other nodes, join children
-        return " ".join(children_repr)
+        # For all other nodes, wrap in brackets
+        return f"[{content}]"
 
 
 class ClauseIdentifier:
