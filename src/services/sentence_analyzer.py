@@ -121,18 +121,10 @@ class SentenceAnalyzer:
         tokens = []
         root_index = 0
         
+        # First pass - create basic token info
         for i, token in enumerate(doc):
             # Get WordNet synsets for the token
             synsets = self._get_synsets_for_token(token)
-            
-            # Get best synset (for now, just the first one)
-            best_synset = None
-            if synsets:
-                try:
-                    synset = wn.synset(synsets[0])
-                    best_synset = (synsets[0], synset.definition())
-                except:
-                    pass
             
             # Get children indices
             children = [child.i for child in token.children]
@@ -147,7 +139,7 @@ class SentenceAnalyzer:
                 head=token.head.i if token.head != token else i,
                 children=children,
                 synsets=synsets,
-                best_synset=best_synset
+                best_synset=None  # Will be filled in second pass
             )
             
             tokens.append(token_info)
@@ -155,6 +147,12 @@ class SentenceAnalyzer:
             # Track root token
             if token.dep_ == "ROOT":
                 root_index = i
+        
+        # Second pass - get best synsets with context
+        for i, (token, token_info) in enumerate(zip(doc, tokens)):
+            if token_info.synsets:
+                best_synset = self._get_best_synset_for_token(token, doc)
+                token_info.best_synset = best_synset
         
         # Build syntactic tree
         syntactic_tree = self._build_syntactic_tree(doc, tokens)
@@ -383,18 +381,112 @@ class SentenceAnalyzer:
     
     def _get_synsets_for_token(self, token) -> List[str]:
         """Get WordNet synsets for a spaCy token."""
+        # Skip synsets for certain POS tags that WordNet doesn't handle
+        skip_pos = {'PRON', 'DET', 'CCONJ', 'SCONJ', 'PART', 'PUNCT', 'SYM', 'X'}
+        if token.pos_ in skip_pos:
+            return []
+        
         # Map spaCy POS to WordNet POS
         wn_pos = self._pos_map.get(token.pos_)
         
+        # Special handling for ADP (adpositions) that might be adverbs in WordNet
+        if token.pos_ == 'ADP' and token.lemma_.lower() in ['over', 'up', 'down', 'out', 'off', 'on', 'in', 'away', 'around', 'through']:
+            # Try to get adverb synsets first
+            adv_synsets = wn.synsets(token.lemma_, pos='r')
+            if adv_synsets:
+                return [s.name() for s in adv_synsets[:5]]
+        
+        # Try to get synsets - WordNet handles nouns, verbs, adjectives, and adverbs
         if wn_pos:
             # Get synsets with specific POS
             synsets = wn.synsets(token.lemma_, pos=wn_pos)
         else:
-            # Get all synsets
+            # For other POS (like ADP/prepositions), still try to find synsets
+            # Some words like "over" can be adverbs in WordNet even if tagged as ADP
             synsets = wn.synsets(token.lemma_)
+            
+            # If we found synsets, filter to only those that match WordNet POS categories
+            if synsets:
+                valid_synsets = []
+                for s in synsets:
+                    if s.pos() in ['n', 'v', 'a', 's', 'r']:  # WordNet POS categories
+                        valid_synsets.append(s)
+                synsets = valid_synsets
+        
+        # Special handling: skip certain words only if they have no synsets
+        # and are being used as function words
+        if not synsets and token.dep_ in ['aux', 'auxpass', 'det', 'case', 'mark']:
+            return []
+        
+        # For potential phrasal verb particles, don't exclude them entirely
+        # Let the disambiguation logic handle them
         
         # Return synset names
         return [s.name() for s in synsets[:5]]  # Limit to top 5
+    
+    def _get_best_synset_for_token(self, token, context_tokens) -> Optional[Tuple[str, str]]:
+        """Get the best synset for a token considering context."""
+        synsets = self._get_synsets_for_token(token)
+        if not synsets:
+            return None
+        
+        # For now, use simple heuristics
+        # In the future, this could use the sense similarity calculator
+        
+        # Special handling for words that can be phrasal verb particles
+        if token.lemma_.lower() in ['over', 'up', 'down', 'out', 'off', 'on', 'in', 'away']:
+            # Check the dependency relation
+            if token.dep_ in ['prt', 'compound:prt']:
+                # It's a phrasal verb particle - prefer aspectual/completive meanings
+                for synset_name in synsets:
+                    try:
+                        synset = wn.synset(synset_name)
+                        definition = synset.definition().lower()
+                        # For particles, prefer aspectual/completive meanings
+                        if any(word in definition for word in ['thoroughly', 'completely', 'finished']):
+                            return (synset_name, synset.definition())
+                    except:
+                        continue
+            else:
+                # It's a preposition/adverb - prefer spatial meanings
+                for synset_name in synsets:
+                    try:
+                        synset = wn.synset(synset_name)
+                        definition = synset.definition().lower()
+                        # Prefer spatial/directional meanings
+                        if any(word in definition for word in ['across', 'above', 'beyond', 
+                                                               'position', 'location', 'space']):
+                            return (synset_name, synset.definition())
+                    except:
+                        continue
+        
+        # For other words, prefer more common senses (they come first)
+        # but filter out highly technical/specific senses for common words
+        for synset_name in synsets:
+            try:
+                synset = wn.synset(synset_name)
+                definition = synset.definition().lower()
+                
+                # Skip overly technical definitions for common words
+                if token.lemma_.lower() in ['run', 'friend', 'time', 'bank']:
+                    technical_terms = ['cricket', 'chemistry', 'physics', 'mathematics', 
+                                     'biology', 'medicine', 'chemical', 'baseball']
+                    if any(term in definition for term in technical_terms):
+                        continue
+                
+                return (synset_name, synset.definition())
+            except:
+                continue
+        
+        # Fallback to first synset if no better option found
+        if synsets:
+            try:
+                synset = wn.synset(synsets[0])
+                return (synsets[0], synset.definition())
+            except:
+                pass
+        
+        return None
     
     def disambiguate_token(self, token_info: TokenInfo, context: str) -> Optional[str]:
         """

@@ -492,7 +492,13 @@ def render_sentence_sidebar():
             
             1. **Syntactic Analysis**: Shows how words and clauses relate hierarchically
             2. **Part-of-Speech Tagging**: Identifies the grammatical role of each word
-            3. **WordNet Integration**: Links each word to its best matching sense
+            3. **Smart WordNet Integration**: Links content words to their best matching senses
+            
+            **Improved disambiguation features:**
+            - Pronouns and function words are excluded from synset matching
+            - Common words avoid overly technical definitions (no "iodine" for "I"!)
+            - Phrasal verb particles (like "over" in "run over") are handled correctly
+            - Context-aware sense selection filters out inappropriate meanings
             
             **The visualization shows:**
             - Complete sentence as the root node
