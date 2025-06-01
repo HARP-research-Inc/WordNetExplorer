@@ -94,6 +94,13 @@ class SentenceAnalyzerV2:
         # Build syntactic tree
         syntactic_tree = self._build_syntactic_tree(doc, tokens)
         
+        # Validate tree structure and emit warnings
+        warnings = syntactic_tree.validate_tree_structure()
+        if warnings:
+            import warnings as py_warnings
+            for warning in warnings:
+                py_warnings.warn(f"Syntactic tree validation: {warning}", stacklevel=2)
+        
         # Apply lemma decomposition if requested
         if decompose_lemmas:
             self._apply_lemma_decomposition(syntactic_tree)

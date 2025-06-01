@@ -51,6 +51,102 @@ class SyntacticNode:
             child_to_remove.parent = None
             child_to_remove.edge_label = None
 
+    def to_dict(self) -> dict:
+        """Convert node to dictionary representation."""
+        return {
+            'node_id': self.node_id,
+            'node_type': self.node_type,
+            'text': self.text,
+            'edge_label': self.edge_label,
+            'children': [child.to_dict() for child in self.children],
+            'token_info': self.token_info.to_dict() if self.token_info else None
+        }
+    
+    def validate_tree_structure(self) -> List[str]:
+        """Validate the tree structure for consistency.
+        
+        Returns:
+            List of warning messages for any issues found.
+        """
+        warnings = []
+        
+        # Check 1: Child nodes should have fewer tokens than parent
+        warnings.extend(self._validate_token_counts())
+        
+        # Check 2: All words in root should appear in leaf nodes
+        if not self.parent:  # This is the root
+            warnings.extend(self._validate_all_words_in_leaves())
+        
+        return warnings
+    
+    def _validate_token_counts(self) -> List[str]:
+        """Validate that child nodes have fewer tokens than parent."""
+        warnings = []
+        
+        if self.children:
+            # Count tokens excluding pure punctuation
+            parent_tokens = [w for w in self.text.split() if w.strip('.,!?;:"\'()[]{}')]
+            parent_token_count = len(parent_tokens)
+            
+            for child in self.children:
+                # Count child tokens excluding pure punctuation
+                child_tokens = [w for w in child.text.split() if w.strip('.,!?;:"\'()[]{}')]
+                child_token_count = len(child_tokens)
+                
+                # Skip nodes that are just punctuation
+                if child.node_type == 'word' and child.token_info and child.token_info.pos == 'PUNCT':
+                    continue
+                
+                # Skip if child is empty after removing punctuation
+                if child_token_count == 0:
+                    continue
+                
+                if child_token_count >= parent_token_count and parent_token_count > 0:
+                    warnings.append(
+                        f"Child node '{child.text}' ({child_token_count} tokens) has as many or more tokens "
+                        f"than parent '{self.text}' ({parent_token_count} tokens)"
+                    )
+                
+                # Recursively check children
+                warnings.extend(child._validate_token_counts())
+        
+        return warnings
+    
+    def _validate_all_words_in_leaves(self) -> List[str]:
+        """Validate that all words in the root appear in leaf nodes."""
+        warnings = []
+        
+        # Get all words from root text (excluding punctuation)
+        root_words = set()
+        for word in self.text.split():
+            # Clean punctuation from word edges
+            cleaned = word.strip('.,!?;:"\'')
+            if cleaned:
+                root_words.add(cleaned.lower())
+        
+        # Collect all words from leaf nodes
+        leaf_words = set()
+        self._collect_leaf_words(leaf_words)
+        
+        # Check for missing words
+        missing_words = root_words - leaf_words
+        if missing_words:
+            warnings.append(
+                f"Words in root not found in leaf nodes: {', '.join(sorted(missing_words))}"
+            )
+        
+        return warnings
+    
+    def _collect_leaf_words(self, leaf_words: set):
+        """Recursively collect words from leaf nodes."""
+        if not self.children:  # This is a leaf
+            if self.node_type == 'word' and self.token_info:
+                # Add the word (lowercase for comparison)
+                leaf_words.add(self.text.lower())
+        else:
+            for child in self.children:
+                child._collect_leaf_words(leaf_words)
+
 
 class PhraseBuilder:
     """Builds phrase structures from tokens."""
