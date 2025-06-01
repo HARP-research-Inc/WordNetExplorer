@@ -58,12 +58,13 @@ class SentenceAnalyzerV2:
         self._node_counter += 1
         return f"node_{self._node_counter}"
     
-    def analyze_sentence(self, sentence: str) -> SentenceAnalysis:
+    def analyze_sentence(self, sentence: str, decompose_lemmas: bool = False) -> SentenceAnalysis:
         """
         Analyze a sentence and extract linguistic information.
         
         Args:
             sentence: The sentence to analyze
+            decompose_lemmas: Whether to decompose words into lemmas with grammatical info
             
         Returns:
             SentenceAnalysis object with parsed information
@@ -92,6 +93,10 @@ class SentenceAnalyzerV2:
         
         # Build syntactic tree
         syntactic_tree = self._build_syntactic_tree(doc, tokens)
+        
+        # Apply lemma decomposition if requested
+        if decompose_lemmas:
+            self._apply_lemma_decomposition(syntactic_tree)
         
         return SentenceAnalysis(
             text=sentence,
@@ -188,6 +193,16 @@ class SentenceAnalyzerV2:
     def get_dependency_color(self, dep: str) -> str:
         """Get color for a dependency relation."""
         return self.colors.get_dependency_color(dep)
+    
+    def _apply_lemma_decomposition(self, syntactic_tree: SyntacticNode):
+        """Apply lemma decomposition to the syntactic tree."""
+        from src.services.tree_postprocessor import TreePostProcessor
+        
+        # Create a TreePostProcessor with our node ID generator
+        processor = TreePostProcessor(self._get_node_id)
+        
+        # Apply lemma decomposition
+        processor.decompose_lemmas(syntactic_tree)
 
 
 class ClauseIdentifier:
@@ -397,7 +412,7 @@ class ClauseBuilder:
         target_parent = parent_node
         edge_label = 'prep_phrase'
 
-        if token.head < len(tokens) and token.head in token_nodes and token.head in clause_indices:
+        if token.head < len(tokens) and token.head in token_nodes:
             head_node = token_nodes[token.head]
             # Check if the head is part of a phrasal verb already attached to parent_node
             is_phrasal_verb_component = False
