@@ -129,8 +129,60 @@ class SentenceAnalyzerV2:
     
     def _identify_clauses(self, doc, tokens: List[TokenInfo]) -> List[List[int]]:
         """Identify clauses in the sentence."""
-        clause_identifier = ClauseIdentifier()
-        return clause_identifier.identify_clauses(doc, tokens)
+        clauses = []
+        clause_roots = set()
+        
+        # Find all verbs that could be clause roots
+        # xcomp (clausal complements) should NOT be separate clauses
+        # They're part of the matrix clause
+        for i, token in enumerate(doc):
+            if token.pos_ == 'VERB' and token.dep_ in ['ROOT', 'ccomp', 'advcl', 'conj']:
+                clause_roots.add(i)
+        
+        # If no clear clause structure, treat as single clause
+        if not clause_roots:
+            return [list(range(len(tokens)))]
+        
+        # Group tokens by their clause root
+        clause_groups = {root: [] for root in clause_roots}
+        
+        for i, token in enumerate(doc):
+            # Find which clause root this token belongs to
+            assigned = False
+            
+            # Check if it's a clause root itself
+            if i in clause_roots:
+                clause_groups[i].append(i)
+                assigned = True
+            else:
+                # Find the nearest clause root in the dependency tree
+                current = token
+                visited = set()
+                
+                while current.i not in visited:
+                    visited.add(current.i)
+                    
+                    if current.i in clause_roots:
+                        clause_groups[current.i].append(i)
+                        assigned = True
+                        break
+                    
+                    if current.head == current:  # Root
+                        break
+                    
+                    current = current.head
+                
+                # If not assigned, assign to the main root
+                if not assigned:
+                    for root in clause_roots:
+                        if tokens[root].dep == 'ROOT':
+                            clause_groups[root].append(i)
+                            break
+        
+        # Convert to list of clauses
+        clauses = [sorted(indices) for indices in clause_groups.values() if indices]
+        
+        return clauses if clauses else [list(range(len(tokens)))]
     
     def _build_complex_sentence_tree(self, root: SyntacticNode, clauses: List[List[int]], 
                                    tokens: List[TokenInfo], doc):
@@ -214,8 +266,10 @@ class ClauseIdentifier:
         clause_roots = set()
         
         # Find all verbs that could be clause roots
+        # xcomp (clausal complements) should NOT be separate clauses
+        # They're part of the matrix clause
         for i, token in enumerate(doc):
-            if token.pos_ == 'VERB' and token.dep_ in ['ROOT', 'ccomp', 'xcomp', 'advcl', 'conj']:
+            if token.pos_ == 'VERB' and token.dep_ in ['ROOT', 'ccomp', 'advcl', 'conj']:
                 clause_roots.add(i)
         
         # If no clear clause structure, treat as single clause
@@ -327,7 +381,7 @@ class ClauseBuilder:
         for idx in clause_indices[:3]:  # Check first few tokens
             token = tokens[idx]
             if (token.pos == 'ADV' and 
-                token.dep in ['advmod'] and
+                token.dep in ['advmod'] and 
                 token.lemma.lower() in sentence_adverbs and
                 # Check if followed by comma (common for sentence adverbs)
                 (idx + 1 < len(tokens) and tokens[idx + 1].text == ',')):
@@ -341,7 +395,7 @@ class ClauseBuilder:
         phrasal_verbs = self._phrasal_verb_handler.identify_phrasal_verbs(tokens)
         processed: Set[int] = set()
         main_verb_idx = self._find_main_verb(clause_indices, tokens)
-        
+
         # Track verb arguments for creating verb phrases
         verb_arguments = {}  # verb_idx -> list of (node, edge_label, index) tuples
         verb_phrase_nodes = {}  # verb_idx -> phrase node
@@ -364,6 +418,15 @@ class ClauseBuilder:
                 
                 # Check if this noun phrase is an argument of a verb
                 if token.dep in ['nsubj', 'nsubjpass', 'dobj', 'iobj', 'dative'] and main_verb_idx is not None:
+                    # Check if this actually belongs to an xcomp verb
+                    actual_head_idx = token.head
+                    if (actual_head_idx < len(tokens) and 
+                        tokens[actual_head_idx].pos == 'VERB' and 
+                        tokens[actual_head_idx].dep == 'xcomp'):
+                        # This belongs to an xcomp verb, don't attach it to the main verb
+                        # It will be handled when we build the infinitive clause
+                        continue
+                    
                     if main_verb_idx not in verb_arguments:
                         verb_arguments[main_verb_idx] = []
                     
@@ -385,6 +448,11 @@ class ClauseBuilder:
                     if (token.head < len(tokens) and 
                         token.head in clause_indices and 
                         tokens[token.head].pos == 'VERB'):
+                        # Check if the verb is an xcomp verb
+                        if tokens[token.head].dep == 'xcomp':
+                            # This will be handled when building the infinitive clause
+                            continue
+                        
                         # This prepositional phrase modifies a verb
                         verb_idx = token.head
                         if verb_idx not in verb_arguments:
@@ -393,7 +461,7 @@ class ClauseBuilder:
                     else:
                         # Not modifying a verb, attach normally
                         self._attach_prep_phrase(prep_phrase_node, token, phrasal_verbs,
-                                            token_nodes, parent_node, tokens)
+                                                token_nodes, parent_node, tokens)
                 else:
                     self._assign_child(parent_node, token_nodes[idx], self._edge_mapper.get_edge_label(token))
                     processed.add(idx)
@@ -402,6 +470,18 @@ class ClauseBuilder:
                 processed.add(idx)
                 if idx not in verb_phrase_nodes:
                     verb_phrase_nodes[idx] = None  # Will create phrase later
+                
+                # Check if this is an xcomp verb (infinitive complement)
+                if token.dep == 'xcomp' and token.head < len(tokens) and token.head in clause_indices:
+                    # This verb is a complement of another verb
+                    head_verb_idx = token.head
+                    if tokens[head_verb_idx].pos == 'VERB':
+                        # Don't create a separate verb phrase for this at the clause level
+                        # Instead, mark it to be included as part of the head verb's arguments
+                        if head_verb_idx not in verb_arguments:
+                            verb_arguments[head_verb_idx] = []
+                        # We'll process this as a special 'xcomp' argument
+                        verb_arguments[head_verb_idx].append((idx, 'xcomp', idx))
             else:
                 processed.add(idx)
                 edge_label = self._edge_mapper.get_edge_label(token)
@@ -434,6 +514,10 @@ class ClauseBuilder:
         # Second pass: create verb phrases with arguments as siblings
         for verb_idx in sorted(set(list(verb_phrase_nodes.keys()) + list(verb_arguments.keys()))):
             if verb_idx not in clause_indices:
+                continue
+            
+            # Skip xcomp verbs - they're handled as arguments of their head verb
+            if tokens[verb_idx].dep == 'xcomp':
                 continue
                 
             # Get or create verb phrase node
@@ -585,6 +669,80 @@ class ClauseBuilder:
                     if label not in ['subj', 'aux']:
                         all_elements.append((arg_idx, arg_node, label))
                 
+                # Process xcomp arguments specially
+                xcomp_indices = [arg_idx for arg_node, label, arg_idx in arguments if label == 'xcomp']
+                if xcomp_indices:
+                    for xcomp_idx in xcomp_indices:
+                        # Find all elements that belong to this infinitive clause
+                        inf_elements = []
+                        
+                        # Helper function to recursively find all dependents
+                        def find_dependents(head_idx, visited=None):
+                            if visited is None:
+                                visited = set()
+                            if head_idx in visited:
+                                return []
+                            visited.add(head_idx)
+                            
+                            deps = []
+                            for i in clause_indices:
+                                if i not in visited and tokens[i].head == head_idx:
+                                    deps.append(i)
+                                    # Recursively find dependents of this token
+                                    deps.extend(find_dependents(i, visited))
+                            return deps
+                        
+                        # Get all tokens that depend on the xcomp verb (recursively)
+                        xcomp_deps = find_dependents(xcomp_idx)
+                        all_xcomp_indices = [xcomp_idx] + xcomp_deps
+                        
+                        # Add the "to" particle if it exists
+                        for i in range(xcomp_idx - 1, max(0, xcomp_idx - 3), -1):
+                            if i in clause_indices and tokens[i].text.lower() == 'to' and tokens[i].head == xcomp_idx:
+                                if i not in all_xcomp_indices:
+                                    all_xcomp_indices.append(i)
+                                break
+                        
+                        # Sort by position
+                        all_xcomp_indices.sort()
+                        
+                        # Build the infinitive clause text directly from tokens
+                        inf_text = ' '.join([tokens[i].text for i in all_xcomp_indices])
+                        
+                        # Create infinitive clause node
+                        inf_clause = SyntacticNode(
+                            node_id=self._get_node_id(),
+                            node_type='phrase',
+                            text=inf_text
+                        )
+                        
+                        # Mark all these indices as processed
+                        processed.update(all_xcomp_indices)
+                        
+                        # Build internal structure - for now, just add the verb
+                        # The full structure will be built in a future improvement
+                        if xcomp_idx in token_nodes:
+                            self._assign_child(inf_clause, token_nodes[xcomp_idx], 'verb_head')
+                        
+                        # Add the "to" if we have it
+                        for i in all_xcomp_indices:
+                            if tokens[i].text.lower() == 'to' and tokens[i].head == xcomp_idx:
+                                if i in token_nodes:
+                                    self._assign_child(inf_clause, token_nodes[i], 'aux')
+                                break
+                        
+                        # Replace the xcomp index with the infinitive clause in arguments
+                        for i, (arg_node, label, arg_idx) in enumerate(arguments):
+                            if label == 'xcomp' and arg_idx == xcomp_idx:
+                                arguments[i] = (inf_clause, 'obj', xcomp_idx)
+                                break
+                        
+                        # Update all_elements
+                        for i, (idx, node, label) in enumerate(all_elements):
+                            if label == 'xcomp' and idx == xcomp_idx:
+                                all_elements[i] = (xcomp_idx, inf_clause, 'obj')
+                                break
+                
                 # Build phrase text in proper order
                 all_elements.sort(key=lambda x: x[0])
                 phrase_text = ' '.join([node.text for _, node, _ in all_elements])
@@ -635,7 +793,7 @@ class ClauseBuilder:
             # Attach verb phrase to parent
             edge_label = 'tverb' if verb_idx == main_verb_idx else 'verb'
             self._assign_child(parent_node, verb_phrase, edge_label)
-
+    
     def _find_main_verb(self, clause_indices: List[int], tokens: List[TokenInfo]) -> Optional[int]:
         """Find the main verb in a clause."""
         for idx in clause_indices:

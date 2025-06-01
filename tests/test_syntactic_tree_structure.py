@@ -348,6 +348,44 @@ class TestSyntacticTreeStructure(unittest.TestCase):
         
         self.assertTrue(phrasal_verb_found, 
                        "'ran over' should be recognized as a phrasal verb")
+    
+    def test_infinitive_clause_with_want(self):
+        """Test that infinitive clauses are properly recognized as complements, not prepositional phrases."""
+        analysis = self.analyzer.analyze_sentence("I want to burn this house to the ground.")
+        
+        # Find verb phrases
+        verb_phrases = self.find_verb_phrases(analysis.syntactic_tree)
+        
+        # Should have at least 2 verb phrases: one for "want" and one for "to burn"
+        self.assertGreaterEqual(len(verb_phrases), 2, 
+                               "Should have verb phrases for both 'want' and 'to burn'")
+        
+        # Find the "want" verb phrase
+        want_vp = None
+        for vp in verb_phrases:
+            if 'want' in vp.text:
+                want_vp = vp
+                break
+        
+        self.assertIsNotNone(want_vp, "Should find verb phrase containing 'want'")
+        
+        # The "want" phrase should NOT include "I want ." as a single phrase
+        # Instead, it should have subject and verb as separate elements
+        self.assertNotEqual(want_vp.text.strip(), "I want .", 
+                           "Verb phrase should not be just 'I want .'")
+        
+        # Should have an infinitive complement
+        has_infinitive_complement = False
+        for child in want_vp.children:
+            if (child.node_type == 'phrase' and 
+                'to burn' in child.text.lower()):
+                has_infinitive_complement = True
+                self.assertIn('obj', child.edge_label, 
+                             "Infinitive should be object/complement, not prepositional phrase")
+                break
+        
+        self.assertTrue(has_infinitive_complement, 
+                       "Should have infinitive clause as complement of 'want'")
 
 
 if __name__ == '__main__':
