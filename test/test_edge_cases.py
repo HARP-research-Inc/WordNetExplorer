@@ -6,7 +6,7 @@ contain unusual constructions.
 """
 
 import pytest
-from src.services.sentence_analyzer_v3 import SentenceAnalyzer
+from src.services.tree_adapter import SentenceAnalyzerAdapter as SentenceAnalyzer
 
 
 class TestEdgeCases:

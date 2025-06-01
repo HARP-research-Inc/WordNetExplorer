@@ -9,7 +9,7 @@ Focuses on ensuring the tree remains a proper tree structure without:
 """
 
 import pytest
-from src.services.sentence_analyzer_v3 import SentenceAnalyzer
+from src.services.tree_adapter import SentenceAnalyzerAdapter as SentenceAnalyzer
 from src.services.syntactic_tree import SyntacticNode
 
 
