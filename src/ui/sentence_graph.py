@@ -396,6 +396,10 @@ def render_sentence_legend():
                 <li><span style="color: #FFD93D;">●</span> <strong>tverb</strong> - Main (tensed) verb</li>
                 <li><span style="color: #FF8B94;">●</span> <strong>subj</strong> - Subject</li>
                 <li><span style="color: #6BCB77;">●</span> <strong>obj</strong> - Object</li>
+                <li><span style="color: #FF69B4;">●</span> <strong>num</strong> - Numeral modifier</li>
+                <li><span style="color: #9370DB;">●</span> <strong>poss</strong> - Possessive (my, her, their)</li>
+                <li><span style="color: #20B2AA;">●</span> <strong>compound</strong> - Compound modifier</li>
+                <li><span style="color: #87CEEB;">●</span> <strong>core</strong> - Core of a phrase</li>
             </ul>
         </div>
         
