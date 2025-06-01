@@ -234,6 +234,12 @@ def visualize_syntactic_graph(G, analysis, settings: Dict) -> str:
             shape = 'ellipse'
             size = 35
             font_size = 14
+        elif node_type == 'phrase':
+            # Phrase node (noun phrases, prep phrases, etc.)
+            color = '#DDA0DD'  # Plum
+            shape = 'box'
+            size = 30
+            font_size = 12
         elif node_type == 'word':
             # Word node
             if attrs.get('pos'):
@@ -277,6 +283,12 @@ def visualize_syntactic_graph(G, analysis, settings: Dict) -> str:
         'prep': '#F8C471',       # Orange - preposition
         'det': '#85C1E2',        # Light blue - determiner
         'aux': '#ABEBC6',        # Light green - auxiliary
+        'head': '#4169E1',       # Royal blue - head of phrase
+        'prep_phrase': '#FF7F50', # Coral - prepositional phrase
+        'pobj': '#00CED1',       # Dark turquoise - object of preposition
+        'num': '#FF69B4',        # Hot pink - numeral
+        'poss': '#9370DB',       # Medium purple - possessive
+        'compound': '#20B2AA'    # Light sea green - compound
     }
     
     for source, target, attrs in G.edges(data=True):
@@ -384,6 +396,7 @@ def render_sentence_legend():
             <ul style="list-style: none; padding-left: 0;">
                 <li>📦 <strong>Box (Gold)</strong> - Complete sentence</li>
                 <li>⭕ <strong>Ellipse (Blue)</strong> - Clauses</li>
+                <li>📦 <strong>Box (Plum)</strong> - Phrases (noun phrases, prep phrases)</li>
                 <li>💎 <strong>Diamond</strong> - Words with synsets</li>
                 <li>⚫ <strong>Dot</strong> - Other words</li>
             </ul>
@@ -392,15 +405,15 @@ def render_sentence_legend():
         <div style="margin-bottom: 15px;">
             <strong>Edge Labels & Colors:</strong>
             <ul style="list-style: none; padding-left: 0;">
-                <li><span style="color: #FF6B6B;">●</span> <strong>sconj</strong> - Subordinating conjunction</li>
-                <li><span style="color: #4ECDC4;">●</span> <strong>iclause</strong> - Independent clause</li>
-                <li><span style="color: #95E1D3;">●</span> <strong>dclause</strong> - Dependent clause</li>
+                <li><span style="color: #4169E1;">●</span> <strong>head</strong> - Head word of a phrase</li>
+                <li><span style="color: #F7DC6F;">●</span> <strong>adj</strong> - Adjective modifier</li>
+                <li><span style="color: #85C1E2;">●</span> <strong>det</strong> - Determiner (the, a, an)</li>
+                <li><span style="color: #FF7F50;">●</span> <strong>prep_phrase</strong> - Prepositional phrase</li>
+                <li><span style="color: #F8C471;">●</span> <strong>prep</strong> - Preposition</li>
+                <li><span style="color: #00CED1;">●</span> <strong>pobj</strong> - Object of preposition</li>
                 <li><span style="color: #FFD93D;">●</span> <strong>tverb</strong> - Main (tensed) verb</li>
                 <li><span style="color: #FF8B94;">●</span> <strong>subj</strong> - Subject</li>
                 <li><span style="color: #6BCB77;">●</span> <strong>obj</strong> - Object</li>
-                <li><span style="color: #BB8FCE;">●</span> <strong>adv</strong> - Adverb/Adverbial</li>
-                <li><span style="color: #F7DC6F;">●</span> <strong>adj</strong> - Adjective</li>
-                <li><span style="color: #F8C471;">●</span> <strong>prep</strong> - Preposition</li>
             </ul>
         </div>
         

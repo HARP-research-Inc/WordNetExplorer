@@ -298,56 +298,189 @@ class SentenceAnalyzer:
     def _build_clause_tree(self, clause_node: SyntacticNode, clause_indices: List[int], 
                           tokens: List[TokenInfo], clause_type: str):
         """Build the tree for a single clause."""
+        # Create a mapping of token indices to nodes for easier access
+        token_nodes = {}
+        
+        # First pass: Create all word nodes
+        for idx in clause_indices:
+            token = tokens[idx]
+            word_node = SyntacticNode(
+                node_id=self._get_node_id(),
+                node_type='word',
+                text=token.text,
+                token_info=token
+            )
+            token_nodes[idx] = word_node
+        
+        # Second pass: Build phrase structures
+        processed = set()
+        
         # Find the main verb
         main_verb_idx = None
         for idx in clause_indices:
-            if tokens[idx].pos == 'VERB':
+            if tokens[idx].pos == 'VERB' and tokens[idx].dep == 'ROOT':
                 main_verb_idx = idx
                 break
         
-        if main_verb_idx is not None:
-            # Create verb node
-            verb_node = SyntacticNode(
-                node_id=self._get_node_id(),
-                node_type='word',
-                text=tokens[main_verb_idx].text,
-                token_info=tokens[main_verb_idx]
-            )
-            clause_node.add_child(verb_node, 'tverb')  # tense verb
+        # If no ROOT verb, find any verb
+        if main_verb_idx is None:
+            for idx in clause_indices:
+                if tokens[idx].pos == 'VERB':
+                    main_verb_idx = idx
+                    break
+        
+        # Process each token to build phrases
+        for idx in clause_indices:
+            if idx in processed:
+                continue
             
-            # Add other constituents
-            for idx in clause_indices:
-                if idx == main_verb_idx:
+            token = tokens[idx]
+            
+            # Handle noun phrases (nouns with their modifiers)
+            if token.pos == 'NOUN' and idx not in processed:
+                noun_phrase_node, phrase_indices = self._build_noun_phrase(idx, tokens, token_nodes, clause_indices)
+                processed.update(phrase_indices)
+                
+                # Determine where to attach the noun phrase
+                if token.dep in ['nsubj', 'nsubjpass'] and main_verb_idx is not None:
+                    # Subject of the main verb
+                    token_nodes[main_verb_idx].add_child(noun_phrase_node, 'subj')
+                elif token.dep in ['dobj', 'iobj'] and main_verb_idx is not None:
+                    # Object of the main verb
+                    token_nodes[main_verb_idx].add_child(noun_phrase_node, 'obj')
+                elif token.dep == 'pobj':
+                    # Object of preposition - will be handled by prep phrase
                     continue
-                
-                token = tokens[idx]
-                word_node = SyntacticNode(
-                    node_id=self._get_node_id(),
-                    node_type='word',
-                    text=token.text,
-                    token_info=token
-                )
-                
-                # Determine edge label based on dependency
-                edge_label = self._get_edge_label(token)
-                
-                # Decide where to attach
-                if token.head == main_verb_idx:
-                    verb_node.add_child(word_node, edge_label)
                 else:
-                    clause_node.add_child(word_node, edge_label)
-        else:
-            # No verb found, add all words directly
-            for idx in clause_indices:
-                token = tokens[idx]
-                word_node = SyntacticNode(
-                    node_id=self._get_node_id(),
-                    node_type='word',
-                    text=token.text,
-                    token_info=token
-                )
+                    # Attach directly to clause
+                    edge_label = self._get_edge_label(token)
+                    clause_node.add_child(noun_phrase_node, edge_label)
+            
+            # Handle prepositional phrases
+            elif token.pos == 'ADP' and idx not in processed:
+                prep_phrase_node, phrase_indices = self._build_prep_phrase(idx, tokens, token_nodes, clause_indices)
+                processed.update(phrase_indices)
+                
+                # Attach prepositional phrase to its head
+                if token.head < len(tokens) and token.head in token_nodes:
+                    # Attach to the head word (usually a verb or noun)
+                    token_nodes[token.head].add_child(prep_phrase_node, 'prep_phrase')
+                else:
+                    clause_node.add_child(prep_phrase_node, 'prep_phrase')
+            
+            # Handle standalone verbs
+            elif token.pos == 'VERB' and idx not in processed:
+                processed.add(idx)
+                edge_label = 'tverb' if idx == main_verb_idx else 'verb'
+                clause_node.add_child(token_nodes[idx], edge_label)
+            
+            # Handle other standalone words
+            elif idx not in processed:
+                processed.add(idx)
                 edge_label = self._get_edge_label(token)
-                clause_node.add_child(word_node, edge_label)
+                
+                # Attach to appropriate parent
+                if token.head < len(tokens) and token.head in token_nodes and token.head != idx:
+                    token_nodes[token.head].add_child(token_nodes[idx], edge_label)
+                else:
+                    clause_node.add_child(token_nodes[idx], edge_label)
+    
+    def _build_noun_phrase(self, noun_idx: int, tokens: List[TokenInfo], 
+                          token_nodes: Dict[int, SyntacticNode], 
+                          clause_indices: List[int]) -> Tuple[SyntacticNode, Set[int]]:
+        """Build a noun phrase with the noun and its modifiers."""
+        noun_token = tokens[noun_idx]
+        indices_in_phrase = {noun_idx}
+        
+        # Collect modifiers of this noun
+        modifiers = []
+        
+        # Look for adjectives, determiners, etc. that modify this noun
+        for idx in clause_indices:
+            if idx == noun_idx:
+                continue
+            
+            token = tokens[idx]
+            # Check if this token modifies our noun
+            if token.head == noun_idx and token.dep in ['amod', 'det', 'nummod', 'poss', 'compound']:
+                modifiers.append((idx, token))
+                indices_in_phrase.add(idx)
+        
+        # If no modifiers, just return the noun node
+        if not modifiers:
+            return token_nodes[noun_idx], indices_in_phrase
+        
+        # Create noun phrase node
+        # Build phrase text
+        all_indices = sorted(indices_in_phrase)
+        phrase_text = ' '.join([tokens[i].text for i in all_indices])
+        
+        np_node = SyntacticNode(
+            node_id=self._get_node_id(),
+            node_type='phrase',
+            text=phrase_text
+        )
+        
+        # Add noun as head
+        np_node.add_child(token_nodes[noun_idx], 'head')
+        
+        # Add modifiers in order
+        for mod_idx, mod_token in sorted(modifiers):
+            edge_label = {
+                'amod': 'adj',
+                'det': 'det',
+                'nummod': 'num',
+                'poss': 'poss',
+                'compound': 'compound'
+            }.get(mod_token.dep, mod_token.dep)
+            
+            np_node.add_child(token_nodes[mod_idx], edge_label)
+        
+        return np_node, indices_in_phrase
+    
+    def _build_prep_phrase(self, prep_idx: int, tokens: List[TokenInfo], 
+                          token_nodes: Dict[int, SyntacticNode], 
+                          clause_indices: List[int]) -> Tuple[SyntacticNode, Set[int]]:
+        """Build a prepositional phrase."""
+        prep_token = tokens[prep_idx]
+        indices_in_phrase = {prep_idx}
+        
+        # Find the object of the preposition
+        pobj_idx = None
+        for idx in clause_indices:
+            token = tokens[idx]
+            if token.head == prep_idx and token.dep == 'pobj':
+                pobj_idx = idx
+                break
+        
+        # Create prepositional phrase node
+        if pobj_idx is not None:
+            # Include the whole noun phrase if the object is a noun
+            if tokens[pobj_idx].pos == 'NOUN':
+                obj_node, obj_indices = self._build_noun_phrase(pobj_idx, tokens, token_nodes, clause_indices)
+                indices_in_phrase.update(obj_indices)
+            else:
+                obj_node = token_nodes[pobj_idx]
+                indices_in_phrase.add(pobj_idx)
+            
+            # Build phrase text
+            all_indices = sorted(indices_in_phrase)
+            phrase_text = ' '.join([tokens[i].text for i in all_indices])
+            
+            pp_node = SyntacticNode(
+                node_id=self._get_node_id(),
+                node_type='phrase',
+                text=phrase_text
+            )
+            
+            # Add preposition and object
+            pp_node.add_child(token_nodes[prep_idx], 'prep')
+            pp_node.add_child(obj_node, 'pobj')
+            
+            return pp_node, indices_in_phrase
+        else:
+            # Just return the preposition if no object found
+            return token_nodes[prep_idx], indices_in_phrase
     
     def _get_edge_label(self, token: TokenInfo) -> str:
         """Get appropriate edge label for a token based on its role."""
