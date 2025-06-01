@@ -20,6 +20,10 @@ class SyntacticNode:
     
     def add_child(self, child: 'SyntacticNode', edge_label: str):
         """Add a child with an edge label."""
+        # If child already has a parent, remove it from the old parent first
+        if child.parent and child in child.parent.children:
+            child.parent.children.remove(child)
+        
         child.parent = self
         child.edge_label = edge_label
         self.children.append(child)

@@ -332,27 +332,33 @@ class TreePostProcessor:
         
         decomposer = LemmaDecomposer(self._get_node_id)
         
-        # Process current node if it's a word
-        if node.node_type == 'word' and node.token_info:
+        # First recursively process children (bottom-up approach)
+        # This ensures we decompose leaf nodes first
+        for child in node.children[:]:  # Copy list to avoid modification issues
+            self.decompose_lemmas(child)
+        
+        # Then process current node if it's a word
+        if node.node_type == 'word' and node.token_info and node.parent:
             # Check if this node should be decomposed
             if decomposer.should_decompose(node.token_info):
-                # Get parent and edge label before decomposition
+                # Get parent reference
                 parent = node.parent
                 edge_label = node.edge_label
                 
-                # Decompose the node
+                # Create new decomposed structure
                 decomposed = decomposer.decompose_word_node(node)
                 
-                # If decomposition happened, update parent's children
-                if decomposed != node and parent:
-                    # Find and replace in parent's children list
+                # Only update if decomposition actually created a new node
+                if decomposed != node:
+                    # Update parent-child relationship
+                    decomposed.parent = parent
+                    decomposed.edge_label = edge_label
+                    
+                    # Replace in parent's children list
                     for i, child in enumerate(parent.children):
-                        if child == node:
+                        if child is node:  # Use 'is' for identity check
                             parent.children[i] = decomposed
-                            decomposed.parent = parent
-                            decomposed.edge_label = edge_label
                             break
-        
-        # Recursively process children
-        for child in node.children[:]:  # Copy list to avoid modification issues
-            self.decompose_lemmas(child) 
+                    
+                    # Clear the original node's parent to avoid cycles
+                    node.parent = None 

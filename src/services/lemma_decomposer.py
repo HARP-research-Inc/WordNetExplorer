@@ -24,7 +24,17 @@ class LemmaDecomposer:
         if len(token.text) <= 1:
             return False
         
-        # Decompose verbs, nouns, adjectives, and adverbs
+        # Don't decompose particles, prepositions, determiners, etc.
+        # These don't have inflected forms that need decomposition
+        non_decomposable_pos = ['PART', 'ADP', 'DET', 'CCONJ', 'SCONJ', 'PRON', 'INTJ', 'PUNCT', 'SYM', 'X']
+        if token.pos in non_decomposable_pos:
+            return False
+        
+        # Don't decompose "to" when it's an infinitive marker
+        if token.text.lower() == 'to' and token.tag == 'TO':
+            return False
+        
+        # Only decompose verbs, nouns, adjectives, and adverbs
         return token.pos in ['VERB', 'NOUN', 'ADJ', 'ADV']
     
     def get_grammatical_label(self, token: TokenInfo) -> str:
