@@ -346,14 +346,29 @@ class ClauseBuilder:
             )
             token_nodes[idx] = word_node
         
+        # First identify vocatives (highest priority)
+        vocatives = self._identify_vocatives(clause_indices, tokens, token_nodes)
+        
+        # Then identify sentence adverbs
         sentence_adverbs = self._identify_sentence_adverbs(clause_indices, tokens)
         
-        if sentence_adverbs:
-            for adv_idx in sentence_adverbs:
-                self._assign_child(clause_node, token_nodes[adv_idx], 'adv_mod')
-            
-            remaining_indices = [idx for idx in clause_indices if idx not in sentence_adverbs]
-            if remaining_indices:
+        # Remove vocatives and adverbs from processing
+        processed_indices = set(vocatives.keys()).union(sentence_adverbs)
+        remaining_indices = [idx for idx in clause_indices if idx not in processed_indices]
+        
+        # Add vocatives first (only those with actual nodes)
+        for voc_idx, voc_node in vocatives.items():
+            if voc_node is not None:  # Only add actual vocative nodes
+                self._assign_child(clause_node, voc_node, 'vocative')
+        
+        # Then add sentence adverbs
+        for adv_idx in sentence_adverbs:
+            self._assign_child(clause_node, token_nodes[adv_idx], 'adv_mod')
+        
+        # Process the rest
+        if remaining_indices:
+            # If we removed vocatives or adverbs, create a subclause
+            if processed_indices:
                 subclause_text = ' '.join([tokens[idx].text for idx in remaining_indices])
                 subclause_node = SyntacticNode(
                     node_id=self._get_node_id(),
@@ -362,8 +377,182 @@ class ClauseBuilder:
                 )
                 self._assign_child(clause_node, subclause_node, 'main_clause')
                 self._build_clause_content(subclause_node, remaining_indices, tokens, token_nodes)
-        else:
-            self._build_clause_content(clause_node, clause_indices, tokens, token_nodes)
+            else:
+                self._build_clause_content(clause_node, remaining_indices, tokens, token_nodes)
+    
+    def _identify_vocatives(self, clause_indices: List[int], tokens: List[TokenInfo], 
+                           token_nodes: Dict[int, SyntacticNode]) -> Dict[int, SyntacticNode]:
+        """Identify vocative phrases in the clause.
+        
+        Returns:
+            Dict mapping token indices to vocative nodes. 
+            Indices mapped to None are part of a phrase and should be excluded.
+        """
+        vocatives = {}
+        
+        # Check if we're inside quoted speech - if so, don't extract vocatives
+        in_quotes = False
+        for idx in clause_indices:
+            if tokens[idx].text == '"':
+                in_quotes = not in_quotes
+        
+        if in_quotes:
+            # Don't extract vocatives from within quotes
+            return vocatives
+        
+        # First, check for comma-separated vocatives at the end of the clause
+        # Pattern: "..., you ungrateful jerk."
+        for i in range(len(clause_indices) - 1, -1, -1):
+            idx = clause_indices[i]
+            token = tokens[idx]
+            
+            # Look for a comma followed by a potential vocative
+            if token.text == ',' and i < len(clause_indices) - 1:
+                # Check if what follows could be a vocative
+                next_idx = clause_indices[i + 1]
+                next_token = tokens[next_idx]
+                
+                # Only consider it a vocative if:
+                # 1. It starts with a pronoun/name/noun
+                # 2. It's at the end of the sentence
+                # 3. It contains an address term or insult/endearment
+                if next_token.pos in ['PRON', 'PROPN', 'NOUN']:
+                    # Check if this looks like a vocative contextually
+                    # Look for patterns like "you [adjective] [noun]" or just names
+                    is_likely_vocative = False
+                    
+                    # Check if it's a name (proper noun)
+                    if next_token.pos == 'PROPN':
+                        is_likely_vocative = True
+                    
+                    # Check for "you" followed by noun/adjective
+                    elif next_token.text.lower() == 'you' and i + 2 < len(clause_indices):
+                        following_idx = clause_indices[i + 2]
+                        if tokens[following_idx].pos in ['NOUN', 'ADJ']:
+                            is_likely_vocative = True
+                    
+                    # Check if it's a single noun at the end (like "sir", "man", etc.)
+                    elif next_token.pos == 'NOUN':
+                        # Make sure it's not a regular object by checking dependencies
+                        if next_token.dep not in ['dobj', 'pobj']:
+                            is_likely_vocative = True
+                    
+                    if is_likely_vocative:
+                        # Collect all tokens after the comma until end or punctuation
+                        vocative_indices = []
+                        for j in range(i + 1, len(clause_indices)):
+                            voc_idx = clause_indices[j]
+                            if tokens[voc_idx].text in ['.', '!', '?']:
+                                # Include final punctuation with vocative
+                                vocative_indices.append(voc_idx)
+                                break
+                            vocative_indices.append(voc_idx)
+                        
+                        if vocative_indices:
+                            # Create vocative phrase including comma and final punctuation
+                            all_vocative_indices = [idx] + vocative_indices  # Include the comma
+                            vocative_text = ' '.join([tokens[vi].text for vi in all_vocative_indices])
+                            
+                            # Create vocative node
+                            voc_node = SyntacticNode(
+                                node_id=self._get_node_id(),
+                                node_type='clause',
+                                text=vocative_text
+                            )
+                            
+                            # Add all tokens as children
+                            for vi in all_vocative_indices:
+                                if vi in token_nodes:
+                                    edge = 'punct' if tokens[vi].text in [',', '.', '!', '?'] else 'word'
+                                    self._assign_child(voc_node, token_nodes[vi], edge)
+                            
+                            # Mark all indices as part of vocative
+                            for vi in all_vocative_indices:
+                                vocatives[vi] = voc_node if vi == idx else None
+                            
+                            # Found end vocative, no need to check other patterns
+                            return vocatives
+        
+        # If no end vocative found, check other patterns
+        for idx in clause_indices:
+            token = tokens[idx]
+            
+            # Pattern 1: nsubj with oprd/attr dependent ("you bastard")
+            if token.dep == 'nsubj' and idx not in vocatives:
+                # Check if this has an oprd/attr dependent
+                for i in clause_indices:
+                    if (tokens[i].head == idx and 
+                        tokens[i].dep in ['oprd', 'attr', 'acomp']):
+                        # This is likely a vocative like "you bastard"
+                        # Create vocative phrase
+                        voc_text = f"{token.text} {tokens[i].text}"
+                        voc_node = SyntacticNode(
+                            node_id=self._get_node_id(),
+                            node_type='phrase',
+                            text=voc_text
+                        )
+                        self._assign_child(voc_node, token_nodes[idx], 'det')
+                        self._assign_child(voc_node, token_nodes[i], 'head')
+                        
+                        # Mark both indices as processed
+                        vocatives[idx] = voc_node
+                        vocatives[i] = None  # Mark as processed but don't add separately
+                        break
+            
+            # Pattern 2: Appositive vocatives (e.g., "you fool,")
+            if token.dep == 'appos' and idx not in vocatives:
+                # Check if this is preceded by a pronoun and followed by comma
+                head_idx = token.head
+                if (head_idx < len(tokens) and 
+                    tokens[head_idx].pos == 'PRON' and
+                    head_idx in clause_indices):
+                    # Check for comma after
+                    has_comma_after = (idx < len(tokens) - 1 and 
+                                     idx + 1 in clause_indices and 
+                                     tokens[idx + 1].text == ',')
+                    
+                    if has_comma_after:
+                        # Create vocative phrase "you fool"
+                        voc_text = f"{tokens[head_idx].text} {token.text}"
+                        voc_node = SyntacticNode(
+                            node_id=self._get_node_id(),
+                            node_type='phrase',
+                            text=voc_text
+                        )
+                        self._assign_child(voc_node, token_nodes[head_idx], 'det')
+                        self._assign_child(voc_node, token_nodes[idx], 'head')
+                        
+                        # Mark both indices as processed
+                        vocatives[head_idx] = voc_node
+                        vocatives[idx] = None
+            
+            # Pattern 3: Vocative with comma at beginning (names, titles)
+            if (token.pos in ['PROPN', 'NOUN'] and 
+                token.dep in ['npadvmod', 'nmod', 'vocative', 'dep'] and
+                idx not in vocatives):
+                # Check for comma after (beginning vocative)
+                has_comma_after = (idx < len(tokens) - 1 and 
+                                 idx + 1 in clause_indices and 
+                                 tokens[idx + 1].text == ',')
+                
+                is_clause_start = idx == min(clause_indices)
+                
+                if is_clause_start and has_comma_after:
+                    # Likely a vocative at start
+                    # Include the comma in the vocative
+                    voc_text = f"{token.text} ,"
+                    voc_node = SyntacticNode(
+                        node_id=self._get_node_id(),
+                        node_type='clause',
+                        text=voc_text
+                    )
+                    self._assign_child(voc_node, token_nodes[idx], 'word')
+                    self._assign_child(voc_node, token_nodes[idx + 1], 'punct')
+                    
+                    vocatives[idx] = voc_node
+                    vocatives[idx + 1] = None  # Mark comma as processed
+        
+        return vocatives
 
     def _identify_sentence_adverbs(self, clause_indices: List[int], tokens: List[TokenInfo]) -> List[int]:
         """Identify sentence-level adverbs in the clause."""
