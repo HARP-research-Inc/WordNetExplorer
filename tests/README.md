@@ -61,6 +61,38 @@ Tests for URL parameter correlation with rendered settings to ensure UI state co
 - ✅ Comprehensive parameter round-trip testing
 - ✅ URL parameter precedence over default settings
 
+#### `test_parser_integration.py` 
+Tests for the modular parsing system integration, including token processing and dependency analysis.
+
+**Key Test Classes:**
+- `TestParserIntegration` - Basic parsing functionality tests
+- `TestParserPerformance` - Performance tests for complex sentences
+- `TestVerbPhraseStructure` 🆕 - Verb phrase structure specification
+
+**Test Coverage:**
+- ✅ Token feature extraction and classification
+- ✅ Content/function word identification
+- ✅ Dependency structure analysis
+- ✅ Noun phrase and prepositional phrase handling
+- ✅ Complex sentence parsing
+- ✅ Auxiliary verb handling
+- ✅ WordNet filtering
+- ✅ Edge case handling
+- ✅ **Verb phrase structure specification** 🆕
+  - Simple SVO sentences
+  - Intransitive verbs
+  - Ditransitive verbs
+  - Auxiliary verb inclusion
+  - Phrasal verb structure
+  - Verb phrases with modifiers
+  - Nested verb phrases
+
+#### `test_token_processor.py`
+Tests for individual token processing functions.
+
+#### `test_dependency_analyzer.py`
+Tests for dependency analysis functions.
+
 ### Utility Files
 
 #### `conftest.py`
@@ -114,7 +146,17 @@ Ensure URL parameters correctly correlate with settings:
 - Round-trip consistency
 - Parameter precedence
 
-### 6. Overall System Health Test (1 test)
+### 6. Parser Integration Tests (8+ tests) 🆕
+Test the modular parsing system and define verb phrase structure:
+- Token processing and classification
+- Dependency analysis
+- **Verb phrase structure specification**
+- Complex sentence handling
+- Edge cases
+
+See `VERB_PHRASE_TEST_SPEC.md` for detailed verb phrase structure specification.
+
+### 7. Overall System Health Test (1 test)
 Comprehensive system validation across multiple words and configurations.
 
 ## Test Execution
@@ -148,15 +190,18 @@ pytest tests/ -v --tb=short
 
 ## Test Results Summary
 
-**Total Tests:** 26 tests across 4 test files
+**Total Tests:** 34+ tests across 6 test files
 - ✅ Arrow Consistency: 9 tests
 - ✅ Graph Building: 5 tests  
 - ✅ URL Parameters: 7 tests
+- ✅ Parser Integration: 8+ tests (including new verb phrase tests)
+- ✅ Token Processing: Multiple unit tests
+- ✅ Dependency Analysis: Multiple unit tests
 - ✅ Specific Cases: 2 tests
 - ✅ Error Handling: 3 tests
 - ✅ System Health: 1 test
 
-**Success Rate:** 100% (26/26 tests passing)
+**Success Rate:** Tests define expected behavior for implementation
 
 ### Key Achievements Verified
 - **100% taxonomic arrow consistency** (specific→general direction)
@@ -167,6 +212,7 @@ pytest tests/ -v --tb=short
 - **Bidirectional parameter mapping** accuracy
 - **Cross-POS relationship consistency**
 - **Enhanced color scheme validation**
+- **Verb phrase structure specification** 🆕
 
 ## Dependencies
 

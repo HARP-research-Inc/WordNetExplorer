@@ -330,7 +330,12 @@ class ClauseBuilder:
         phrasal_verbs = self._phrasal_verb_handler.identify_phrasal_verbs(tokens)
         processed: Set[int] = set()
         main_verb_idx = self._find_main_verb(clause_indices, tokens)
+        
+        # Track verb arguments for creating verb phrases
+        verb_arguments = {}  # verb_idx -> list of (node, edge_label) tuples
+        verb_phrase_nodes = {}  # verb_idx -> phrase node
 
+        # First pass: identify all nodes
         for idx in clause_indices:
             if idx in processed:
                 continue
@@ -340,39 +345,107 @@ class ClauseBuilder:
                 verb_phrase_node, phrase_indices = self._phrasal_verb_handler.build_verb_phrase(
                     idx, phrasal_verbs[idx], tokens, token_nodes, self._get_node_id)
                 processed.update(phrase_indices)
-                edge_label = 'tverb' if idx == main_verb_idx else 'verb'
-                self._assign_child(parent_node, verb_phrase_node, edge_label)
+                verb_phrase_nodes[idx] = verb_phrase_node
             elif token.pos == 'NOUN':
                 noun_phrase_node, phrase_indices = self._phrase_builder.build_noun_phrase(
                     idx, tokens, token_nodes, clause_indices)
                 processed.update(phrase_indices)
-                self._attach_noun_phrase(noun_phrase_node, token, main_verb_idx, 
-                                       token_nodes, parent_node)
+                
+                # Check if this noun phrase is an argument of a verb
+                if token.dep in ['nsubj', 'nsubjpass', 'dobj', 'iobj', 'dative'] and main_verb_idx is not None:
+                    if main_verb_idx not in verb_arguments:
+                        verb_arguments[main_verb_idx] = []
+                    
+                    edge_label = 'subj' if token.dep in ['nsubj', 'nsubjpass'] else 'obj'
+                    if token.dep == 'dative':
+                        edge_label = 'dative'
+                    
+                    verb_arguments[main_verb_idx].append((noun_phrase_node, edge_label))
+                else:
+                    # Not a verb argument, attach normally
+                    edge_label = self._edge_mapper.get_edge_label(token)
+                    self._assign_child(parent_node, noun_phrase_node, edge_label)
             elif token.pos == 'ADP':
                 prep_phrase_node, phrase_indices = self._phrase_builder.build_prep_phrase(
                     idx, tokens, token_nodes, clause_indices)
                 processed.update(phrase_indices)
-                if prep_phrase_node: # build_prep_phrase can return None if no pobj
+                if prep_phrase_node:
                     self._attach_prep_phrase(prep_phrase_node, token, phrasal_verbs,
                                         token_nodes, parent_node, tokens)
-                else: # If it's just a preposition without an object, add it directly
+                else:
                     self._assign_child(parent_node, token_nodes[idx], self._edge_mapper.get_edge_label(token))
                     processed.add(idx)
-            elif token.pos == 'VERB':
+            elif token.pos == 'VERB' and idx not in phrasal_verbs:
+                # Track this verb for wrapping
                 processed.add(idx)
-                edge_label = 'tverb' if idx == main_verb_idx else 'verb'
-                self._assign_child(parent_node, token_nodes[idx], edge_label)
+                if idx not in verb_phrase_nodes:
+                    verb_phrase_nodes[idx] = None  # Will create phrase later
             else:
                 processed.add(idx)
                 edge_label = self._edge_mapper.get_edge_label(token)
-                target_parent = parent_node
-                if token.head < len(tokens) and token.head in token_nodes and token.head != idx and token.head in clause_indices:
-                    # Try to attach to head if head is within the current clause and not processed as part of a larger phrase
-                    head_node = token_nodes[token.head]
-                    if head_node.parent == parent_node: # Ensure head is already child of current parent_node or is parent_node itself
-                        target_parent = head_node
-                self._assign_child(target_parent, token_nodes[idx], edge_label)
-    
+                
+                # Check if this is a modifier of a verb (like adverbs)
+                if token.head < len(tokens) and token.head in clause_indices and tokens[token.head].pos == 'VERB':
+                    verb_idx = token.head
+                    if verb_idx not in verb_arguments:
+                        verb_arguments[verb_idx] = []
+                    verb_arguments[verb_idx].append((token_nodes[idx], edge_label))
+                else:
+                    # Attach to parent normally
+                    self._assign_child(parent_node, token_nodes[idx], edge_label)
+        
+        # Second pass: create verb phrases with arguments as siblings
+        for verb_idx in sorted(set(list(verb_phrase_nodes.keys()) + list(verb_arguments.keys()))):
+            if verb_idx not in clause_indices:
+                continue
+                
+            # Get or create verb phrase node
+            if verb_idx in verb_phrase_nodes and verb_phrase_nodes[verb_idx] is not None:
+                # Already have a phrasal verb phrase
+                verb_phrase = verb_phrase_nodes[verb_idx]
+            else:
+                # Create new verb phrase
+                verb_token = tokens[verb_idx]
+                arguments = verb_arguments.get(verb_idx, [])
+                
+                # Build text for verb phrase
+                phrase_parts = []
+                for arg_node, _ in arguments:
+                    if any(label == 'subj' for _, label in arguments if _ == arg_node):
+                        phrase_parts.insert(0, arg_node.text)  # Subject goes first
+                
+                phrase_parts.append(verb_token.text)
+                
+                for arg_node, label in arguments:
+                    if label != 'subj':
+                        phrase_parts.append(arg_node.text)
+                
+                verb_phrase = SyntacticNode(
+                    node_id=self._get_node_id(),
+                    node_type='phrase',
+                    text=' '.join(phrase_parts)
+                )
+                
+                # Add subject first (if any)
+                for arg_node, edge_label in arguments:
+                    if edge_label == 'subj':
+                        self._assign_child(verb_phrase, arg_node, edge_label)
+                        break
+                
+                # Add verb
+                verb_node = token_nodes[verb_idx]
+                edge_label = 'verb_head' if arguments else 'verb'
+                self._assign_child(verb_phrase, verb_node, edge_label)
+                
+                # Add other arguments
+                for arg_node, edge_label in arguments:
+                    if edge_label != 'subj':
+                        self._assign_child(verb_phrase, arg_node, edge_label)
+            
+            # Attach verb phrase to parent
+            edge_label = 'tverb' if verb_idx == main_verb_idx else 'verb'
+            self._assign_child(parent_node, verb_phrase, edge_label)
+
     def _find_main_verb(self, clause_indices: List[int], tokens: List[TokenInfo]) -> Optional[int]:
         """Find the main verb in a clause."""
         for idx in clause_indices:
@@ -387,23 +460,9 @@ class ClauseBuilder:
                            main_verb_idx: Optional[int], token_nodes: dict, 
                            parent_node: SyntacticNode):
         """Attach a noun phrase to the appropriate parent."""
-        target_parent = parent_node
+        # This method is now simplified since verb arguments are handled in _build_clause_content
         edge_label = self._edge_mapper.get_edge_label(token)
-
-        if main_verb_idx is not None and main_verb_idx in token_nodes:            
-            if token.dep in ['nsubj', 'nsubjpass']:
-                target_parent = token_nodes[main_verb_idx]
-                edge_label = 'subj'
-            elif token.dep in ['dobj', 'iobj']:
-                target_parent = token_nodes[main_verb_idx]
-                edge_label = 'obj'
-            elif token.dep == 'dative':
-                target_parent = token_nodes[main_verb_idx]
-                edge_label = 'dative'
-            elif token.dep == 'pobj': # Should be handled by prep phrase attachment logic
-                return 
-        
-        self._assign_child(target_parent, noun_phrase_node, edge_label)
+        self._assign_child(parent_node, noun_phrase_node, edge_label)
     
     def _attach_prep_phrase(self, prep_phrase_node: SyntacticNode, token: TokenInfo,
                            phrasal_verbs: Dict[int, List[int]], token_nodes: dict,

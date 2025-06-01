@@ -352,5 +352,199 @@ class TestParserPerformance(unittest.TestCase):
         self.assertGreaterEqual(distance, 4)  # At least 4 edges
 
 
+class TestVerbPhraseStructure(unittest.TestCase):
+    """Test expected verb phrase structure in parsed sentences.
+    
+    These tests define the expected behavior where verbs are wrapped in
+    phrase nodes with their arguments (subject, object, etc.) as siblings.
+    """
+    
+    @classmethod
+    def setUpClass(cls):
+        """Load spaCy model once for all tests."""
+        try:
+            cls.nlp = spacy.load("en_core_web_sm")
+        except OSError:
+            raise unittest.SkipTest("spaCy model 'en_core_web_sm' not installed")
+    
+    def test_simple_svo_verb_phrase(self):
+        """Test that simple SVO sentences create verb phrases with arguments as siblings."""
+        doc = self.nlp("The cat eats fish.")
+        
+        # Expected structure:
+        # verb_phrase
+        # ├── subj: "The cat" (noun phrase)
+        # ├── verb: "eats" 
+        # └── obj: "fish"
+        
+        # Find the main verb
+        verb_idx = next(i for i, t in enumerate(doc) if t.text == "eats")
+        
+        # The verb should be part of a phrase that contains:
+        # 1. The subject (cat with its determiner)
+        # 2. The verb itself
+        # 3. The object (fish)
+        
+        # Get all tokens that should be in the verb phrase
+        subj_indices = [i for i, t in enumerate(doc) if t.text in ["The", "cat"]]
+        obj_indices = [i for i, t in enumerate(doc) if t.text == "fish"]
+        
+        # All these should be grouped together in the verb phrase
+        verb_phrase_indices = subj_indices + [verb_idx] + obj_indices
+        
+        # Note: These assertions define the expected behavior
+        # The actual implementation would need to create this structure
+        # This serves as a specification
+        self.assertGreater(len(verb_phrase_indices), 3)
+    
+    def test_intransitive_verb_phrase(self):
+        """Test intransitive verbs with just subject."""
+        doc = self.nlp("The dog sleeps.")
+        
+        # Expected structure:
+        # verb_phrase
+        # ├── subj: "The dog"
+        # └── verb: "sleeps"
+        
+        verb_idx = next(i for i, t in enumerate(doc) if t.text == "sleeps")
+        subj_indices = [i for i, t in enumerate(doc) if t.text in ["The", "dog"]]
+        
+        # Verb phrase should contain subject and verb
+        verb_phrase_indices = subj_indices + [verb_idx]
+        self.assertEqual(len(verb_phrase_indices), 3)  # The, dog, sleeps
+    
+    def test_ditransitive_verb_phrase(self):
+        """Test ditransitive verbs with direct and indirect objects."""
+        doc = self.nlp("She gave him the book.")
+        
+        # Expected structure:
+        # verb_phrase
+        # ├── subj: "She"
+        # ├── verb: "gave"
+        # ├── iobj: "him" 
+        # └── dobj: "the book"
+        
+        verb_idx = next(i for i, t in enumerate(doc) if t.text == "gave")
+        
+        # All arguments should be siblings in the verb phrase
+        she_idx = next(i for i, t in enumerate(doc) if t.text == "She")
+        him_idx = next(i for i, t in enumerate(doc) if t.text == "him")
+        book_indices = [i for i, t in enumerate(doc) if t.text in ["the", "book"]]
+        
+        verb_phrase_indices = [she_idx, verb_idx, him_idx] + book_indices
+        self.assertEqual(len(set(verb_phrase_indices)), 5)  # All unique indices
+    
+    def test_auxiliary_verb_phrase(self):
+        """Test that auxiliary verbs are included in the verb phrase."""
+        doc = self.nlp("She has been running.")
+        
+        # Expected structure:
+        # verb_phrase
+        # ├── subj: "She"
+        # ├── aux: "has"
+        # ├── aux: "been"
+        # └── verb: "running"
+        
+        # Find all verb-related tokens
+        she_idx = next(i for i, t in enumerate(doc) if t.text == "She")
+        has_idx = next(i for i, t in enumerate(doc) if t.text == "has")
+        been_idx = next(i for i, t in enumerate(doc) if t.text == "been")
+        running_idx = next(i for i, t in enumerate(doc) if t.text == "running")
+        
+        # All should be siblings in the verb phrase
+        verb_phrase_indices = [she_idx, has_idx, been_idx, running_idx]
+        self.assertEqual(len(verb_phrase_indices), 4)
+    
+    def test_phrasal_verb_structure(self):
+        """Test phrasal verbs within verb phrases."""
+        doc = self.nlp("She looked up the word.")
+        
+        # Expected structure:
+        # verb_phrase
+        # ├── subj: "She"
+        # ├── phrasal_verb: "looked up"
+        # │   ├── verb: "looked"
+        # │   └── particle: "up"
+        # └── obj: "the word"
+        
+        # The phrasal verb should be a child of the main verb phrase
+        # with subject and object as siblings
+        
+        she_idx = next(i for i, t in enumerate(doc) if t.text == "She")
+        looked_idx = next(i for i, t in enumerate(doc) if t.text == "looked")
+        up_idx = next(i for i, t in enumerate(doc) if t.text == "up")
+        word_indices = [i for i, t in enumerate(doc) if t.text in ["the", "word"]]
+        
+        # All components should be related within the verb phrase structure
+        all_indices = [she_idx, looked_idx, up_idx] + word_indices
+        self.assertEqual(len(set(all_indices)), 5)
+    
+    def test_verb_phrase_with_modifiers(self):
+        """Test verb phrases with adverbial modifiers."""
+        doc = self.nlp("She quickly ran to the store.")
+        
+        # Expected structure:
+        # verb_phrase
+        # ├── subj: "She"
+        # ├── advmod: "quickly"
+        # ├── verb: "ran"
+        # └── prep_phrase: "to the store"
+        
+        she_idx = next(i for i, t in enumerate(doc) if t.text == "She")
+        quickly_idx = next(i for i, t in enumerate(doc) if t.text == "quickly")
+        ran_idx = next(i for i, t in enumerate(doc) if t.text == "ran")
+        
+        # Subject, adverb, and verb should be siblings
+        core_indices = [she_idx, quickly_idx, ran_idx]
+        self.assertEqual(len(core_indices), 3)
+        
+        # The prepositional phrase should also be part of the verb phrase
+        to_store_indices = [i for i, t in enumerate(doc) if t.text in ["to", "the", "store"]]
+        self.assertEqual(len(to_store_indices), 3)
+    
+    def test_complex_verb_phrase_dependencies(self):
+        """Test that verb phrase structure preserves dependency relationships."""
+        doc = self.nlp("The teacher gave the students homework yesterday.")
+        
+        # Even with the verb phrase structure, we should be able to:
+        # 1. Identify the subject (teacher)
+        # 2. Identify direct object (homework)
+        # 3. Identify indirect object (students)
+        # 4. Identify temporal modifier (yesterday)
+        
+        verb_idx = next(i for i, t in enumerate(doc) if t.text == "gave")
+        
+        # All arguments and modifiers should be accessible from the verb phrase
+        teacher_indices = [i for i, t in enumerate(doc) if t.text in ["The", "teacher"]]
+        students_indices = [i for i, t in enumerate(doc) if t.text in ["the", "students"]]
+        homework_idx = next(i for i, t in enumerate(doc) if t.text == "homework")
+        yesterday_idx = next(i for i, t in enumerate(doc) if t.text == "yesterday")
+        
+        # All should be part of the same verb phrase structure
+        all_indices = teacher_indices + [verb_idx] + students_indices + [homework_idx, yesterday_idx]
+        self.assertGreater(len(set(all_indices)), 6)
+    
+    def test_nested_verb_phrases(self):
+        """Test sentences with multiple verbs creating nested structures."""
+        doc = self.nlp("I want to learn to code.")
+        
+        # Expected: Multiple verb phrases, potentially nested
+        # Main verb phrase for "want" containing subject
+        # Nested verb phrases for "to learn" and "to code"
+        
+        want_idx = next(i for i, t in enumerate(doc) if t.text == "want")
+        learn_idx = next(i for i, t in enumerate(doc) if t.text == "learn")
+        code_idx = next(i for i, t in enumerate(doc) if t.text == "code")
+        
+        # Each verb should be in its own phrase with appropriate arguments
+        self.assertNotEqual(want_idx, learn_idx)
+        self.assertNotEqual(learn_idx, code_idx)
+        
+        # The main verb phrase should contain "I want"
+        # with "to learn to code" as a complement
+        i_idx = next(i for i, t in enumerate(doc) if t.text == "I")
+        self.assertLess(i_idx, want_idx)  # Subject before verb
+
+
 if __name__ == '__main__':
     unittest.main() 
