@@ -289,7 +289,7 @@ def render_sense_content(explorer, session_manager, settings):
         st.markdown(
             """
             <div style="text-align: center; padding: 50px;">
-                <h2>👋 Welcome to Sense Explorer</h2>
+                <h2>👋 Welcome to Sense Disambuation Tool!</h2>
                 <p style="font-size: 18px; color: #666;">
                     Enter a word in the sidebar to begin exploring its different senses.
                 </p>
@@ -420,13 +420,13 @@ def render_sense_content(explorer, session_manager, settings):
 # Tab Configuration - Add new tabs here!
 TAB_CONFIG = {
     'search': {
-        'label': '🔍 Search',
+        'label': '🔍 Network Explorer',
         'sidebar_function': render_search_sidebar,
         'content_function': render_search_content,
         'description': 'Explore word relationships and semantic networks'
     },
     'sense': {
-        'label': '🧠 Sense',
+        'label': '🧠 Sense Disambuation',
         'sidebar_function': render_sense_sidebar,
         'content_function': render_sense_content,
         'description': 'Advanced sense disambiguation and analysis'
