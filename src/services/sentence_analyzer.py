@@ -312,9 +312,6 @@ class SentenceAnalyzer:
             )
             token_nodes[idx] = word_node
         
-        # Second pass: Build phrase structures
-        processed = set()
-        
         # Find the main verb
         main_verb_idx = None
         for idx in clause_indices:
@@ -329,61 +326,189 @@ class SentenceAnalyzer:
                     main_verb_idx = idx
                     break
         
-        # Process each token to build phrases
+        if main_verb_idx is None:
+            # No verb found - just attach all nodes to clause
+            for idx in clause_indices:
+                clause_node.add_child(token_nodes[idx], self._get_edge_label(tokens[idx]))
+            return
+        
+        # Identify sentence-level adverbs first (like "gleefully")
+        sentence_adverbs = []
+        for idx in clause_indices:
+            token = tokens[idx]
+            if (token.pos == 'ADV' and 
+                token.head == main_verb_idx and 
+                token.dep in ['advmod'] and
+                idx < main_verb_idx):  # Adverbs before the verb are often sentence-level
+                sentence_adverbs.append(idx)
+        
+        # Build verb phrase structure
+        processed = set(sentence_adverbs)  # Mark sentence adverbs as processed
+        verb_phrase_node, vp_indices = self._build_verb_phrase(main_verb_idx, tokens, token_nodes, clause_indices, exclude_indices=processed)
+        processed.update(vp_indices)
+        
+        # Attach sentence-level adverbs to clause
+        for adv_idx in sentence_adverbs:
+            clause_node.add_child(token_nodes[adv_idx], 'adv')
+        
+        # Attach the verb phrase
+        clause_node.add_child(verb_phrase_node, 'predicate')
+        
+        # Process remaining unprocessed tokens
         for idx in clause_indices:
             if idx in processed:
                 continue
             
             token = tokens[idx]
             
-            # Handle noun phrases (nouns with their modifiers)
-            if token.pos == 'NOUN' and idx not in processed:
-                noun_phrase_node, phrase_indices = self._build_noun_phrase(idx, tokens, token_nodes, clause_indices)
-                processed.update(phrase_indices)
-                
-                # Determine where to attach the noun phrase
-                if token.dep in ['nsubj', 'nsubjpass'] and main_verb_idx is not None:
-                    # Subject of the main verb
-                    token_nodes[main_verb_idx].add_child(noun_phrase_node, 'subj')
-                elif token.dep in ['dobj', 'iobj'] and main_verb_idx is not None:
-                    # Object of the main verb
-                    token_nodes[main_verb_idx].add_child(noun_phrase_node, 'obj')
-                elif token.dep == 'pobj':
-                    # Object of preposition - will be handled by prep phrase
-                    continue
-                else:
-                    # Attach directly to clause
-                    edge_label = self._get_edge_label(token)
-                    clause_node.add_child(noun_phrase_node, edge_label)
-            
-            # Handle prepositional phrases
-            elif token.pos == 'ADP' and idx not in processed:
-                prep_phrase_node, phrase_indices = self._build_prep_phrase(idx, tokens, token_nodes, clause_indices)
-                processed.update(phrase_indices)
-                
-                # Attach prepositional phrase to its head
-                if token.head < len(tokens) and token.head in token_nodes:
-                    # Attach to the head word (usually a verb or noun)
-                    token_nodes[token.head].add_child(prep_phrase_node, 'prep_phrase')
-                else:
-                    clause_node.add_child(prep_phrase_node, 'prep_phrase')
-            
-            # Handle standalone verbs
-            elif token.pos == 'VERB' and idx not in processed:
+            # Subjects attach to clause level
+            if token.dep in ['nsubj', 'nsubjpass']:
+                clause_node.add_child(token_nodes[idx], 'subj')
                 processed.add(idx)
-                edge_label = 'tverb' if idx == main_verb_idx else 'verb'
-                clause_node.add_child(token_nodes[idx], edge_label)
-            
-            # Handle other standalone words
+            # Punctuation
+            elif token.pos == 'PUNCT':
+                clause_node.add_child(token_nodes[idx], 'punct')
+                processed.add(idx)
+            # Other tokens
             elif idx not in processed:
-                processed.add(idx)
                 edge_label = self._get_edge_label(token)
-                
-                # Attach to appropriate parent
-                if token.head < len(tokens) and token.head in token_nodes and token.head != idx:
-                    token_nodes[token.head].add_child(token_nodes[idx], edge_label)
+                clause_node.add_child(token_nodes[idx], edge_label)
+                processed.add(idx)
+    
+    def _build_verb_phrase(self, verb_idx: int, tokens: List[TokenInfo], 
+                          token_nodes: Dict[int, SyntacticNode], 
+                          clause_indices: List[int], exclude_indices: Set[int] = None) -> Tuple[SyntacticNode, Set[int]]:
+        """Build a verb phrase including the verb and its complements."""
+        if exclude_indices is None:
+            exclude_indices = set()
+            
+        verb_token = tokens[verb_idx]
+        indices_in_phrase = {verb_idx}
+        
+        # Check for phrasal verb particles
+        particle_idx = None
+        for idx in clause_indices:
+            if idx in exclude_indices:
+                continue
+            token = tokens[idx]
+            # Check for particles and prepositions that might be part of phrasal verbs
+            if token.head == verb_idx:
+                # Direct particle marker
+                if token.dep == 'prt':
+                    particle_idx = idx
+                    indices_in_phrase.add(idx)
+                    break
+                # Preposition immediately after verb that takes an object (phrasal verb pattern)
+                elif (token.dep == 'prep' and 
+                      token.lemma.lower() in ['over', 'up', 'down', 'out', 'off', 'on', 'in', 'away'] and
+                      abs(token.head - idx) == 1):  # Adjacent to verb
+                    # Check if this preposition has an object (making it a phrasal verb)
+                    has_object = False
+                    for check_idx in clause_indices:
+                        if tokens[check_idx].head == idx and tokens[check_idx].dep == 'pobj':
+                            has_object = True
+                            break
+                    if has_object:
+                        particle_idx = idx
+                        indices_in_phrase.add(idx)
+                        break
+        
+        # Collect direct objects and complements
+        objects = []
+        complements = []
+        
+        for idx in clause_indices:
+            if idx == verb_idx or idx == particle_idx or idx in exclude_indices:
+                continue
+            
+            token = tokens[idx]
+            # Direct/indirect objects of the verb
+            if token.head == verb_idx and token.dep in ['dobj', 'iobj']:
+                objects.append(idx)
+            # Objects of the particle/preposition in phrasal verbs
+            elif particle_idx and token.head == particle_idx and token.dep == 'pobj':
+                objects.append(idx)
+            # Other complements (but not subjects or top-level adverbs)
+            elif token.head == verb_idx and token.dep not in ['nsubj', 'nsubjpass']:
+                complements.append(idx)
+        
+        # Build the verb phrase
+        if particle_idx and objects:
+            # Phrasal verb with object: "ran over my friend"
+            # Include objects in the phrase
+            for obj_idx in objects:
+                if tokens[obj_idx].pos == 'NOUN':
+                    obj_node, obj_indices = self._build_noun_phrase(obj_idx, tokens, token_nodes, clause_indices)
+                    indices_in_phrase.update(obj_indices)
                 else:
-                    clause_node.add_child(token_nodes[idx], edge_label)
+                    indices_in_phrase.add(obj_idx)
+            
+            # Build phrase text
+            all_indices = sorted(indices_in_phrase)
+            phrase_text = ' '.join([tokens[i].text for i in all_indices])
+            
+            vp_node = SyntacticNode(
+                node_id=self._get_node_id(),
+                node_type='phrase',
+                text=phrase_text
+            )
+            
+            # Add verb
+            vp_node.add_child(token_nodes[verb_idx], 'verb')
+            
+            # Create particle phrase for "over my friend"
+            if objects:
+                # Build "over my friend" as a unit
+                particle_phrase_indices = {particle_idx}
+                
+                for obj_idx in objects:
+                    if tokens[obj_idx].pos == 'NOUN':
+                        obj_node, obj_indices = self._build_noun_phrase(obj_idx, tokens, token_nodes, clause_indices)
+                        particle_phrase_indices.update(obj_indices)
+                    else:
+                        particle_phrase_indices.add(obj_idx)
+                
+                # Build text for particle phrase
+                particle_phrase_indices_sorted = sorted(particle_phrase_indices)
+                particle_phrase_text = ' '.join([tokens[i].text for i in particle_phrase_indices_sorted])
+                
+                particle_phrase_node = SyntacticNode(
+                    node_id=self._get_node_id(),
+                    node_type='phrase',
+                    text=particle_phrase_text
+                )
+                
+                # Add particle
+                particle_phrase_node.add_child(token_nodes[particle_idx], 'particle')
+                
+                # Add objects to particle phrase
+                for obj_idx in objects:
+                    if tokens[obj_idx].pos == 'NOUN':
+                        obj_node, _ = self._build_noun_phrase(obj_idx, tokens, token_nodes, clause_indices)
+                        particle_phrase_node.add_child(obj_node, 'obj')
+                    else:
+                        particle_phrase_node.add_child(token_nodes[obj_idx], 'obj')
+                
+                vp_node.add_child(particle_phrase_node, 'particle_phrase')
+            
+            # Add other complements (like "with my scooter")
+            for comp_idx in complements:
+                if comp_idx not in indices_in_phrase:
+                    # Handle prepositional phrases
+                    if tokens[comp_idx].pos == 'ADP':
+                        pp_node, pp_indices = self._build_prep_phrase(comp_idx, tokens, token_nodes, clause_indices)
+                        indices_in_phrase.update(pp_indices)
+                        vp_node.add_child(pp_node, 'prep_phrase')
+                    else:
+                        indices_in_phrase.add(comp_idx)
+                        edge_label = self._get_edge_label(tokens[comp_idx])
+                        vp_node.add_child(token_nodes[comp_idx], edge_label)
+            
+            return vp_node, indices_in_phrase
+        
+        else:
+            # Regular verb phrase - just return the verb
+            return token_nodes[verb_idx], indices_in_phrase
     
     def _build_noun_phrase(self, noun_idx: int, tokens: List[TokenInfo], 
                           token_nodes: Dict[int, SyntacticNode], 
@@ -394,6 +519,7 @@ class SentenceAnalyzer:
         
         # Collect modifiers of this noun
         modifiers = []
+        possessives = []
         
         # Look for adjectives, determiners, etc. that modify this noun
         for idx in clause_indices:
@@ -402,41 +528,110 @@ class SentenceAnalyzer:
             
             token = tokens[idx]
             # Check if this token modifies our noun
-            if token.head == noun_idx and token.dep in ['amod', 'det', 'nummod', 'poss', 'compound']:
-                modifiers.append((idx, token))
-                indices_in_phrase.add(idx)
+            if token.head == noun_idx:
+                if token.dep == 'poss':
+                    possessives.append((idx, token))
+                    indices_in_phrase.add(idx)
+                elif token.dep in ['amod', 'det', 'nummod', 'compound']:
+                    modifiers.append((idx, token))
+                    indices_in_phrase.add(idx)
         
-        # If no modifiers, just return the noun node
-        if not modifiers:
+        # If no modifiers and no possessives, just return the noun node
+        if not modifiers and not possessives:
             return token_nodes[noun_idx], indices_in_phrase
         
-        # Create noun phrase node
-        # Build phrase text
-        all_indices = sorted(indices_in_phrase)
-        phrase_text = ' '.join([tokens[i].text for i in all_indices])
-        
-        np_node = SyntacticNode(
-            node_id=self._get_node_id(),
-            node_type='phrase',
-            text=phrase_text
-        )
-        
-        # Add noun as head
-        np_node.add_child(token_nodes[noun_idx], 'head')
-        
-        # Add modifiers in order
-        for mod_idx, mod_token in sorted(modifiers):
-            edge_label = {
-                'amod': 'adj',
-                'det': 'det',
-                'nummod': 'num',
-                'poss': 'poss',
-                'compound': 'compound'
-            }.get(mod_token.dep, mod_token.dep)
+        # Build the structure
+        # If we have possessives, create "my fat friend" structure
+        if possessives:
+            # Build full phrase text
+            all_indices = sorted(indices_in_phrase)
+            full_phrase_text = ' '.join([tokens[i].text for i in all_indices])
             
-            np_node.add_child(token_nodes[mod_idx], edge_label)
+            # Create top-level phrase node
+            top_phrase_node = SyntacticNode(
+                node_id=self._get_node_id(),
+                node_type='phrase',
+                text=full_phrase_text
+            )
+            
+            # Add possessives
+            for poss_idx, poss_token in possessives:
+                top_phrase_node.add_child(token_nodes[poss_idx], 'poss')
+            
+            # If we have adjectives, create intermediate "fat friend" node
+            if any(mod[1].dep == 'amod' for mod in modifiers):
+                # Build text without possessives
+                non_poss_indices = [i for i in indices_in_phrase if i not in [p[0] for p in possessives]]
+                adj_noun_text = ' '.join([tokens[i].text for i in sorted(non_poss_indices)])
+                
+                adj_noun_node = SyntacticNode(
+                    node_id=self._get_node_id(),
+                    node_type='phrase',
+                    text=adj_noun_text
+                )
+                
+                # Add adjectives to intermediate node
+                for mod_idx, mod_token in modifiers:
+                    if mod_token.dep == 'amod':
+                        adj_noun_node.add_child(token_nodes[mod_idx], 'adj')
+                
+                # Add noun to intermediate node
+                adj_noun_node.add_child(token_nodes[noun_idx], 'head')
+                
+                # Add other modifiers (det, compound) to intermediate node
+                for mod_idx, mod_token in modifiers:
+                    if mod_token.dep != 'amod':
+                        edge_label = {
+                            'det': 'det',
+                            'nummod': 'num',
+                            'compound': 'compound'
+                        }.get(mod_token.dep, mod_token.dep)
+                        adj_noun_node.add_child(token_nodes[mod_idx], edge_label)
+                
+                # Add intermediate node to top node
+                top_phrase_node.add_child(adj_noun_node, 'np')
+            else:
+                # No adjectives, just add noun directly
+                top_phrase_node.add_child(token_nodes[noun_idx], 'head')
+                
+                # Add other modifiers
+                for mod_idx, mod_token in modifiers:
+                    edge_label = {
+                        'det': 'det',
+                        'nummod': 'num',
+                        'compound': 'compound'
+                    }.get(mod_token.dep, mod_token.dep)
+                    top_phrase_node.add_child(token_nodes[mod_idx], edge_label)
+            
+            return top_phrase_node, indices_in_phrase
         
-        return np_node, indices_in_phrase
+        else:
+            # No possessives, build regular noun phrase
+            # Build phrase text
+            all_indices = sorted(indices_in_phrase)
+            phrase_text = ' '.join([tokens[i].text for i in all_indices])
+            
+            np_node = SyntacticNode(
+                node_id=self._get_node_id(),
+                node_type='phrase',
+                text=phrase_text
+            )
+            
+            # Add noun as head
+            np_node.add_child(token_nodes[noun_idx], 'head')
+            
+            # Add modifiers in order
+            for mod_idx, mod_token in sorted(modifiers):
+                edge_label = {
+                    'amod': 'adj',
+                    'det': 'det',
+                    'nummod': 'num',
+                    'compound': 'compound'
+                }.get(mod_token.dep, mod_token.dep)
+                
+                np_node.add_child(token_nodes[mod_idx], edge_label)
+            
+            return np_node, indices_in_phrase
     
     def _build_prep_phrase(self, prep_idx: int, tokens: List[TokenInfo], 
                           token_nodes: Dict[int, SyntacticNode], 
