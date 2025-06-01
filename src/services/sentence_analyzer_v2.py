@@ -735,11 +735,9 @@ class ClauseBuilder:
                             inf_token_nodes[idx] = token_nodes[idx]
                         
                         # Build the clause content for the infinitive
-                        # Use a recursive call to _build_clause_content
-                        # But we need to be careful about the processed set
-                        temp_processed = set()
+                        # But we'll add components directly to inf_clause instead of creating a verb phrase
                         
-                        # Build verb phrase for the xcomp verb
+                        # Build verb phrase arguments for the xcomp verb
                         xcomp_arguments = {}
                         
                         # Find arguments of the xcomp verb
@@ -836,45 +834,33 @@ class ClauseBuilder:
                                     xcomp_arguments[xcomp_idx] = []
                                 xcomp_arguments[xcomp_idx].append((pp_node, 'prep_phrase', min(pp_indices)))
                         
-                        # Now build the verb phrase for the infinitive
+                        # Now add the components directly to the infinitive clause
+                        # instead of creating a verb phrase wrapper
                         if xcomp_idx in xcomp_arguments:
                             arguments = xcomp_arguments[xcomp_idx]
                             
-                            # Collect all elements
-                            vp_elements = []
+                            # Collect all elements with their indices for ordering
+                            all_inf_elements = []
                             
-                            # Add auxiliaries first
+                            # Add auxiliaries
                             for node, label, idx in arguments:
                                 if label == 'aux':
-                                    vp_elements.append((idx, node, label))
+                                    all_inf_elements.append((idx, node, label))
                             
                             # Add the verb
-                            vp_elements.append((xcomp_idx, inf_token_nodes[xcomp_idx], 'verb_head'))
+                            if xcomp_idx in inf_token_nodes:
+                                all_inf_elements.append((xcomp_idx, inf_token_nodes[xcomp_idx], 'verb_head'))
                             
                             # Add other arguments
                             for node, label, idx in arguments:
                                 if label != 'aux':
-                                    vp_elements.append((idx, node, label))
+                                    all_inf_elements.append((idx, node, label))
                             
-                            # Sort by position
-                            vp_elements.sort(key=lambda x: x[0])
+                            # Sort by position and add to infinitive clause
+                            all_inf_elements.sort(key=lambda x: x[0])
                             
-                            # Create verb phrase text
-                            vp_text = ' '.join([node.text for _, node, _ in vp_elements])
-                            
-                            # Create verb phrase
-                            verb_phrase = SyntacticNode(
-                                node_id=self._get_node_id(),
-                                node_type='phrase',
-                                text=vp_text
-                            )
-                            
-                            # Add children in order
-                            for _, node, label in vp_elements:
-                                self._assign_child(verb_phrase, node, label)
-                            
-                            # Add verb phrase to infinitive clause
-                            self._assign_child(inf_clause, verb_phrase, 'verb')
+                            for _, node, label in all_inf_elements:
+                                self._assign_child(inf_clause, node, label)
                         else:
                             # Simple case - just add the verb and aux
                             # Add the "to" if we have it
