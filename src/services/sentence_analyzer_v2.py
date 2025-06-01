@@ -922,6 +922,52 @@ class ClauseBuilder:
                                 if xcomp_idx not in xcomp_arguments:
                                     xcomp_arguments[xcomp_idx] = []
                                 xcomp_arguments[xcomp_idx].append((pp_node, 'prep_phrase', min(pp_indices)))
+                            
+                            # Check for other dependencies that attach directly to the xcomp verb
+                            elif token.head == xcomp_idx:
+                                # This handles cases like 'oprd' when comma separates vocative
+                                # e.g., "stop hitting me, you bastard" where 'bastard' attaches to 'stop'
+                                
+                                if token.dep in ['oprd', 'attr', 'acomp']:
+                                    # Check if this has a subject (vocative construction)
+                                    subj_idx = None
+                                    for j in all_xcomp_indices:
+                                        if tokens[j].dep == 'nsubj' and tokens[j].head == idx:
+                                            subj_idx = j
+                                            break
+                                    
+                                    if subj_idx and subj_idx in inf_token_nodes:
+                                        # Create vocative phrase "you bastard"
+                                        voc_text = f"{tokens[subj_idx].text} {tokens[idx].text}"
+                                        voc_node = SyntacticNode(
+                                            node_id=self._get_node_id(),
+                                            node_type='phrase',
+                                            text=voc_text
+                                        )
+                                        self._assign_child(voc_node, inf_token_nodes[subj_idx], 'det')
+                                        self._assign_child(voc_node, inf_token_nodes[idx], 'head')
+                                        
+                                        if xcomp_idx not in xcomp_arguments:
+                                            xcomp_arguments[xcomp_idx] = []
+                                        xcomp_arguments[xcomp_idx].append((voc_node, 'vocative', min(subj_idx, idx)))
+                                    else:
+                                        # Just add it as a complement
+                                        if xcomp_idx not in xcomp_arguments:
+                                            xcomp_arguments[xcomp_idx] = []
+                                        xcomp_arguments[xcomp_idx].append((inf_token_nodes[idx], 'comp', idx))
+                                
+                                elif token.dep == 'punct':
+                                    # Handle punctuation
+                                    if xcomp_idx not in xcomp_arguments:
+                                        xcomp_arguments[xcomp_idx] = []
+                                    xcomp_arguments[xcomp_idx].append((inf_token_nodes[idx], 'punct', idx))
+                                
+                                else:
+                                    # Other unhandled dependencies
+                                    edge = self._edge_mapper.get_edge_label(token)
+                                    if xcomp_idx not in xcomp_arguments:
+                                        xcomp_arguments[xcomp_idx] = []
+                                    xcomp_arguments[xcomp_idx].append((inf_token_nodes[idx], edge, idx))
                         
                         # Now add the components directly to the infinitive clause
                         # instead of creating a verb phrase wrapper
