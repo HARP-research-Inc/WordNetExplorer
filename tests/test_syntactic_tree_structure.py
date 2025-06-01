@@ -350,7 +350,7 @@ class TestSyntacticTreeStructure(unittest.TestCase):
                        "'ran over' should be recognized as a phrasal verb")
     
     def test_infinitive_clause_with_want(self):
-        """Test that infinitive clauses are properly recognized as complements, not prepositional phrases."""
+        """Test that infinitive clauses are properly recognized as complements with full structure."""
         analysis = self.analyzer.analyze_sentence("I want to burn this house to the ground.")
         
         # Find verb phrases
@@ -363,7 +363,7 @@ class TestSyntacticTreeStructure(unittest.TestCase):
         # Find the "want" verb phrase
         want_vp = None
         for vp in verb_phrases:
-            if 'want' in vp.text:
+            if 'want' in vp.text and 'I want' in vp.text:
                 want_vp = vp
                 break
         
@@ -375,17 +375,96 @@ class TestSyntacticTreeStructure(unittest.TestCase):
                            "Verb phrase should not be just 'I want .'")
         
         # Should have an infinitive complement
-        has_infinitive_complement = False
+        infinitive_clause = None
         for child in want_vp.children:
             if (child.node_type == 'phrase' and 
                 'to burn' in child.text.lower()):
-                has_infinitive_complement = True
+                infinitive_clause = child
                 self.assertIn('obj', child.edge_label, 
                              "Infinitive should be object/complement, not prepositional phrase")
                 break
         
-        self.assertTrue(has_infinitive_complement, 
-                       "Should have infinitive clause as complement of 'want'")
+        self.assertIsNotNone(infinitive_clause, 
+                            "Should have infinitive clause as complement of 'want'")
+        
+        # Check the internal structure of the infinitive clause
+        # It should have a verb phrase child that contains the full structure
+        self.assertEqual(len(infinitive_clause.children), 1, 
+                        "Infinitive clause should have one child (the verb phrase)")
+        
+        # The child should be a verb phrase
+        verb_phrase = infinitive_clause.children[0]
+        self.assertEqual(verb_phrase.node_type, 'phrase', 
+                        "Child of infinitive clause should be a phrase")
+        self.assertEqual(verb_phrase.edge_label, 'verb', 
+                        "Child should be labeled as 'verb'")
+        
+        # Check that the verb phrase has the full structure
+        vp_children = self.get_child_texts(verb_phrase)
+        self.assertGreater(len(vp_children), 2, 
+                          f"Verb phrase should have more than just 'to' and 'burn', got: {vp_children}")
+        
+        # Verify specific components
+        vp_child_labels = self.get_child_edge_labels(verb_phrase)
+        self.assertIn('aux', vp_child_labels, "Should have auxiliary 'to'")
+        self.assertIn('verb_head', vp_child_labels, "Should have verb head 'burn'")
+        self.assertIn('obj', vp_child_labels, "Should have object")
+        self.assertIn('prep_phrase', vp_child_labels, "Should have prepositional phrase")
+        
+        # Check the verb phrase text contains all components
+        vp_text = verb_phrase.text.lower()
+        self.assertIn('burn', vp_text, "Verb phrase should contain verb 'burn'")
+        self.assertIn('house', vp_text, "Verb phrase should contain object 'house'")
+        self.assertIn('ground', vp_text, "Verb phrase should contain prep phrase 'to the ground'")
+    
+    def test_infinitive_clause_with_profanity(self):
+        """Test infinitive clause with emphatic adjective."""
+        analysis = self.analyzer.analyze_sentence("I want to burn this house to the fucking ground.")
+        
+        # Find the main verb phrase
+        verb_phrases = self.find_verb_phrases(analysis.syntactic_tree)
+        want_vp = None
+        for vp in verb_phrases:
+            if 'want' in vp.text and 'I want' in vp.text:
+                want_vp = vp
+                break
+        
+        self.assertIsNotNone(want_vp, "Should find 'want' verb phrase")
+        
+        # Find the infinitive clause
+        infinitive_clause = None
+        for child in want_vp.children:
+            if child.node_type == 'phrase' and 'to burn' in child.text.lower():
+                infinitive_clause = child
+                break
+        
+        self.assertIsNotNone(infinitive_clause, "Should find infinitive clause")
+        
+        # The infinitive clause should contain the full text
+        self.assertIn('fucking', infinitive_clause.text, 
+                     "Infinitive clause should contain all words including emphatic adjective")
+        
+        # Should have proper internal structure
+        # The infinitive clause should have one child - the verb phrase
+        self.assertEqual(len(infinitive_clause.children), 1, 
+                        "Infinitive clause should have one child (the verb phrase)")
+        
+        inner_vp = infinitive_clause.children[0]
+        self.assertEqual(inner_vp.node_type, 'phrase', "Child should be a phrase")
+        self.assertEqual(inner_vp.edge_label, 'verb', "Child should be verb phrase")
+        
+        # Check that it contains all the necessary parts
+        vp_text = inner_vp.text.lower()
+        self.assertIn('burn', vp_text, "Should contain verb")
+        self.assertIn('house', vp_text, "Should contain object")
+        self.assertIn('ground', vp_text, "Should contain prepositional object")
+        
+        # Check the structure has all components
+        vp_child_labels = self.get_child_edge_labels(inner_vp)
+        self.assertIn('aux', vp_child_labels, "Should have auxiliary 'to'")
+        self.assertIn('verb_head', vp_child_labels, "Should have verb head")
+        self.assertIn('obj', vp_child_labels, "Should have object")
+        self.assertIn('prep_phrase', vp_child_labels, "Should have prepositional phrase")
 
 
 if __name__ == '__main__':

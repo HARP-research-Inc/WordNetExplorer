@@ -719,17 +719,175 @@ class ClauseBuilder:
                         # Mark all these indices as processed
                         processed.update(all_xcomp_indices)
                         
-                        # Build internal structure - for now, just add the verb
-                        # The full structure will be built in a future improvement
-                        if xcomp_idx in token_nodes:
-                            self._assign_child(inf_clause, token_nodes[xcomp_idx], 'verb_head')
+                        # Build the full internal structure of the infinitive clause
+                        # We need to build it just like a regular clause but inside this phrase
                         
-                        # Add the "to" if we have it
-                        for i in all_xcomp_indices:
-                            if tokens[i].text.lower() == 'to' and tokens[i].head == xcomp_idx:
-                                if i in token_nodes:
-                                    self._assign_child(inf_clause, token_nodes[i], 'aux')
-                                break
+                        # Create a temporary token_nodes dict for the infinitive clause tokens
+                        inf_token_nodes = {}
+                        for idx in all_xcomp_indices:
+                            if idx not in token_nodes:
+                                token_nodes[idx] = SyntacticNode(
+                                    node_id=self._get_node_id(),
+                                    node_type='word',
+                                    text=tokens[idx].text,
+                                    token_info=tokens[idx]
+                                )
+                            inf_token_nodes[idx] = token_nodes[idx]
+                        
+                        # Build the clause content for the infinitive
+                        # Use a recursive call to _build_clause_content
+                        # But we need to be careful about the processed set
+                        temp_processed = set()
+                        
+                        # Build verb phrase for the xcomp verb
+                        xcomp_arguments = {}
+                        
+                        # Find arguments of the xcomp verb
+                        for idx in all_xcomp_indices:
+                            if idx == xcomp_idx:
+                                continue
+                            token = tokens[idx]
+                            
+                            # Check for auxiliaries (like "to")
+                            if token.dep == 'aux' and token.head == xcomp_idx:
+                                if xcomp_idx not in xcomp_arguments:
+                                    xcomp_arguments[xcomp_idx] = []
+                                xcomp_arguments[xcomp_idx].append((inf_token_nodes[idx], 'aux', idx))
+                            
+                            # Check for objects
+                            elif token.dep in ['dobj', 'obj'] and token.head == xcomp_idx:
+                                # Build noun phrase if needed
+                                np_indices = [idx]
+                                # Find determiners and modifiers
+                                for i in all_xcomp_indices:
+                                    if tokens[i].head == idx:
+                                        np_indices.append(i)
+                                
+                                if len(np_indices) > 1:
+                                    np_indices.sort()
+                                    np_text = ' '.join([tokens[i].text for i in np_indices])
+                                    np_node = SyntacticNode(
+                                        node_id=self._get_node_id(),
+                                        node_type='phrase',
+                                        text=np_text
+                                    )
+                                    # Add children to noun phrase
+                                    for i in np_indices:
+                                        if i in inf_token_nodes:
+                                            edge = 'head' if i == idx else self._edge_mapper.get_edge_label(tokens[i])
+                                            self._assign_child(np_node, inf_token_nodes[i], edge)
+                                    
+                                    if xcomp_idx not in xcomp_arguments:
+                                        xcomp_arguments[xcomp_idx] = []
+                                    xcomp_arguments[xcomp_idx].append((np_node, 'obj', min(np_indices)))
+                                else:
+                                    if xcomp_idx not in xcomp_arguments:
+                                        xcomp_arguments[xcomp_idx] = []
+                                    xcomp_arguments[xcomp_idx].append((inf_token_nodes[idx], 'obj', idx))
+                            
+                            # Check for prepositional phrases
+                            elif token.pos == 'ADP' and token.head == xcomp_idx:
+                                # Build prep phrase
+                                pp_indices = [idx]
+                                # Find all dependents of this preposition
+                                for i in all_xcomp_indices:
+                                    if tokens[i].head == idx or (tokens[i].head < len(all_xcomp_indices) and 
+                                                                 all_xcomp_indices[tokens[i].head] == idx):
+                                        if i not in pp_indices:
+                                            pp_indices.append(i)
+                                
+                                pp_indices.sort()
+                                pp_text = ' '.join([tokens[i].text for i in pp_indices])
+                                pp_node = SyntacticNode(
+                                    node_id=self._get_node_id(),
+                                    node_type='phrase',
+                                    text=pp_text
+                                )
+                                
+                                # Build internal structure
+                                self._assign_child(pp_node, inf_token_nodes[idx], 'prep')
+                                
+                                # Find pobj
+                                for i in pp_indices:
+                                    if tokens[i].dep == 'pobj':
+                                        # Build noun phrase for pobj
+                                        pobj_indices = [i]
+                                        for j in all_xcomp_indices:
+                                            if tokens[j].head == i:
+                                                pobj_indices.append(j)
+                                        
+                                        if len(pobj_indices) > 1:
+                                            pobj_indices.sort()
+                                            pobj_text = ' '.join([tokens[j].text for j in pobj_indices])
+                                            pobj_node = SyntacticNode(
+                                                node_id=self._get_node_id(),
+                                                node_type='phrase',
+                                                text=pobj_text
+                                            )
+                                            for j in pobj_indices:
+                                                if j in inf_token_nodes:
+                                                    edge = 'head' if j == i else self._edge_mapper.get_edge_label(tokens[j])
+                                                    self._assign_child(pobj_node, inf_token_nodes[j], edge)
+                                            self._assign_child(pp_node, pobj_node, 'pobj')
+                                        else:
+                                            self._assign_child(pp_node, inf_token_nodes[i], 'pobj')
+                                        break
+                                
+                                if xcomp_idx not in xcomp_arguments:
+                                    xcomp_arguments[xcomp_idx] = []
+                                xcomp_arguments[xcomp_idx].append((pp_node, 'prep_phrase', min(pp_indices)))
+                        
+                        # Now build the verb phrase for the infinitive
+                        if xcomp_idx in xcomp_arguments:
+                            arguments = xcomp_arguments[xcomp_idx]
+                            
+                            # Collect all elements
+                            vp_elements = []
+                            
+                            # Add auxiliaries first
+                            for node, label, idx in arguments:
+                                if label == 'aux':
+                                    vp_elements.append((idx, node, label))
+                            
+                            # Add the verb
+                            vp_elements.append((xcomp_idx, inf_token_nodes[xcomp_idx], 'verb_head'))
+                            
+                            # Add other arguments
+                            for node, label, idx in arguments:
+                                if label != 'aux':
+                                    vp_elements.append((idx, node, label))
+                            
+                            # Sort by position
+                            vp_elements.sort(key=lambda x: x[0])
+                            
+                            # Create verb phrase text
+                            vp_text = ' '.join([node.text for _, node, _ in vp_elements])
+                            
+                            # Create verb phrase
+                            verb_phrase = SyntacticNode(
+                                node_id=self._get_node_id(),
+                                node_type='phrase',
+                                text=vp_text
+                            )
+                            
+                            # Add children in order
+                            for _, node, label in vp_elements:
+                                self._assign_child(verb_phrase, node, label)
+                            
+                            # Add verb phrase to infinitive clause
+                            self._assign_child(inf_clause, verb_phrase, 'verb')
+                        else:
+                            # Simple case - just add the verb and aux
+                            # Add the "to" if we have it
+                            for i in all_xcomp_indices:
+                                if tokens[i].text.lower() == 'to' and tokens[i].head == xcomp_idx:
+                                    if i in inf_token_nodes:
+                                        self._assign_child(inf_clause, inf_token_nodes[i], 'aux')
+                                    break
+                            
+                            # Add the verb
+                            if xcomp_idx in inf_token_nodes:
+                                self._assign_child(inf_clause, inf_token_nodes[xcomp_idx], 'verb_head')
                         
                         # Replace the xcomp index with the infinitive clause in arguments
                         for i, (arg_node, label, arg_idx) in enumerate(arguments):
