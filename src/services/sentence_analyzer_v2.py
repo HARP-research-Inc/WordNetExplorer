@@ -314,14 +314,25 @@ class ClauseBuilder:
     def _identify_sentence_adverbs(self, clause_indices: List[int], tokens: List[TokenInfo]) -> List[int]:
         """Identify sentence-level adverbs in the clause."""
         adverbs = []
+        # Sentence-level adverbs are typically discourse markers or sentential adverbs
+        # like "However,", "Therefore,", "Unfortunately,", etc.
+        # Not just any adverb that modifies a verb
+        sentence_adverbs = {
+            'however', 'therefore', 'moreover', 'furthermore', 'nevertheless',
+            'nonetheless', 'consequently', 'hence', 'thus', 'accordingly',
+            'unfortunately', 'fortunately', 'surprisingly', 'interestingly',
+            'clearly', 'obviously', 'apparently', 'evidently', 'certainly'
+        }
+        
         for idx in clause_indices[:3]:  # Check first few tokens
             token = tokens[idx]
             if (token.pos == 'ADV' and 
-                token.dep in ['advmod'] and 
-                token.head < len(tokens) and # Ensure head is a valid index
-                tokens[token.head].pos == 'VERB'):
+                token.dep in ['advmod'] and
+                token.lemma.lower() in sentence_adverbs and
+                # Check if followed by comma (common for sentence adverbs)
+                (idx + 1 < len(tokens) and tokens[idx + 1].text == ',')):
                 adverbs.append(idx)
-                break # Assuming only one primary sentence-level adverb at the beginning
+                break
         return adverbs
 
     def _build_clause_content(self, parent_node: SyntacticNode, clause_indices: List[int],
@@ -332,7 +343,7 @@ class ClauseBuilder:
         main_verb_idx = self._find_main_verb(clause_indices, tokens)
         
         # Track verb arguments for creating verb phrases
-        verb_arguments = {}  # verb_idx -> list of (node, edge_label) tuples
+        verb_arguments = {}  # verb_idx -> list of (node, edge_label, index) tuples
         verb_phrase_nodes = {}  # verb_idx -> phrase node
 
         # First pass: identify all nodes
@@ -360,7 +371,7 @@ class ClauseBuilder:
                     if token.dep == 'dative':
                         edge_label = 'dative'
                     
-                    verb_arguments[main_verb_idx].append((noun_phrase_node, edge_label))
+                    verb_arguments[main_verb_idx].append((noun_phrase_node, edge_label, idx))  # Add index
                 else:
                     # Not a verb argument, attach normally
                     edge_label = self._edge_mapper.get_edge_label(token)
@@ -370,8 +381,19 @@ class ClauseBuilder:
                     idx, tokens, token_nodes, clause_indices)
                 processed.update(phrase_indices)
                 if prep_phrase_node:
-                    self._attach_prep_phrase(prep_phrase_node, token, phrasal_verbs,
-                                        token_nodes, parent_node, tokens)
+                    # Check if this prepositional phrase modifies a verb
+                    if (token.head < len(tokens) and 
+                        token.head in clause_indices and 
+                        tokens[token.head].pos == 'VERB'):
+                        # This prepositional phrase modifies a verb
+                        verb_idx = token.head
+                        if verb_idx not in verb_arguments:
+                            verb_arguments[verb_idx] = []
+                        verb_arguments[verb_idx].append((prep_phrase_node, 'prep_phrase', idx))
+                    else:
+                        # Not modifying a verb, attach normally
+                        self._attach_prep_phrase(prep_phrase_node, token, phrasal_verbs,
+                                            token_nodes, parent_node, tokens)
                 else:
                     self._assign_child(parent_node, token_nodes[idx], self._edge_mapper.get_edge_label(token))
                     processed.add(idx)
@@ -389,7 +411,16 @@ class ClauseBuilder:
                     verb_idx = token.head
                     if verb_idx not in verb_arguments:
                         verb_arguments[verb_idx] = []
-                    verb_arguments[verb_idx].append((token_nodes[idx], edge_label))
+                    verb_arguments[verb_idx].append((token_nodes[idx], edge_label, idx))  # Add index for ordering
+                # Also check for auxiliary verbs (AUX modifying VERB)
+                elif (token.pos == 'AUX' and 
+                      token.head < len(tokens) and 
+                      token.head in clause_indices and 
+                      tokens[token.head].pos == 'VERB'):
+                    verb_idx = token.head
+                    if verb_idx not in verb_arguments:
+                        verb_arguments[verb_idx] = []
+                    verb_arguments[verb_idx].append((token_nodes[idx], 'aux', idx))
                 else:
                     # Attach to parent normally
                     self._assign_child(parent_node, token_nodes[idx], edge_label)
@@ -407,25 +438,39 @@ class ClauseBuilder:
                 
                 if arguments:
                     # Create a wrapper phrase that includes the phrasal verb and its arguments
-                    phrase_parts = []
-                    for arg_node, label in arguments:
+                    # Build phrase text with proper ordering
+                    all_indices = []
+                    for arg_node, label, arg_idx in arguments:
                         if label == 'subj':
-                            phrase_parts.insert(0, arg_node.text)  # Subject goes first
+                            all_indices.append((arg_idx, arg_node.text))
                     
-                    phrase_parts.append(phrasal_verb_phrase.text)
+                    # Add phrasal verb indices
+                    phrasal_indices = []
+                    for child in phrasal_verb_phrase.children:
+                        if child.token_info:
+                            # Find the index of this token in the original token list
+                            for t_idx, t in enumerate(tokens):
+                                if t == child.token_info:
+                                    phrasal_indices.append((t_idx, child.text))
+                                    break
+                    all_indices.extend(phrasal_indices)
                     
-                    for arg_node, label in arguments:
+                    for arg_node, label, arg_idx in arguments:
                         if label != 'subj':
-                            phrase_parts.append(arg_node.text)
+                            all_indices.append((arg_idx, arg_node.text))
+                    
+                    # Sort by index to preserve sentence order
+                    all_indices.sort(key=lambda x: x[0])
+                    phrase_text = ' '.join([text for _, text in all_indices])
                     
                     verb_phrase = SyntacticNode(
                         node_id=self._get_node_id(),
                         node_type='phrase',
-                        text=' '.join(phrase_parts)
+                        text=phrase_text
                     )
                     
                     # Add subject first (if any)
-                    for arg_node, edge_label in arguments:
+                    for arg_node, edge_label, _ in arguments:
                         if edge_label == 'subj':
                             self._assign_child(verb_phrase, arg_node, edge_label)
                             break
@@ -434,7 +479,7 @@ class ClauseBuilder:
                     self._assign_child(verb_phrase, phrasal_verb_phrase, 'verb')
                     
                     # Add other arguments
-                    for arg_node, edge_label in arguments:
+                    for arg_node, edge_label, _ in arguments:
                         if edge_label != 'subj':
                             self._assign_child(verb_phrase, arg_node, edge_label)
                 else:
@@ -445,39 +490,93 @@ class ClauseBuilder:
                 verb_token = tokens[verb_idx]
                 arguments = verb_arguments.get(verb_idx, [])
                 
-                # Build text for verb phrase
-                phrase_parts = []
-                for arg_node, label in arguments:
+                # Check if this is an infinitive (has "to" before it)
+                has_infinitive_marker = any(
+                    label == 'aux' and tokens[arg_idx].text.lower() == 'to' 
+                    for _, label, arg_idx in arguments
+                )
+                
+                # Collect all elements with their indices for proper ordering
+                all_elements = []
+                
+                # Add subject
+                for arg_node, label, arg_idx in arguments:
                     if label == 'subj':
-                        phrase_parts.insert(0, arg_node.text)  # Subject goes first
+                        all_elements.append((arg_idx, arg_node, label))
                 
-                phrase_parts.append(verb_token.text)
+                # Add auxiliaries and the verb in proper order
+                # Always collect auxiliary verbs, not just for infinitives
+                verb_elements = [(verb_idx, token_nodes[verb_idx], 'verb_head')]
                 
-                for arg_node, label in arguments:
-                    if label != 'subj':
-                        phrase_parts.append(arg_node.text)
+                # Add aux elements (including auxiliary verbs like "has", "been")
+                for arg_node, label, arg_idx in arguments:
+                    if label == 'aux':
+                        verb_elements.append((arg_idx, arg_node, label))
+                
+                if has_infinitive_marker:
+                    # Check for prepositional phrases modifying the infinitive
+                    # e.g., "to ride with" - "with" should be part of the infinitive phrase
+                    for prep_idx in range(verb_idx + 1, min(verb_idx + 3, len(tokens))):
+                        if prep_idx in clause_indices:
+                            prep_token = tokens[prep_idx]
+                            if (prep_token.pos == 'ADP' and 
+                                prep_token.head == verb_idx and
+                                prep_idx in token_nodes):
+                                # This preposition modifies our verb
+                                verb_elements.append((prep_idx, token_nodes[prep_idx], 'prep'))
+                
+                # Sort verb elements by index
+                verb_elements.sort(key=lambda x: x[0])
+                all_elements.extend(verb_elements)
+                
+                # Add other arguments
+                for arg_node, label, arg_idx in arguments:
+                    if label not in ['subj', 'aux']:
+                        all_elements.append((arg_idx, arg_node, label))
+                
+                # Build phrase text in proper order
+                all_elements.sort(key=lambda x: x[0])
+                phrase_text = ' '.join([node.text for _, node, _ in all_elements])
                 
                 verb_phrase = SyntacticNode(
                     node_id=self._get_node_id(),
                     node_type='phrase',
-                    text=' '.join(phrase_parts)
+                    text=phrase_text
                 )
                 
+                # Add children in logical order (not sentence order)
                 # Add subject first (if any)
-                for arg_node, edge_label in arguments:
-                    if edge_label == 'subj':
-                        self._assign_child(verb_phrase, arg_node, edge_label)
+                for _, node, label in all_elements:
+                    if label == 'subj':
+                        self._assign_child(verb_phrase, node, label)
                         break
                 
+                # Add aux elements (always, not just for infinitives)
+                for _, node, label in all_elements:
+                    if label == 'aux':
+                        self._assign_child(verb_phrase, node, label)
+                
                 # Add verb
-                verb_node = token_nodes[verb_idx]
-                edge_label = 'verb_head' if arguments else 'verb'
-                self._assign_child(verb_phrase, verb_node, edge_label)
+                for _, node, label in all_elements:
+                    if label == 'verb_head':
+                        edge_label = 'verb_head' if arguments else 'verb'
+                        self._assign_child(verb_phrase, node, edge_label)
+                        break
+                
+                # Add prepositions that are part of the infinitive
+                for _, node, label in all_elements:
+                    if label == 'prep':
+                        self._assign_child(verb_phrase, node, label)
+                
+                # Add prepositional phrases
+                for _, node, label in all_elements:
+                    if label == 'prep_phrase':
+                        self._assign_child(verb_phrase, node, label)
                 
                 # Add other arguments
-                for arg_node, edge_label in arguments:
-                    if edge_label != 'subj':
-                        self._assign_child(verb_phrase, arg_node, edge_label)
+                for _, node, label in all_elements:
+                    if label not in ['subj', 'aux', 'verb_head', 'prep', 'prep_phrase']:
+                        self._assign_child(verb_phrase, node, label)
             
             # Attach verb phrase to parent
             edge_label = 'tverb' if verb_idx == main_verb_idx else 'verb'
