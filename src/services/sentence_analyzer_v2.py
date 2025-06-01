@@ -6,12 +6,16 @@ import spacy
 from typing import List, Optional, Dict, Set
 from dataclasses import dataclass
 import streamlit as st
+import logging
 
 from .token_analyzer import TokenAnalyzer, TokenInfo
 from .token_disambiguator import TokenDisambiguator
 from .syntactic_tree import SyntacticNode, PhraseBuilder, EdgeLabelMapper
 from .linguistic_colors import LinguisticColors
 from .phrasal_verb_handler import PhrasalVerbHandler
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -69,10 +73,13 @@ class SentenceAnalyzerV2:
         Returns:
             SentenceAnalysis object with parsed information
         """
+        logger.info(f"Starting analysis of sentence: '{sentence}'")
+        
         # Reset node counter for each sentence
         self._node_counter = 0
         
         # Parse the sentence
+        logger.debug("Parsing sentence with spaCy")
         doc = self.nlp(sentence)
         
         # Extract token information
@@ -80,31 +87,40 @@ class SentenceAnalyzerV2:
         root_index = 0
         
         # First pass - analyze tokens
+        logger.debug("First pass: Analyzing tokens")
         for i, token in enumerate(doc):
             token_info = self._token_analyzer.analyze_token(token, i)
             tokens.append(token_info)
+            logger.debug(f"  Token {i}: '{token.text}' POS:{token.pos_} DEP:{token.dep_}")
             
             # Track root token
             if token.dep_ == "ROOT":
                 root_index = i
+                logger.debug(f"  Found ROOT at index {i}")
         
         # Second pass - disambiguate tokens
+        logger.debug("Second pass: Disambiguating tokens")
         self._token_disambiguator.disambiguate_tokens(tokens, doc)
         
         # Build syntactic tree
+        logger.info("Building syntactic tree")
         syntactic_tree = self._build_syntactic_tree(doc, tokens)
         
         # Validate tree structure and emit warnings
+        logger.debug("Validating tree structure")
         warnings = syntactic_tree.validate_tree_structure()
         if warnings:
             import warnings as py_warnings
             for warning in warnings:
+                logger.warning(f"Tree validation warning: {warning}")
                 py_warnings.warn(f"Syntactic tree validation: {warning}", stacklevel=2)
         
         # Apply lemma decomposition if requested
         if decompose_lemmas:
+            logger.debug("Applying lemma decomposition")
             self._apply_lemma_decomposition(syntactic_tree)
         
+        logger.info("Sentence analysis complete")
         return SentenceAnalysis(
             text=sentence,
             tokens=tokens,
@@ -120,29 +136,36 @@ class SentenceAnalyzerV2:
             node_type='sentence',
             text=doc.text
         )
+        logger.debug(f"Created root sentence node with text: '{doc.text}'")
         
         # First, identify quoted speech segments
         quoted_segments = self._identify_quoted_segments(doc, tokens)
         
         # If we have quoted speech, handle it specially
         if quoted_segments:
+            logger.info(f"Found {len(quoted_segments)} quoted segment(s)")
             self._build_sentence_with_quotes(root, doc, tokens, quoted_segments)
         else:
             # No quotes, proceed with normal clause identification
+            logger.debug("No quoted speech found, identifying clauses")
             clauses = self._identify_clauses(doc, tokens)
+            logger.info(f"Identified {len(clauses)} clause(s)")
             
             if len(clauses) == 1:
                 # Simple sentence - build directly
+                logger.debug("Building simple sentence structure")
                 clause_builder = ClauseBuilder(self._get_node_id)
                 clause_builder.build_clause_tree(root, clauses[0], tokens, 'main')
             else:
                 # Complex sentence - identify relationships
+                logger.debug("Building complex sentence structure")
                 self._build_complex_sentence_tree(root, clauses, tokens, doc)
         
         return root
     
     def _identify_quoted_segments(self, doc, tokens: List[TokenInfo]) -> List[Dict[str, any]]:
         """Identify quoted speech segments in the sentence."""
+        logger.debug("Identifying quoted speech segments")
         segments = []
         in_quote = False
         quote_start = -1
@@ -152,6 +175,7 @@ class SentenceAnalyzerV2:
                 if not in_quote:
                     quote_start = i
                     in_quote = True
+                    logger.debug(f"  Quote started at index {i}")
                 else:
                     # End of quote
                     segments.append({
@@ -159,6 +183,7 @@ class SentenceAnalyzerV2:
                         'end': i,
                         'indices': list(range(quote_start, i + 1))
                     })
+                    logger.debug(f"  Quote ended at index {i} (from {quote_start} to {i})")
                     in_quote = False
         
         return segments
@@ -427,6 +452,8 @@ class ClauseBuilder:
     def build_clause_tree(self, clause_node: SyntacticNode, clause_indices: List[int], 
                          tokens: List[TokenInfo], clause_type: str):
         """Build the tree for a single clause."""
+        logger.debug(f"Building clause tree (type={clause_type}) with {len(clause_indices)} tokens")
+        
         token_nodes: Dict[int, SyntacticNode] = {}
         for idx in clause_indices:
             token = tokens[idx]
@@ -443,13 +470,17 @@ class ClauseBuilder:
         
         # First identify vocatives (highest priority)
         vocatives = self._identify_vocatives(clause_indices, tokens, token_nodes, in_quotes)
+        logger.debug(f"Found {len([v for v in vocatives.values() if v is not None])} vocative(s)")
         
         # Then identify sentence adverbs
         sentence_adverbs = self._identify_sentence_adverbs(clause_indices, tokens)
+        logger.debug(f"Found {len(sentence_adverbs)} sentence adverb(s)")
         
         # Remove vocatives and adverbs from processing
         processed_indices = set(vocatives.keys()).union(sentence_adverbs)
         remaining_indices = [idx for idx in clause_indices if idx not in processed_indices]
+        
+        logger.debug(f"Processing {len(remaining_indices)} remaining indices after removing vocatives/adverbs")
         
         # Add vocatives first (only those with actual nodes)
         for voc_idx, voc_node in vocatives.items():
@@ -474,6 +505,7 @@ class ClauseBuilder:
                     node_type='clause',
                     text=subclause_text
                 )
+                logger.debug(f"Created subclause: '{subclause_text}'")
                 self._assign_child(clause_node, subclause_node, 'main_clause')
                 self._build_clause_content(subclause_node, remaining_indices, tokens, token_nodes)
             else:
@@ -534,6 +566,7 @@ class ClauseBuilder:
             Dict mapping token indices to vocative nodes. 
             Indices mapped to None are part of a phrase and should be excluded.
         """
+        logger.debug(f"Identifying vocatives (in_quotes={in_quotes})")
         vocatives = {}
         
         # First, check for comma-separated vocatives at the end of the clause
@@ -548,6 +581,8 @@ class ClauseBuilder:
                 next_idx = clause_indices[i + 1]
                 next_token = tokens[next_idx]
                 
+                logger.debug(f"  Found comma at index {idx}, next token: '{next_token.text}' (POS: {next_token.pos})")
+                
                 # Only consider it a vocative if:
                 # 1. It starts with a pronoun/name/noun
                 # 2. It's at the end of the sentence
@@ -560,23 +595,27 @@ class ClauseBuilder:
                     # Check if it's a name (proper noun)
                     if next_token.pos == 'PROPN':
                         is_likely_vocative = True
+                        logger.debug("    Likely vocative: proper noun")
                     
                     # Check for "you" followed by noun/adjective
                     elif next_token.text.lower() == 'you' and i + 2 < len(clause_indices):
                         following_idx = clause_indices[i + 2]
                         if tokens[following_idx].pos in ['NOUN', 'ADJ']:
                             is_likely_vocative = True
+                            logger.debug(f"    Likely vocative: 'you' + {tokens[following_idx].pos}")
                     
                     # Check if it's a single noun at the end (like "sir", "man", etc.)
                     elif next_token.pos == 'NOUN':
                         # Make sure it's not a regular object by checking dependencies
                         if next_token.dep not in ['dobj', 'pobj']:
                             is_likely_vocative = True
+                            logger.debug(f"    Likely vocative: noun with dep={next_token.dep}")
                     
                     # If we're in quotes, be less restrictive about what counts as vocative
                     # since quoted speech often has informal vocatives
                     if in_quotes and next_token.text.lower() == 'you':
                         is_likely_vocative = True
+                        logger.debug("    Likely vocative: 'you' in quoted speech")
                     
                     if is_likely_vocative:
                         # Collect all tokens after the comma until end or punctuation
@@ -594,6 +633,8 @@ class ClauseBuilder:
                             # Create vocative phrase including comma and final punctuation
                             all_vocative_indices = [idx] + vocative_indices  # Include the comma
                             vocative_text = ' '.join([tokens[vi].text for vi in all_vocative_indices])
+                            
+                            logger.info(f"  Found end vocative: '{vocative_text}'")
                             
                             # Create vocative node
                             voc_node = SyntacticNode(
@@ -780,26 +821,36 @@ class ClauseBuilder:
     def _build_clause_content(self, parent_node: SyntacticNode, clause_indices: List[int],
                              tokens: List[TokenInfo], token_nodes: Dict[int, SyntacticNode]):
         """Build the content of a clause."""
+        logger.debug(f"Building clause content with {len(clause_indices)} indices")
+        
         phrasal_verbs = self._phrasal_verb_handler.identify_phrasal_verbs(tokens)
+        if phrasal_verbs:
+            logger.debug(f"Identified phrasal verbs: {phrasal_verbs}")
+        
         processed: Set[int] = set()
         main_verb_idx = self._find_main_verb(clause_indices, tokens)
+        if main_verb_idx is not None:
+            logger.debug(f"Main verb at index {main_verb_idx}: '{tokens[main_verb_idx].text}'")
 
         # Track verb arguments for creating verb phrases
         verb_arguments = {}  # verb_idx -> list of (node, edge_label, index) tuples
         verb_phrase_nodes = {}  # verb_idx -> phrase node
 
         # First pass: identify all nodes
+        logger.debug("First pass: identifying nodes and their roles")
         for idx in clause_indices:
             if idx in processed:
                 continue
             token = tokens[idx]
 
             if idx in phrasal_verbs:
+                logger.debug(f"  Processing phrasal verb at {idx}: '{token.text}'")
                 verb_phrase_node, phrase_indices = self._phrasal_verb_handler.build_verb_phrase(
                     idx, phrasal_verbs[idx], tokens, token_nodes, self._get_node_id)
                 processed.update(phrase_indices)
                 verb_phrase_nodes[idx] = verb_phrase_node
             elif token.pos == 'NOUN':
+                logger.debug(f"  Processing noun at {idx}: '{token.text}' (dep={token.dep})")
                 noun_phrase_node, phrase_indices = self._phrase_builder.build_noun_phrase(
                     idx, tokens, token_nodes, clause_indices)
                 processed.update(phrase_indices)
@@ -813,6 +864,7 @@ class ClauseBuilder:
                         tokens[actual_head_idx].dep == 'xcomp'):
                         # This belongs to an xcomp verb, don't attach it to the main verb
                         # It will be handled when we build the infinitive clause
+                        logger.debug(f"    Noun belongs to xcomp verb, skipping")
                         continue
                     
                     if main_verb_idx not in verb_arguments:
@@ -822,10 +874,12 @@ class ClauseBuilder:
                     if token.dep == 'dative':
                         edge_label = 'dative'
                     
+                    logger.debug(f"    Adding as {edge_label} of main verb")
                     verb_arguments[main_verb_idx].append((noun_phrase_node, edge_label, idx))  # Add index
                 else:
                     # Not a verb argument, attach normally
                     edge_label = self._edge_mapper.get_edge_label(token)
+                    logger.debug(f"    Attaching to parent with edge '{edge_label}'")
                     self._assign_child(parent_node, noun_phrase_node, edge_label)
             elif token.pos == 'ADP':
                 prep_phrase_node, phrase_indices = self._phrase_builder.build_prep_phrase(

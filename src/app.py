@@ -25,23 +25,28 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
 # Import configuration
-from config.settings import PAGE_CONFIG
+from src.config.settings import PAGE_CONFIG
 
 # Import core modules
-from core import WordNetExplorer, SessionManager
+from src.core import WordNetExplorer, SessionManager
 
 # Import UI components
-from ui.styles import load_custom_css
-from ui.sidebar import render_sidebar
-from ui.word_info import render_word_information
-from ui.graph_display import render_graph_visualization, render_graph_legend_and_controls
-from ui.welcome import render_welcome_screen
-from ui.footer import render_footer
-from ui.comparison import render_comparison_view
-from ui.path_finding import render_path_finding_view
+from src.ui.styles import load_custom_css
+from src.ui.sidebar import render_sidebar
+from src.ui.word_info import render_word_information
+from src.ui.graph_display import render_graph_visualization, render_graph_legend_and_controls
+from src.ui.welcome import render_welcome_screen
+from src.ui.footer import render_footer
+from src.ui.comparison import render_comparison_view
+from src.ui.path_finding import render_path_finding_view
 
 # Import enhanced history functionality
-from utils.session_state import add_query_to_history, initialize_session_state
+from src.utils.session_state import add_query_to_history, initialize_session_state
+
+# Import additional modules
+from src.services.sentence_analyzer import SentenceAnalyzer
+from src.services.sentence_analyzer_v2 import SentenceAnalyzerV2
+from src.utils.logging_config import configure_logging
 
 
 def render_header():
@@ -489,87 +494,78 @@ def render_sentence_sidebar():
                 key="sentence_decompose_lemmas",
                 help="Show word lemmas with grammatical information (e.g., 'ran' → 'run' [past])"
             )
+            
+            verbose_logging = st.checkbox(
+                "Enable verbose logging",
+                value=False,
+                key="sentence_verbose_logging",
+                help="Show detailed console logging of the parsing process"
+            )
         
         st.markdown("---")
         
         # About section
         with st.expander("ℹ️ How it works"):
             st.markdown("""
-            **Sentence Explorer** analyzes the grammatical structure of your sentence and connects it to WordNet:
+            **Sentence Analysis**: The tool performs:
+            - **Dependency Parsing**: Analyzes grammatical relationships
+            - **Part-of-Speech Tagging**: Identifies word types
+            - **WordNet Integration**: Links words to their semantic senses
+            - **Tree Building**: Constructs a hierarchical syntactic tree
             
-            1. **Syntactic Analysis**: Shows how words and clauses relate hierarchically
-            2. **Part-of-Speech Tagging**: Identifies the grammatical role of each word
-            3. **Smart WordNet Integration**: Links content words to their best matching senses
+            **Visualization Features**:
+            - 🔵 Blue nodes: Words
+            - 🟢 Green nodes: WordNet synsets  
+            - 🔴 Red edges: Grammatical dependencies
+            - 🟦 Blue edges: Semantic relationships
             
-            **Improved disambiguation features:**
-            - Pronouns and function words are excluded from synset matching
-            - Common words avoid overly technical definitions (no "iodine" for "I"!)
-            - Phrasal verb particles (like "over" in "run over") are handled correctly
-            - Context-aware sense selection filters out inappropriate meanings
-            
-            **Advanced Features:**
-            - **Lemma Decomposition**: When enabled, shows the base form (lemma) of words with grammatical information:
-              - "ran" → "run" [past tense]
-              - "dogs" → "dog" [plural]
-              - "better" → "good" [comparative]
-              - "organizing" → "organize" [gerund]
-            
-            **The visualization shows:**
-            - Complete sentence as the root node
-            - Clauses as intermediate nodes
-            - Words as leaf nodes with synset information
-            - Labeled edges showing grammatical relationships
-            
-            **Edge labels:**
-            - **sconj**: Subordinating conjunction
-            - **iclause/dclause**: Independent/dependent clause
-            - **tverb**: Main (tensed) verb
-            - **subj/obj**: Subject/object
-            - **adv/adj**: Adverb/adjective modifier
-            
-            **Interactive features:**
-            - Hover over nodes for detailed information
-            - Words with synsets show definitions in tooltips
-            - Drag nodes to rearrange the layout
-            - Zoom and pan to explore the graph
+            **Advanced Options**:
+            - **Physics**: Makes the graph interactive and draggable
+            - **Auto-disambiguate**: Uses context to select likely word senses
+            - **Lemma decomposition**: Shows base forms with grammatical info
+            - **Verbose logging**: Displays detailed parsing information in console
             """)
     
     # Return settings
     return {
         'sentence': sentence.strip() if sentence else None,
         'show_synsets': show_synsets,
-        'synset_limit': synset_limit,
+        'synset_limit': synset_limit if show_synsets else 0,
         'show_synset_details': show_synset_details,
         'enable_physics': enable_physics,
         'disambiguate_senses': disambiguate_senses,
-        'decompose_lemmas': decompose_lemmas
+        'decompose_lemmas': decompose_lemmas,
+        'verbose_logging': verbose_logging
     }
 
 
 def render_sentence_content(explorer, session_manager, settings):
     """Render the content for the Sentence Explorer tab."""
     
-    # Check if we have input
+    # Configure logging if verbose mode is enabled
+    if settings.get('verbose_logging', False):
+        configure_logging(verbose=True)
+        st.info("🔍 Verbose logging enabled - check console for detailed parsing information")
+    else:
+        # Reset to normal logging
+        configure_logging(verbose=False)
+    
+    # Check if we have a sentence to analyze
     if not settings.get('sentence'):
         st.markdown(
             """
             <div style="text-align: center; padding: 50px;">
                 <h2>👋 Welcome to Sentence Explorer!</h2>
                 <p style="font-size: 18px; color: #666;">
-                    Enter a sentence in the sidebar to begin analyzing its structure.
+                    Enter a sentence in the sidebar to analyze its grammatical structure.
                 </p>
                 <p style="font-size: 16px; color: #888; margin-top: 20px;">
-                    This tool combines grammatical analysis with WordNet to show how words relate to each other and their meanings.
+                    The tool will show:
+                    • Syntactic tree structure
+                    • Part-of-speech tags
+                    • WordNet senses for each word
+                    • Grammatical relationships between words
                 </p>
-                <div style="margin-top: 30px;">
-                    <h3>Example sentences to try:</h3>
-                    <ul style="text-align: left; display: inline-block;">
-                        <li>"The bank near the river has beautiful flowers."</li>
-                        <li>"She will bank on her experience to solve the problem."</li>
-                        <li>"The pilot flies planes across the ocean every week."</li>
-                        <li>"Time flies when you're having fun at the party."</li>
-                    </ul>
-                </div>
             </div>
             """,
             unsafe_allow_html=True
