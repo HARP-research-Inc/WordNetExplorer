@@ -693,6 +693,19 @@ class ClauseBuilder:
                         
                         # Get all tokens that depend on the xcomp verb (recursively)
                         xcomp_deps = find_dependents(xcomp_idx)
+                        
+                        # Also check for nested xcomps - if a dependent is also an xcomp verb
+                        # we need to include its dependents too
+                        additional_deps = []
+                        for dep_idx in xcomp_deps:
+                            if tokens[dep_idx].dep == 'xcomp':
+                                # This is a nested xcomp, get its dependents too
+                                nested_deps = find_dependents(dep_idx)
+                                additional_deps.extend(nested_deps)
+                        
+                        xcomp_deps.extend(additional_deps)
+                        xcomp_deps = list(set(xcomp_deps))  # Remove duplicates
+                        
                         all_xcomp_indices = [xcomp_idx] + xcomp_deps
                         
                         # Add the "to" particle if it exists
@@ -750,6 +763,83 @@ class ClauseBuilder:
                                 if xcomp_idx not in xcomp_arguments:
                                     xcomp_arguments[xcomp_idx] = []
                                 xcomp_arguments[xcomp_idx].append((inf_token_nodes[idx], 'aux', idx))
+                            
+                            # Check for nested xcomp verbs (like "hitting" in "stop hitting")
+                            elif token.dep == 'xcomp' and token.head == xcomp_idx:
+                                # This is a nested xcomp - build it as a verb phrase with its arguments
+                                nested_xcomp_idx = idx
+                                
+                                # Find all arguments of this nested xcomp
+                                nested_args = []
+                                nested_verb_text_parts = [(nested_xcomp_idx, tokens[nested_xcomp_idx].text)]
+                                
+                                for i in all_xcomp_indices:
+                                    if i == nested_xcomp_idx:
+                                        continue
+                                    if tokens[i].head == nested_xcomp_idx:
+                                        nested_verb_text_parts.append((i, tokens[i].text))
+                                        
+                                        # Build appropriate nodes for nested arguments
+                                        if tokens[i].dep in ['dobj', 'obj', 'dative']:
+                                            # Handle objects
+                                            if i in inf_token_nodes:
+                                                nested_args.append((inf_token_nodes[i], 'obj', i))
+                                        elif tokens[i].dep in ['nsubj']:
+                                            # Vocative or subject
+                                            if i in inf_token_nodes:
+                                                nested_args.append((inf_token_nodes[i], 'subj', i))
+                                        elif tokens[i].dep in ['oprd', 'attr', 'acomp']:
+                                            # Predicate complement (like "bastard" in "you bastard")
+                                            if i in inf_token_nodes:
+                                                # Check if this has a subject (vocative construction)
+                                                subj_idx = None
+                                                for j in all_xcomp_indices:
+                                                    if tokens[j].dep == 'nsubj' and tokens[j].head == i:
+                                                        subj_idx = j
+                                                        break
+                                                
+                                                if subj_idx and subj_idx in inf_token_nodes:
+                                                    # Create vocative phrase "you bastard"
+                                                    voc_text = f"{tokens[subj_idx].text} {tokens[i].text}"
+                                                    voc_node = SyntacticNode(
+                                                        node_id=self._get_node_id(),
+                                                        node_type='phrase',
+                                                        text=voc_text
+                                                    )
+                                                    self._assign_child(voc_node, inf_token_nodes[subj_idx], 'det')
+                                                    self._assign_child(voc_node, inf_token_nodes[i], 'head')
+                                                    nested_args.append((voc_node, 'vocative', min(subj_idx, i)))
+                                                else:
+                                                    nested_args.append((inf_token_nodes[i], 'comp', i))
+                                        else:
+                                            # Other dependencies
+                                            edge = self._edge_mapper.get_edge_label(tokens[i])
+                                            if i in inf_token_nodes:
+                                                nested_args.append((inf_token_nodes[i], edge, i))
+                                
+                                # Sort parts by index to get correct text
+                                nested_verb_text_parts.sort(key=lambda x: x[0])
+                                nested_verb_text = ' '.join([text for _, text in nested_verb_text_parts])
+                                
+                                # Create nested verb phrase
+                                nested_verb_phrase = SyntacticNode(
+                                    node_id=self._get_node_id(),
+                                    node_type='phrase',
+                                    text=nested_verb_text
+                                )
+                                
+                                # Add the verb itself
+                                self._assign_child(nested_verb_phrase, inf_token_nodes[nested_xcomp_idx], 'verb_head')
+                                
+                                # Add its arguments
+                                nested_args.sort(key=lambda x: x[2])  # Sort by index
+                                for node, label, _ in nested_args:
+                                    self._assign_child(nested_verb_phrase, node, label)
+                                
+                                # Add this nested verb phrase as object of the main xcomp
+                                if xcomp_idx not in xcomp_arguments:
+                                    xcomp_arguments[xcomp_idx] = []
+                                xcomp_arguments[xcomp_idx].append((nested_verb_phrase, 'obj', nested_xcomp_idx))
                             
                             # Check for objects
                             elif token.dep in ['dobj', 'obj'] and token.head == xcomp_idx:

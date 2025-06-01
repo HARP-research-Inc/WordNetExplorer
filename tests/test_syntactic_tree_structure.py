@@ -239,6 +239,49 @@ class TestSyntacticTreeStructure(unittest.TestCase):
         self.assertIn('students', child_texts, "Indirect object should be in verb phrase")
         self.assertIn('homework', child_texts, "Direct object should be in verb phrase")
     
+    def test_quoted_speech(self):
+        """Test handling of quoted speech with complex internal structure."""
+        analysis = self.analyzer.analyze_sentence('He said "stop hitting me you bastard."')
+        
+        # Find verb phrases
+        verb_phrases = self.find_verb_phrases(analysis.syntactic_tree)
+        
+        # Should have at least the main verb "said"
+        self.assertGreater(len(verb_phrases), 0, "Should have verb phrases")
+        
+        # Find the "said" verb phrase
+        said_vp = None
+        for vp in verb_phrases:
+            if 'said' in vp.text:
+                said_vp = vp
+                break
+        
+        self.assertIsNotNone(said_vp, "Should find 'said' verb phrase")
+        
+        # Check structure of "said" verb phrase
+        child_labels = self.get_child_edge_labels(said_vp)
+        self.assertIn('subj', child_labels, "Should have subject 'He'")
+        self.assertIn('verb_head', child_labels, "Should have verb 'said'")
+        
+        # Should have the quoted speech as a complement
+        # Note: SpaCy might parse this as 'ccomp' (clausal complement) or similar
+        has_complement = any(label in ['ccomp', 'obj', 'dobj'] for label in child_labels)
+        self.assertTrue(has_complement, "Should have quoted speech as complement")
+        
+        # The quoted speech should contain "stop"
+        quoted_text_found = False
+        for child in said_vp.children:
+            if 'stop' in child.text.lower():
+                quoted_text_found = True
+                # Check that it contains the full quoted content
+                self.assertIn('hitting', child.text.lower(), 
+                             "Quoted speech should contain 'hitting'")
+                self.assertIn('bastard', child.text.lower(), 
+                             "Quoted speech should contain vocative 'bastard'")
+                break
+        
+        self.assertTrue(quoted_text_found, "Should find the quoted speech content")
+    
     def test_syntactic_tree_has_hierarchical_structure(self):
         """Test that the syntactic tree has proper hierarchical structure."""
         analysis = self.analyzer.analyze_sentence("The quick brown fox jumps over the lazy dog.")
