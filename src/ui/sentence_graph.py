@@ -214,9 +214,9 @@ def visualize_syntactic_graph(G, analysis, settings: Dict) -> str:
     else:
         net.toggle_physics(False)
     
-    # Get sentence analyzer for colors
-    from src.services.sentence_analyzer import SentenceAnalyzer
-    analyzer = SentenceAnalyzer()
+    # Get color helper
+    from src.services.linguistic_colors import LinguisticColors
+    colors = LinguisticColors()
     
     # Add nodes
     for node_id, attrs in G.nodes(data=True):
@@ -243,7 +243,7 @@ def visualize_syntactic_graph(G, analysis, settings: Dict) -> str:
         elif node_type == 'word':
             # Word node
             if attrs.get('pos'):
-                color = analyzer.get_pos_color(attrs.get('tag', ''))
+                color = colors.get_pos_color(attrs.get('tag', ''))
             else:
                 color = '#D5D8DC'
             shape = 'dot'
@@ -271,30 +271,7 @@ def visualize_syntactic_graph(G, analysis, settings: Dict) -> str:
         )
     
     # Add edges with custom styling
-    edge_colors = {
-        'sconj': '#FF6B6B',      # Red - subordinating conjunction
-        'iclause': '#4ECDC4',    # Teal - independent clause
-        'dclause': '#95E1D3',    # Mint - dependent clause
-        'predicate': '#FFD700',  # Gold - predicate/verb phrase
-        'verb': '#FFD93D',       # Yellow - verb
-        'tverb': '#FFD93D',      # Yellow - main verb
-        'subj': '#FF8B94',       # Pink - subject
-        'obj': '#6BCB77',        # Green - object
-        'adv': '#BB8FCE',        # Purple - adverb
-        'adj': '#F7DC6F',        # Yellow - adjective
-        'prep': '#F8C471',       # Orange - preposition
-        'det': '#85C1E2',        # Light blue - determiner
-        'aux': '#ABEBC6',        # Light green - auxiliary
-        'head': '#4169E1',       # Royal blue - head of phrase
-        'prep_phrase': '#FF7F50', # Coral - prepositional phrase
-        'pobj': '#00CED1',       # Dark turquoise - object of preposition
-        'num': '#FF69B4',        # Hot pink - numeral
-        'poss': '#9370DB',       # Medium purple - possessive
-        'compound': '#20B2AA',   # Light sea green - compound
-        'particle': '#FF4500',   # Orange red - phrasal verb particle
-        'particle_phrase': '#FF6347', # Tomato - particle with object
-        'np': '#DDA0DD',         # Plum - noun phrase
-    }
+    edge_colors = LinguisticColors.EDGE_COLORS
     
     for source, target, attrs in G.edges(data=True):
         edge_label = attrs.get('label', '')
@@ -401,48 +378,24 @@ def render_sentence_legend():
             <ul style="list-style: none; padding-left: 0;">
                 <li>📦 <strong>Box (Gold)</strong> - Complete sentence</li>
                 <li>⭕ <strong>Ellipse (Blue)</strong> - Clauses</li>
-                <li>📦 <strong>Box (Plum)</strong> - Phrases (noun phrases, verb phrases, prep phrases)</li>
+                <li>📦 <strong>Box (Plum)</strong> - Phrases (noun phrases, prep phrases)</li>
                 <li>💎 <strong>Diamond</strong> - Words with synsets</li>
                 <li>⚫ <strong>Dot</strong> - Other words</li>
             </ul>
         </div>
         
         <div style="margin-bottom: 15px;">
-            <strong>Major Structure Labels:</strong>
+            <strong>Edge Labels & Colors:</strong>
             <ul style="list-style: none; padding-left: 0;">
-                <li><span style="color: #FFD700;">●</span> <strong>predicate</strong> - Main verb phrase</li>
-                <li><span style="color: #FF8B94;">●</span> <strong>subj</strong> - Subject</li>
-                <li><span style="color: #BB8FCE;">●</span> <strong>adv</strong> - Adverb (sentence level)</li>
-            </ul>
-        </div>
-        
-        <div style="margin-bottom: 15px;">
-            <strong>Phrasal Verb Labels:</strong>
-            <ul style="list-style: none; padding-left: 0;">
-                <li><span style="color: #FFD93D;">●</span> <strong>verb</strong> - Main verb</li>
-                <li><span style="color: #FF6347;">●</span> <strong>particle_phrase</strong> - Particle + object</li>
-                <li><span style="color: #FF4500;">●</span> <strong>particle</strong> - Particle (over, up, etc.)</li>
-            </ul>
-        </div>
-        
-        <div style="margin-bottom: 15px;">
-            <strong>Noun Phrase Labels:</strong>
-            <ul style="list-style: none; padding-left: 0;">
-                <li><span style="color: #DDA0DD;">●</span> <strong>np</strong> - Noun phrase</li>
-                <li><span style="color: #9370DB;">●</span> <strong>poss</strong> - Possessive (my, your, etc.)</li>
+                <li><span style="color: #4169E1;">●</span> <strong>head</strong> - Head word of a phrase</li>
                 <li><span style="color: #F7DC6F;">●</span> <strong>adj</strong> - Adjective modifier</li>
-                <li><span style="color: #4169E1;">●</span> <strong>head</strong> - Head noun</li>
                 <li><span style="color: #85C1E2;">●</span> <strong>det</strong> - Determiner (the, a, an)</li>
-            </ul>
-        </div>
-        
-        <div style="margin-bottom: 15px;">
-            <strong>Other Labels:</strong>
-            <ul style="list-style: none; padding-left: 0;">
-                <li><span style="color: #6BCB77;">●</span> <strong>obj</strong> - Object</li>
                 <li><span style="color: #FF7F50;">●</span> <strong>prep_phrase</strong> - Prepositional phrase</li>
                 <li><span style="color: #F8C471;">●</span> <strong>prep</strong> - Preposition</li>
                 <li><span style="color: #00CED1;">●</span> <strong>pobj</strong> - Object of preposition</li>
+                <li><span style="color: #FFD93D;">●</span> <strong>tverb</strong> - Main (tensed) verb</li>
+                <li><span style="color: #FF8B94;">●</span> <strong>subj</strong> - Subject</li>
+                <li><span style="color: #6BCB77;">●</span> <strong>obj</strong> - Object</li>
             </ul>
         </div>
         
