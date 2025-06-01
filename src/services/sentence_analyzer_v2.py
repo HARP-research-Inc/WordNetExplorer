@@ -402,16 +402,53 @@ class ClauseBuilder:
             # Get or create verb phrase node
             if verb_idx in verb_phrase_nodes and verb_phrase_nodes[verb_idx] is not None:
                 # Already have a phrasal verb phrase
-                verb_phrase = verb_phrase_nodes[verb_idx]
+                phrasal_verb_phrase = verb_phrase_nodes[verb_idx]
+                arguments = verb_arguments.get(verb_idx, [])
+                
+                if arguments:
+                    # Create a wrapper phrase that includes the phrasal verb and its arguments
+                    phrase_parts = []
+                    for arg_node, label in arguments:
+                        if label == 'subj':
+                            phrase_parts.insert(0, arg_node.text)  # Subject goes first
+                    
+                    phrase_parts.append(phrasal_verb_phrase.text)
+                    
+                    for arg_node, label in arguments:
+                        if label != 'subj':
+                            phrase_parts.append(arg_node.text)
+                    
+                    verb_phrase = SyntacticNode(
+                        node_id=self._get_node_id(),
+                        node_type='phrase',
+                        text=' '.join(phrase_parts)
+                    )
+                    
+                    # Add subject first (if any)
+                    for arg_node, edge_label in arguments:
+                        if edge_label == 'subj':
+                            self._assign_child(verb_phrase, arg_node, edge_label)
+                            break
+                    
+                    # Add the phrasal verb
+                    self._assign_child(verb_phrase, phrasal_verb_phrase, 'verb')
+                    
+                    # Add other arguments
+                    for arg_node, edge_label in arguments:
+                        if edge_label != 'subj':
+                            self._assign_child(verb_phrase, arg_node, edge_label)
+                else:
+                    # No arguments, use the phrasal verb phrase as is
+                    verb_phrase = phrasal_verb_phrase
             else:
-                # Create new verb phrase
+                # Create new verb phrase for regular verb
                 verb_token = tokens[verb_idx]
                 arguments = verb_arguments.get(verb_idx, [])
                 
                 # Build text for verb phrase
                 phrase_parts = []
-                for arg_node, _ in arguments:
-                    if any(label == 'subj' for _, label in arguments if _ == arg_node):
+                for arg_node, label in arguments:
+                    if label == 'subj':
                         phrase_parts.insert(0, arg_node.text)  # Subject goes first
                 
                 phrase_parts.append(verb_token.text)
@@ -473,19 +510,42 @@ class ClauseBuilder:
 
         if token.head < len(tokens) and token.head in token_nodes:
             head_node = token_nodes[token.head]
-            # Check if the head is part of a phrasal verb already attached to parent_node
-            is_phrasal_verb_component = False
-            for verb_idx, particles in phrasal_verbs.items():
-                if token.head == verb_idx or token.head in particles:
-                    # If head is part of a phrasal verb already under parent_node, attach PP to parent_node
-                    for child in parent_node.children:
-                        if child.node_type == 'phrase' and child.text == f"{tokens[verb_idx].text} {tokens[particles[0]].text}": # Simplified check
-                            is_phrasal_verb_component = True
-                            break
-                    break
             
-            if not is_phrasal_verb_component:
-                target_parent = head_node # Default to attaching to head
+            # Check if the head is a verb word node
+            if (head_node.node_type == 'word' and 
+                head_node.token_info and 
+                head_node.token_info.pos == 'VERB'):
+                # Don't attach prep phrases to verb word nodes
+                # Instead, check if the verb is part of a verb phrase
+                verb_idx = token.head
+                
+                # Find the verb phrase containing this verb
+                for child in parent_node.children:
+                    if child.node_type == 'phrase' and child.edge_label in ['tverb', 'verb']:
+                        # Check if this phrase contains our verb
+                        for grandchild in child.children:
+                            if (grandchild.node_type == 'word' and 
+                                grandchild.token_info and 
+                                grandchild.token_info.index == verb_idx):
+                                # Found the verb phrase containing our verb
+                                target_parent = child
+                                break
+                        if target_parent != parent_node:
+                            break
+            else:
+                # Check if the head is part of a phrasal verb already attached to parent_node
+                is_phrasal_verb_component = False
+                for verb_idx, particles in phrasal_verbs.items():
+                    if token.head == verb_idx or token.head in particles:
+                        # If head is part of a phrasal verb already under parent_node, attach PP to parent_node
+                        for child in parent_node.children:
+                            if child.node_type == 'phrase' and child.text == f"{tokens[verb_idx].text} {tokens[particles[0]].text}": # Simplified check
+                                is_phrasal_verb_component = True
+                                break
+                        break
+                
+                if not is_phrasal_verb_component and head_node.parent == parent_node:
+                    target_parent = head_node # Default to attaching to head
         
         self._assign_child(target_parent, prep_phrase_node, edge_label)
 

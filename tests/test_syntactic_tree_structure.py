@@ -152,7 +152,17 @@ class TestSyntacticTreeStructure(unittest.TestCase):
         self.assertGreater(len(verb_phrases), 0, 
                           "Should have verb phrase for phrasal verb")
         
-        vp = verb_phrases[0]
+        # Find the verb phrase that contains the subject (the outermost one)
+        vp_with_subject = None
+        for vp in verb_phrases:
+            child_labels = self.get_child_edge_labels(vp)
+            if 'subj' in child_labels:
+                vp_with_subject = vp
+                break
+        
+        self.assertIsNotNone(vp_with_subject, "Should find verb phrase with subject")
+        
+        vp = vp_with_subject
         child_labels = self.get_child_edge_labels(vp)
         
         # Should have subject and object as siblings
