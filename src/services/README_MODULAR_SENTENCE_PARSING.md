@@ -1,124 +1,169 @@
 # Modular Sentence Parsing Architecture
 
-This document describes the modularized sentence parsing system, refactored from the monolithic `sentence_analyzer.py` into focused, reusable components.
+This directory contains a highly modular sentence parsing system designed for maximum maintainability and extensibility.
 
-## Overview
+## 📦 Components Overview
 
-The sentence parsing functionality has been broken down into the following modules:
+### Core Analysis Modules
 
-### 1. `token_analyzer.py`
-**Purpose**: Analyzes individual tokens and retrieves WordNet synsets
+#### 1. `token_analyzer.py`
+- **Purpose**: Analyzes individual tokens and retrieves WordNet synsets
+- **Key Classes**: 
+  - `TokenInfo`: Data class containing token linguistic information
+  - `TokenAnalyzer`: Extracts token features and synsets
+- **Responsibilities**:
+  - Extract POS tags, dependencies, lemmas
+  - Retrieve all possible WordNet synsets for each token
 
-**Key Components**:
-- `TokenInfo`: Data class representing parsed token information
-- `TokenAnalyzer`: Handles token analysis and synset retrieval
-  - Maps POS tags to WordNet POS
-  - Special handling for adpositions (ADP) that might be adverbs
-  - Filters out function words without synsets
+#### 2. `token_disambiguator.py`
+- **Purpose**: Selects the best WordNet sense for each token based on context
+- **Key Classes**: `TokenDisambiguator`
+- **Responsibilities**:
+  - Filter out overly technical or domain-specific definitions
+  - Select most appropriate sense based on context
 
-### 2. `token_disambiguator.py`
-**Purpose**: Selects the best synset for tokens based on context
+### Tree Building Modules
 
-**Key Components**:
-- `TokenDisambiguator`: Handles word sense disambiguation
-  - Filters technical senses for common words
-  - Special handling for phrasal verb particles
-  - Context-aware sense selection
+#### 3. `syntactic_tree.py`
+- **Purpose**: Defines tree structures and phrase building utilities
+- **Key Classes**:
+  - `SyntacticNode`: Core tree node structure
+  - `PhraseBuilder`: Builds noun phrases and prepositional phrases
+  - `EdgeLabelMapper`: Maps dependencies to edge labels
+- **Responsibilities**:
+  - Create hierarchical noun phrases with proper layering
+  - Build prepositional phrases
+  - Map dependency relations to tree edge labels
 
-### 3. `syntactic_tree.py`
-**Purpose**: Data structures and builders for syntactic trees
+#### 4. `clause_identifier.py`
+- **Purpose**: Identifies clause boundaries in sentences
+- **Key Classes**: `ClauseIdentifier`
+- **Responsibilities**:
+  - Detect main and subordinate clauses
+  - Group tokens by their clause membership
+  - Handle simple and complex sentence structures
 
-**Key Components**:
-- `SyntacticNode`: Tree node structure with parent/child relationships
-- `PhraseBuilder`: Builds phrase structures (noun phrases, prep phrases)
-- `EdgeLabelMapper`: Maps dependency relations to semantic edge labels
+#### 5. `clause_builder.py`
+- **Purpose**: Builds syntactic tree structures for clauses
+- **Key Classes**: `ClauseBuilder`
+- **Responsibilities**:
+  - Create word nodes for tokens
+  - Build phrases from tokens
+  - Handle sentence-level adverbs
+  - Attach phrases to appropriate parents
 
-### 4. `linguistic_colors.py`
-**Purpose**: Centralized color mappings for visualization
+#### 6. `tree_postprocessor.py`
+- **Purpose**: Refines tree structures for better visualization
+- **Key Classes**: `TreePostProcessor`
+- **Responsibilities**:
+  - Group related object phrases
+  - Reinterpret phrasal verbs
+  - Restructure clauses for cleaner presentation
+  - Move punctuation to appropriate positions
 
-**Key Components**:
-- `LinguisticColors`: Static methods and constants for colors
+### Utility Modules
+
+#### 7. `phrasal_verb_handler.py`
+- **Purpose**: Identifies and handles multi-word verb constructions
+- **Key Classes**: `PhrasalVerbHandler`
+- **Responsibilities**:
+  - Detect phrasal verbs (e.g., "run over", "look up")
+  - Create verb phrase nodes
+  - Handle verb particles correctly
+
+#### 8. `linguistic_colors.py`
+- **Purpose**: Centralized color mappings for visualization
+- **Key Classes**: `LinguisticColors`
+- **Data**:
   - POS tag colors
   - Dependency relation colors
-  - Edge color mappings
+  - Edge colors for syntactic tree
   - Node type colors
 
-### 5. `sentence_analyzer_v2.py`
-**Purpose**: Main analyzer that orchestrates all components
+### Main Orchestrators
 
-**Key Components**:
-- `SentenceAnalysis`: Data class for complete sentence analysis
-- `SentenceAnalyzerV2`: Main analyzer class
-  - Uses all modular components
-  - Lazy loads spaCy model
-  - Builds syntactic tree with clauses and phrases
-- `ClauseIdentifier`: Identifies clause boundaries
-- `ClauseBuilder`: Builds clause structures using phrase builders
+#### 9. `sentence_analyzer_v2.py` (Legacy)
+- **Purpose**: Original modular implementation
+- **Status**: Fully functional but larger file
 
-## Benefits of Modularization
+#### 10. `sentence_analyzer_v3.py` (Recommended)
+- **Purpose**: Streamlined orchestrator using all modular components
+- **Key Classes**:
+  - `SentenceAnalysis`: Output data structure
+  - `SentenceAnalyzer`: Main orchestrator
+- **Workflow**:
+  1. Parse with spaCy
+  2. Analyze tokens
+  3. Disambiguate senses
+  4. Identify clauses
+  5. Build clause trees
+  6. Post-process for visualization
 
-1. **Separation of Concerns**: Each module has a single, focused responsibility
-2. **Reusability**: Components can be used independently in other parts of the system
-3. **Testability**: Each module can be unit tested in isolation
-4. **Maintainability**: Easier to modify or extend specific functionality
-5. **Readability**: Smaller, focused files are easier to understand
+## 🔄 Processing Pipeline
 
-## Usage Example
-
-```python
-from src.services.sentence_analyzer_v2 import SentenceAnalyzerV2
-
-# Create analyzer
-analyzer = SentenceAnalyzerV2()
-
-# Analyze a sentence
-analysis = analyzer.analyze_sentence("The quick brown fox jumps over the lazy dog.")
-
-# Access results
-for token in analysis.tokens:
-    if token.best_synset:
-        print(f"{token.text}: {token.best_synset[1]}")
-
-# Access syntactic tree
-print(f"Root node type: {analysis.syntactic_tree.node_type}")
+```
+Input Sentence
+    ↓
+spaCy Parsing
+    ↓
+Token Analysis (token_analyzer.py)
+    ↓
+Sense Disambiguation (token_disambiguator.py)
+    ↓
+Clause Identification (clause_identifier.py)
+    ↓
+For each clause:
+    ├── Phrasal Verb Detection (phrasal_verb_handler.py)
+    ├── Phrase Building (syntactic_tree.py)
+    └── Clause Tree Construction (clause_builder.py)
+    ↓
+Post-Processing (tree_postprocessor.py)
+    ↓
+Final Syntactic Tree
 ```
 
-## Extension Points
+## 🎯 Design Principles
 
-The modular architecture makes it easy to extend functionality:
+1. **Single Responsibility**: Each module has one clear purpose
+2. **Loose Coupling**: Components communicate through well-defined interfaces
+3. **High Cohesion**: Related functionality is grouped together
+4. **Testability**: Each component can be tested in isolation
+5. **Extensibility**: New features can be added without modifying existing code
 
-1. **Add new phrase types**: Extend `PhraseBuilder` with methods for verb phrases, adjective phrases, etc.
-2. **Improve disambiguation**: Replace simple heuristics in `TokenDisambiguator` with ML-based approaches
-3. **Custom visualizations**: Use `LinguisticColors` constants for consistent styling
-4. **Alternative parsers**: Replace spaCy with other NLP libraries by modifying `TokenAnalyzer`
+## 🔧 Usage Example
 
-## Migration Notes
+```python
+from src.services.sentence_analyzer_v3 import SentenceAnalyzer
 
-To use the new modular system:
+analyzer = SentenceAnalyzer()
+analysis = analyzer.analyze_sentence("I gleefully ran over my fat friend with a scooter")
 
-1. Replace imports:
-   ```python
-   # Old
-   from src.services.sentence_analyzer import SentenceAnalyzer
-   
-   # New
-   from src.services.sentence_analyzer_v2 import SentenceAnalyzerV2
-   ```
+# Access results
+print(f"Tokens: {len(analysis.tokens)}")
+print(f"Root: {analysis.tokens[analysis.root_index].text}")
+print(f"Tree: {analysis.syntactic_tree}")
+```
 
-2. The API remains the same - `analyze_sentence()` returns the same `SentenceAnalysis` object
+## 📊 Key Improvements
 
-3. Color methods are now accessed via the `colors` attribute:
-   ```python
-   # Old
-   analyzer.get_pos_color(tag)
-   
-   # New
-   analyzer.colors.get_pos_color(tag)
-   ```
+1. **Modular Architecture**: 10 focused modules instead of 1-2 large files
+2. **Hierarchical Noun Phrases**: Proper layering of determiners, adjectives, etc.
+3. **Phrasal Verb Support**: Correctly handles multi-word verbs
+4. **Clean Visualization**: Post-processed trees for better display
+5. **Maintainable Code**: Each module is small and focused
 
-## Future Improvements
+## 🔄 Migration Notes
 
-1. **Advanced Disambiguation**: Integrate with the existing `sense_similarity.py` module for context-based disambiguation
-2. **Coreference Resolution**: Add module for tracking entity references across clauses
-3. **Semantic Role Labeling**: Add module for identifying semantic roles (agent, patient, etc.)
-4. **Multi-language Support**: Abstract language-specific logic into separate modules 
+To use the new modular system in existing code:
+
+```python
+# Old import
+from src.services.sentence_analyzer import SentenceAnalyzer
+
+# New import (recommended)
+from src.services.sentence_analyzer_v3 import SentenceAnalyzer
+
+# The API remains the same!
+```
+
+The new system maintains backward compatibility while providing cleaner, more maintainable code. 
