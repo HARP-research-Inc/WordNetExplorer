@@ -482,6 +482,13 @@ def render_sentence_sidebar():
                 key="sentence_disambiguate",
                 help="Automatically select the most likely sense for each word (experimental)"
             )
+            
+            decompose_lemmas = st.checkbox(
+                "Decompose to lemmas",
+                value=False,
+                key="sentence_decompose_lemmas",
+                help="Show word lemmas with grammatical information (e.g., 'ran' → 'run' [past])"
+            )
         
         st.markdown("---")
         
@@ -499,6 +506,13 @@ def render_sentence_sidebar():
             - Common words avoid overly technical definitions (no "iodine" for "I"!)
             - Phrasal verb particles (like "over" in "run over") are handled correctly
             - Context-aware sense selection filters out inappropriate meanings
+            
+            **Advanced Features:**
+            - **Lemma Decomposition**: When enabled, shows the base form (lemma) of words with grammatical information:
+              - "ran" → "run" [past tense]
+              - "dogs" → "dog" [plural]
+              - "better" → "good" [comparative]
+              - "organizing" → "organize" [gerund]
             
             **The visualization shows:**
             - Complete sentence as the root node
@@ -527,7 +541,8 @@ def render_sentence_sidebar():
         'synset_limit': synset_limit,
         'show_synset_details': show_synset_details,
         'enable_physics': enable_physics,
-        'disambiguate_senses': disambiguate_senses
+        'disambiguate_senses': disambiguate_senses,
+        'decompose_lemmas': decompose_lemmas
     }
 
 
@@ -563,7 +578,7 @@ def render_sentence_content(explorer, session_manager, settings):
     
     # Import required modules
     try:
-        from src.services.sentence_analyzer_v2 import SentenceAnalyzerV2 as SentenceAnalyzer
+        from src.services.sentence_analyzer_v3 import SentenceAnalyzer
         from src.ui.sentence_graph import render_sentence_graph_visualization, render_sentence_legend
     except ImportError as e:
         st.error(f"Error importing required modules: {e}")
@@ -575,7 +590,7 @@ def render_sentence_content(explorer, session_manager, settings):
     with st.spinner(f"Analyzing sentence..."):
         try:
             analyzer = SentenceAnalyzer()
-            analysis = analyzer.analyze_sentence(sentence)
+            analysis = analyzer.analyze_sentence(sentence, decompose_lemmas=settings.get('decompose_lemmas', False))
             
             st.success(f"Analyzed sentence with {len(analysis.tokens)} tokens")
             

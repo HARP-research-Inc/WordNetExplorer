@@ -404,6 +404,20 @@ def render_sentence_legend():
         </div>
         
         <div style="margin-bottom: 15px;">
+            <strong>Lemma Decomposition Labels:</strong>
+            <ul style="list-style: none; padding-left: 0;">
+                <li><span style="color: #8B008B;">●</span> <strong>past</strong> - Past tense verb</li>
+                <li><span style="color: #FF1493;">●</span> <strong>present</strong> - Present tense verb</li>
+                <li><span style="color: #DA70D6;">●</span> <strong>gerund</strong> - Gerund/progressive form</li>
+                <li><span style="color: #9932CC;">●</span> <strong>past_part</strong> - Past participle</li>
+                <li><span style="color: #2E8B57;">●</span> <strong>singular</strong> - Singular noun</li>
+                <li><span style="color: #3CB371;">●</span> <strong>plural</strong> - Plural noun</li>
+                <li><span style="color: #1E90FF;">●</span> <strong>comparative</strong> - Comparative form</li>
+                <li><span style="color: #0000CD;">●</span> <strong>superlative</strong> - Superlative form</li>
+            </ul>
+        </div>
+        
+        <div style="margin-bottom: 15px;">
             <strong>Part of Speech Colors (Words):</strong>
             <ul style="list-style: none; padding-left: 0;">
                 <li><span style="color: #FFB6C1;">●</span> Nouns</li>

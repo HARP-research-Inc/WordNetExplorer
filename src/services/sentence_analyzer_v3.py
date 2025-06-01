@@ -70,12 +70,13 @@ class SentenceAnalyzer:
         self._node_counter += 1
         return f"node_{self._node_counter}"
     
-    def analyze_sentence(self, sentence: str) -> SentenceAnalysis:
+    def analyze_sentence(self, sentence: str, decompose_lemmas: bool = False) -> SentenceAnalysis:
         """
         Analyze a sentence and extract linguistic information.
         
         Args:
             sentence: The sentence to analyze
+            decompose_lemmas: Whether to decompose words into lemmas with grammatical info
             
         Returns:
             SentenceAnalysis object with parsed information
@@ -93,7 +94,7 @@ class SentenceAnalyzer:
         self._token_disambiguator.disambiguate_tokens(tokens, doc)
         
         # Step 4: Build syntactic tree
-        syntactic_tree = self._build_syntactic_tree(doc, tokens)
+        syntactic_tree = self._build_syntactic_tree(doc, tokens, decompose_lemmas)
         
         # Find root token
         root_index = next((i for i, t in enumerate(tokens) if t.dep == "ROOT"), 0)
@@ -115,7 +116,7 @@ class SentenceAnalyzer:
         
         return tokens
     
-    def _build_syntactic_tree(self, doc, tokens: List[TokenInfo]) -> SyntacticNode:
+    def _build_syntactic_tree(self, doc, tokens: List[TokenInfo], decompose_lemmas: bool = False) -> SyntacticNode:
         """Build syntactic tree from tokens."""
         # Create root sentence node
         root = SyntacticNode(
@@ -130,15 +131,15 @@ class SentenceAnalyzer:
         # Build clause structures
         if len(clauses) == 1:
             # Simple sentence
-            self._build_simple_sentence(root, clauses[0], tokens)
+            self._build_simple_sentence(root, clauses[0], tokens, decompose_lemmas)
         else:
             # Complex sentence
-            self._build_complex_sentence(root, clauses, tokens, doc)
+            self._build_complex_sentence(root, clauses, tokens, doc, decompose_lemmas)
         
         return root
     
     def _build_simple_sentence(self, root: SyntacticNode, clause_indices: List[int], 
-                              tokens: List[TokenInfo]):
+                              tokens: List[TokenInfo], decompose_lemmas: bool = False):
         """Build structure for a simple sentence."""
         clause_builder = ClauseBuilder(self._get_node_id)
         tree_processor = TreePostProcessor(self._get_node_id)
@@ -150,9 +151,13 @@ class SentenceAnalyzer:
         tree_processor.group_object_phrases(root, tokens, clause_indices)
         tree_processor.reinterpret_phrasal_verbs(root, tokens)
         tree_processor.restructure_clause_for_presentation(root, tokens)
+        
+        # Apply lemma decomposition if requested
+        if decompose_lemmas:
+            tree_processor.decompose_lemmas(root)
     
     def _build_complex_sentence(self, root: SyntacticNode, clauses: List[List[int]], 
-                               tokens: List[TokenInfo], doc):
+                               tokens: List[TokenInfo], doc, decompose_lemmas: bool = False):
         """Build structure for a complex sentence with multiple clauses."""
         clause_builder = ClauseBuilder(self._get_node_id)
         tree_processor = TreePostProcessor(self._get_node_id)
@@ -214,6 +219,10 @@ class SentenceAnalyzer:
                 tree_processor.group_object_phrases(clause_node, tokens, clause_indices)
                 tree_processor.reinterpret_phrasal_verbs(clause_node, tokens)
                 tree_processor.restructure_clause_for_presentation(clause_node, tokens)
+        
+        # Apply lemma decomposition if requested
+        if decompose_lemmas:
+            tree_processor.decompose_lemmas(root)
     
     # Color methods for backward compatibility
     def get_pos_color(self, pos: str) -> str:

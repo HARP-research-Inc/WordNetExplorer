@@ -71,7 +71,26 @@ class LinguisticColors:
         'particle': '#DDA0DD',    # Plum - particle
         'obj_group': '#98FB98',   # Pale green - object group
         'part': '#F0E68C',       # Khaki - part of group
-        'core': '#87CEEB'        # Sky blue - core of phrase
+        'core': '#87CEEB',       # Sky blue - core of phrase
+        # Lemma decomposition edges
+        'base': '#4B0082',       # Indigo - base form
+        'past': '#8B008B',       # Dark magenta - past tense
+        'present': '#FF1493',    # Deep pink - present tense
+        'present_3sg': '#FF69B4', # Hot pink - 3rd person singular
+        'gerund': '#DA70D6',     # Orchid - gerund/progressive
+        'past_part': '#9932CC',  # Dark orchid - past participle
+        'singular': '#2E8B57',   # Sea green - singular
+        'plural': '#3CB371',     # Medium sea green - plural
+        'proper_sg': '#228B22',  # Forest green - proper singular
+        'proper_pl': '#006400',  # Dark green - proper plural
+        'positive': '#4682B4',   # Steel blue - positive degree
+        'comparative': '#1E90FF', # Dodger blue - comparative
+        'superlative': '#0000CD', # Medium blue - superlative
+        'verb_form': '#8A2BE2',  # Blue violet - generic verb form
+        'noun_form': '#32CD32',  # Lime green - generic noun form
+        'adj_form': '#6495ED',   # Cornflower blue - generic adj form
+        'adv_form': '#DC143C',   # Crimson - generic adv form
+        'form': '#708090'        # Slate gray - generic form
     }
     
     # Node colors for syntactic tree

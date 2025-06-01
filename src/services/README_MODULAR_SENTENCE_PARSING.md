@@ -60,6 +60,7 @@ This directory contains a highly modular sentence parsing system designed for ma
   - Reinterpret phrasal verbs
   - Restructure clauses for cleaner presentation
   - Move punctuation to appropriate positions
+  - Apply lemma decomposition (when enabled)
 
 ### Utility Modules
 
@@ -71,7 +72,16 @@ This directory contains a highly modular sentence parsing system designed for ma
   - Create verb phrase nodes
   - Handle verb particles correctly
 
-#### 8. `linguistic_colors.py`
+#### 8. `lemma_decomposer.py`
+- **Purpose**: Decomposes words into lemmas with grammatical annotations
+- **Key Classes**: `LemmaDecomposer`
+- **Responsibilities**:
+  - Identify words that differ from their lemmas
+  - Create hierarchical structure showing lemma + grammatical form
+  - Generate appropriate edge labels (past, plural, comparative, etc.)
+  - Handle verbs, nouns, adjectives, and adverbs
+
+#### 9. `linguistic_colors.py`
 - **Purpose**: Centralized color mappings for visualization
 - **Key Classes**: `LinguisticColors`
 - **Data**:
@@ -79,14 +89,15 @@ This directory contains a highly modular sentence parsing system designed for ma
   - Dependency relation colors
   - Edge colors for syntactic tree
   - Node type colors
+  - Lemma decomposition edge colors
 
 ### Main Orchestrators
 
-#### 9. `sentence_analyzer_v2.py` (Legacy)
+#### 10. `sentence_analyzer_v2.py` (Legacy)
 - **Purpose**: Original modular implementation
 - **Status**: Fully functional but larger file
 
-#### 10. `sentence_analyzer_v3.py` (Recommended)
+#### 11. `sentence_analyzer_v3.py` (Recommended)
 - **Purpose**: Streamlined orchestrator using all modular components
 - **Key Classes**:
   - `SentenceAnalysis`: Output data structure
@@ -98,6 +109,7 @@ This directory contains a highly modular sentence parsing system designed for ma
   4. Identify clauses
   5. Build clause trees
   6. Post-process for visualization
+  7. Apply lemma decomposition (optional)
 
 ## 🔄 Processing Pipeline
 
@@ -118,6 +130,9 @@ For each clause:
     └── Clause Tree Construction (clause_builder.py)
     ↓
 Post-Processing (tree_postprocessor.py)
+    ├── Group objects
+    ├── Restructure clauses
+    └── Lemma Decomposition (optional, lemma_decomposer.py)
     ↓
 Final Syntactic Tree
 ```
@@ -136,7 +151,15 @@ Final Syntactic Tree
 from src.services.sentence_analyzer_v3 import SentenceAnalyzer
 
 analyzer = SentenceAnalyzer()
+
+# Basic analysis
 analysis = analyzer.analyze_sentence("I gleefully ran over my fat friend with a scooter")
+
+# With lemma decomposition
+analysis = analyzer.analyze_sentence(
+    "The dogs were running quickly",
+    decompose_lemmas=True
+)
 
 # Access results
 print(f"Tokens: {len(analysis.tokens)}")
@@ -146,11 +169,12 @@ print(f"Tree: {analysis.syntactic_tree}")
 
 ## 📊 Key Improvements
 
-1. **Modular Architecture**: 10 focused modules instead of 1-2 large files
+1. **Modular Architecture**: 11 focused modules instead of 1-2 large files
 2. **Hierarchical Noun Phrases**: Proper layering of determiners, adjectives, etc.
 3. **Phrasal Verb Support**: Correctly handles multi-word verbs
 4. **Clean Visualization**: Post-processed trees for better display
 5. **Maintainable Code**: Each module is small and focused
+6. **Lemma Decomposition**: Optional feature to show word forms with grammatical info
 
 ## 🔄 Migration Notes
 

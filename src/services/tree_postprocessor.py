@@ -320,4 +320,39 @@ class TreePostProcessor:
         
         # Re-add punctuation at the end
         for punct in punct_nodes:
-            clause_node.children.append(punct) 
+            clause_node.children.append(punct)
+    
+    def decompose_lemmas(self, node: SyntacticNode):
+        """
+        Recursively decompose word nodes into lemmas when appropriate.
+        
+        This should be called after all other processing is complete.
+        """
+        from src.services.lemma_decomposer import LemmaDecomposer
+        
+        decomposer = LemmaDecomposer(self._get_node_id)
+        
+        # Process current node if it's a word
+        if node.node_type == 'word' and node.token_info:
+            # Check if this node should be decomposed
+            if decomposer.should_decompose(node.token_info):
+                # Get parent and edge label before decomposition
+                parent = node.parent
+                edge_label = node.edge_label
+                
+                # Decompose the node
+                decomposed = decomposer.decompose_word_node(node)
+                
+                # If decomposition happened, update parent's children
+                if decomposed != node and parent:
+                    # Find and replace in parent's children list
+                    for i, child in enumerate(parent.children):
+                        if child == node:
+                            parent.children[i] = decomposed
+                            decomposed.parent = parent
+                            decomposed.edge_label = edge_label
+                            break
+        
+        # Recursively process children
+        for child in node.children[:]:  # Copy list to avoid modification issues
+            self.decompose_lemmas(child) 
