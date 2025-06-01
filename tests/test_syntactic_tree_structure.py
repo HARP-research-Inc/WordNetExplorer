@@ -121,10 +121,28 @@ class TestSyntacticTreeStructure(unittest.TestCase):
         # Should have subject
         self.assertIn('subj', child_labels, "Should have subject")
         
-        # Should have auxiliary verbs as children or within the structure
-        aux_count = sum(1 for label in child_labels if 'aux' in label)
-        self.assertGreaterEqual(aux_count, 1, 
-                               "Should have auxiliary verbs in verb phrase")
+        # Should have a verb sub-phrase that contains auxiliaries
+        verb_subphrase = None
+        for child in vp.children:
+            if child.edge_label == 'verb' and child.node_type == 'phrase':
+                verb_subphrase = child
+                break
+        
+        self.assertIsNotNone(verb_subphrase, 
+                            "Should have verb sub-phrase containing auxiliaries and main verb")
+        
+        # Check the verb sub-phrase contains auxiliaries
+        subphrase_labels = self.get_child_edge_labels(verb_subphrase)
+        aux_count = sum(1 for label in subphrase_labels if label == 'aux')
+        self.assertGreaterEqual(aux_count, 2, 
+                               "Should have 'has' and 'been' as auxiliaries")
+        
+        # Should have the main verb
+        self.assertIn('verb_head', subphrase_labels, "Should have main verb")
+        
+        # Check the text includes all parts
+        self.assertEqual(verb_subphrase.text, "has been running",
+                        "Verb sub-phrase should contain all auxiliary verbs and main verb")
     
     def test_verb_not_directly_under_clause(self):
         """Test that verbs are not direct children of clauses but wrapped in phrases."""

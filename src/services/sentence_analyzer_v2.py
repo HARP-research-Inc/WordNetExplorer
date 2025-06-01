@@ -607,37 +607,36 @@ class ClauseBuilder:
                     if label == 'subj':
                         all_elements.append((arg_idx, arg_node, label))
                 
-                # If we have modal auxiliaries, create a sub-phrase for modal+verb
-                if modal_aux_nodes:
-                    # Create modal+verb phrase
-                    modal_verb_elements = []
-                    modal_verb_elements.extend([(idx, node, 'aux') for idx, node in modal_aux_nodes])
-                    modal_verb_elements.append((verb_idx, token_nodes[verb_idx], 'verb_head'))
+                # Group ALL auxiliaries with the verb, not just modals
+                # Combine modal and other auxiliaries
+                all_aux_nodes = modal_aux_nodes + other_aux_nodes
+                
+                if all_aux_nodes:
+                    # Create aux+verb phrase
+                    aux_verb_elements = []
+                    aux_verb_elements.extend([(idx, node, 'aux') for idx, node in all_aux_nodes])
+                    aux_verb_elements.append((verb_idx, token_nodes[verb_idx], 'verb_head'))
                     
                     # Sort by index to preserve order
-                    modal_verb_elements.sort(key=lambda x: x[0])
+                    aux_verb_elements.sort(key=lambda x: x[0])
                     
                     # Create phrase text
-                    modal_verb_text = ' '.join([node.text for _, node, _ in modal_verb_elements])
+                    aux_verb_text = ' '.join([node.text for _, node, _ in aux_verb_elements])
                     
-                    # Create modal+verb phrase node
-                    modal_verb_phrase = SyntacticNode(
+                    # Create aux+verb phrase node
+                    aux_verb_phrase = SyntacticNode(
                         node_id=self._get_node_id(),
                         node_type='phrase',
-                        text=modal_verb_text
+                        text=aux_verb_text
                     )
                     
-                    # Add children to modal+verb phrase
-                    for _, node, label in modal_verb_elements:
-                        self._assign_child(modal_verb_phrase, node, label)
+                    # Add children to aux+verb phrase
+                    for _, node, label in aux_verb_elements:
+                        self._assign_child(aux_verb_phrase, node, label)
                     
-                    # Add modal+verb phrase to all_elements
-                    min_idx = min(idx for idx, _, _ in modal_verb_elements)
-                    all_elements.append((min_idx, modal_verb_phrase, 'verb'))
-                    
-                    # Add other auxiliaries separately
-                    for idx, node in other_aux_nodes:
-                        all_elements.append((idx, node, 'aux'))
+                    # Add aux+verb phrase to all_elements
+                    min_idx = min(idx for idx, _, _ in aux_verb_elements)
+                    all_elements.append((min_idx, aux_verb_phrase, 'verb'))
                 else:
                     # No modal auxiliaries, add elements as before
                     # Add auxiliaries and the verb in proper order
