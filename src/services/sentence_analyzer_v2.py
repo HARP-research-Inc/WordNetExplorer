@@ -114,18 +114,103 @@ class SentenceAnalyzerV2:
             text=doc.text
         )
         
-        # Identify clauses
-        clauses = self._identify_clauses(doc, tokens)
+        # First, identify quoted speech segments
+        quoted_segments = self._identify_quoted_segments(doc, tokens)
         
-        if len(clauses) == 1:
-            # Simple sentence - build directly
-            clause_builder = ClauseBuilder(self._get_node_id)
-            clause_builder.build_clause_tree(root, clauses[0], tokens, 'main')
+        # If we have quoted speech, handle it specially
+        if quoted_segments:
+            self._build_sentence_with_quotes(root, doc, tokens, quoted_segments)
         else:
-            # Complex sentence - identify relationships
-            self._build_complex_sentence_tree(root, clauses, tokens, doc)
+            # No quotes, proceed with normal clause identification
+            clauses = self._identify_clauses(doc, tokens)
+            
+            if len(clauses) == 1:
+                # Simple sentence - build directly
+                clause_builder = ClauseBuilder(self._get_node_id)
+                clause_builder.build_clause_tree(root, clauses[0], tokens, 'main')
+            else:
+                # Complex sentence - identify relationships
+                self._build_complex_sentence_tree(root, clauses, tokens, doc)
         
         return root
+    
+    def _identify_quoted_segments(self, doc, tokens: List[TokenInfo]) -> List[Dict[str, any]]:
+        """Identify quoted speech segments in the sentence."""
+        segments = []
+        in_quote = False
+        quote_start = -1
+        
+        for i, token in enumerate(doc):
+            if token.text == '"':
+                if not in_quote:
+                    quote_start = i
+                    in_quote = True
+                else:
+                    # End of quote
+                    segments.append({
+                        'start': quote_start,
+                        'end': i,
+                        'indices': list(range(quote_start, i + 1))
+                    })
+                    in_quote = False
+        
+        return segments
+    
+    def _build_sentence_with_quotes(self, root: SyntacticNode, doc, tokens: List[TokenInfo], 
+                                   quoted_segments: List[Dict[str, any]]):
+        """Build sentence tree when quoted speech is present."""
+        all_indices = list(range(len(tokens)))
+        quoted_indices = set()
+        
+        for segment in quoted_segments:
+            quoted_indices.update(segment['indices'])
+        
+        # Get non-quoted indices
+        non_quoted_indices = [i for i in all_indices if i not in quoted_indices]
+        
+        # Build the main clause (non-quoted parts)
+        if non_quoted_indices:
+            clause_builder = ClauseBuilder(self._get_node_id)
+            # Find continuous segments of non-quoted text
+            segments = []
+            current_segment = []
+            
+            for i in all_indices:
+                if i in non_quoted_indices:
+                    current_segment.append(i)
+                elif current_segment:
+                    segments.append(current_segment)
+                    current_segment = []
+            
+            if current_segment:
+                segments.append(current_segment)
+            
+            # For now, treat all non-quoted segments as one clause
+            # This could be refined to handle multiple clauses outside quotes
+            main_indices = []
+            for seg in segments:
+                main_indices.extend(seg)
+            
+            if main_indices:
+                clause_builder.build_clause_tree(root, main_indices, tokens, 'main')
+        
+        # Build quoted segments
+        for segment in quoted_segments:
+            # Create a quoted speech node
+            quote_text = ' '.join([tokens[i].text for i in segment['indices']])
+            quote_node = SyntacticNode(
+                node_id=self._get_node_id(),
+                node_type='quote',
+                text=quote_text
+            )
+            
+            # Build the internal structure of the quote
+            clause_builder = ClauseBuilder(self._get_node_id)
+            clause_builder.build_clause_tree(quote_node, segment['indices'], tokens, 'quoted')
+            
+            # Attach quote to root
+            # Need to find where it belongs - for now, attach to root
+            root.add_child(quote_node, 'quote')
     
     def _identify_clauses(self, doc, tokens: List[TokenInfo]) -> List[List[int]]:
         """Identify clauses in the sentence."""
@@ -346,8 +431,11 @@ class ClauseBuilder:
             )
             token_nodes[idx] = word_node
         
+        # Check if we're inside quoted speech based on clause_type
+        in_quotes = clause_type == 'quoted'
+        
         # First identify vocatives (highest priority)
-        vocatives = self._identify_vocatives(clause_indices, tokens, token_nodes)
+        vocatives = self._identify_vocatives(clause_indices, tokens, token_nodes, in_quotes)
         
         # Then identify sentence adverbs
         sentence_adverbs = self._identify_sentence_adverbs(clause_indices, tokens)
@@ -359,6 +447,10 @@ class ClauseBuilder:
         # Add vocatives first (only those with actual nodes)
         for voc_idx, voc_node in vocatives.items():
             if voc_node is not None:  # Only add actual vocative nodes
+                # If vocative is a full clause, build its internal structure
+                if voc_node.node_type == 'clause' and voc_node.children:
+                    # Build internal structure for complex vocatives
+                    self._build_vocative_internal_structure(voc_node, tokens)
                 self._assign_child(clause_node, voc_node, 'vocative')
         
         # Then add sentence adverbs
@@ -380,25 +472,62 @@ class ClauseBuilder:
             else:
                 self._build_clause_content(clause_node, remaining_indices, tokens, token_nodes)
     
+    def _build_vocative_internal_structure(self, voc_node: SyntacticNode, tokens: List[TokenInfo]):
+        """Build internal structure for vocative phrases."""
+        # Find word nodes in the vocative
+        word_nodes = [child for child in voc_node.children if child.node_type == 'word' and child.edge_label == 'word']
+        
+        if len(word_nodes) >= 2:
+            # Check for patterns like "you ungrateful jerk"
+            # First word might be pronoun/determiner, rest form a noun phrase
+            first_word = word_nodes[0]
+            
+            if first_word.token_info and first_word.token_info.pos in ['PRON', 'DET']:
+                # Create noun phrase for the rest
+                if len(word_nodes) > 2:
+                    # Multiple words after pronoun - create phrase
+                    np_text = ' '.join([node.text for node in word_nodes[1:]])
+                    np_node = SyntacticNode(
+                        node_id=self._get_node_id(),
+                        node_type='phrase',
+                        text=np_text
+                    )
+                    
+                    # Move word nodes to noun phrase
+                    for i, node in enumerate(word_nodes[1:]):
+                        voc_node.children.remove(node)
+                        if i == len(word_nodes) - 2:  # Last word is head
+                            np_node.add_child(node, 'head')
+                        else:
+                            # Determine edge label based on POS
+                            if node.token_info and node.token_info.pos == 'ADJ':
+                                np_node.add_child(node, 'adj')
+                            else:
+                                np_node.add_child(node, 'mod')
+                    
+                    # Update first word edge label and add noun phrase
+                    first_word.edge_label = 'det'
+                    voc_node.add_child(np_node, 'np')
+                else:
+                    # Just two words - update edge labels
+                    first_word.edge_label = 'det'
+                    word_nodes[1].edge_label = 'head'
+    
     def _identify_vocatives(self, clause_indices: List[int], tokens: List[TokenInfo], 
-                           token_nodes: Dict[int, SyntacticNode]) -> Dict[int, SyntacticNode]:
+                           token_nodes: Dict[int, SyntacticNode], in_quotes: bool = False) -> Dict[int, SyntacticNode]:
         """Identify vocative phrases in the clause.
+        
+        Args:
+            clause_indices: Indices of tokens in this clause
+            tokens: All tokens
+            token_nodes: Dictionary of token nodes
+            in_quotes: Whether we're processing quoted speech
         
         Returns:
             Dict mapping token indices to vocative nodes. 
             Indices mapped to None are part of a phrase and should be excluded.
         """
         vocatives = {}
-        
-        # Check if we're inside quoted speech - if so, don't extract vocatives
-        in_quotes = False
-        for idx in clause_indices:
-            if tokens[idx].text == '"':
-                in_quotes = not in_quotes
-        
-        if in_quotes:
-            # Don't extract vocatives from within quotes
-            return vocatives
         
         # First, check for comma-separated vocatives at the end of the clause
         # Pattern: "..., you ungrateful jerk."
@@ -437,14 +566,20 @@ class ClauseBuilder:
                         if next_token.dep not in ['dobj', 'pobj']:
                             is_likely_vocative = True
                     
+                    # If we're in quotes, be less restrictive about what counts as vocative
+                    # since quoted speech often has informal vocatives
+                    if in_quotes and next_token.text.lower() == 'you':
+                        is_likely_vocative = True
+                    
                     if is_likely_vocative:
                         # Collect all tokens after the comma until end or punctuation
                         vocative_indices = []
                         for j in range(i + 1, len(clause_indices)):
                             voc_idx = clause_indices[j]
-                            if tokens[voc_idx].text in ['.', '!', '?']:
-                                # Include final punctuation with vocative
-                                vocative_indices.append(voc_idx)
+                            if tokens[voc_idx].text in ['.', '!', '?', '"']:
+                                # Include final punctuation with vocative (but not closing quote if in quotes)
+                                if tokens[voc_idx].text != '"' or not in_quotes:
+                                    vocative_indices.append(voc_idx)
                                 break
                             vocative_indices.append(voc_idx)
                         
@@ -456,7 +591,7 @@ class ClauseBuilder:
                             # Create vocative node
                             voc_node = SyntacticNode(
                                 node_id=self._get_node_id(),
-                                node_type='clause',
+                                node_type='clause' if not in_quotes else 'phrase',
                                 text=vocative_text
                             )
                             
@@ -472,6 +607,63 @@ class ClauseBuilder:
                             
                             # Found end vocative, no need to check other patterns
                             return vocatives
+                
+                # Also check if it starts with an adjective followed by noun (like "young man")
+                elif next_token.pos == 'ADJ' and i + 2 < len(clause_indices):
+                    # Look ahead to see if there's a noun
+                    j = i + 1
+                    has_noun = False
+                    adj_indices = []
+                    
+                    # Collect all adjectives
+                    while j < len(clause_indices):
+                        j_idx = clause_indices[j]
+                        if tokens[j_idx].pos == 'ADJ':
+                            adj_indices.append(j_idx)
+                            j += 1
+                        elif tokens[j_idx].pos == 'NOUN':
+                            has_noun = True
+                            break
+                        else:
+                            break
+                    
+                    # If we found adjective(s) + noun pattern, likely a vocative
+                    if has_noun and j < len(clause_indices):
+                        noun_idx = clause_indices[j]
+                        
+                        # Check if the noun is npadvmod (typical for vocatives)
+                        if tokens[noun_idx].dep in ['npadvmod', 'vocative', 'dep']:
+                            # Collect all tokens for the vocative
+                            vocative_indices = []
+                            for k in range(i + 1, len(clause_indices)):
+                                voc_idx = clause_indices[k]
+                                if tokens[voc_idx].text in ['.', '!', '?']:
+                                    vocative_indices.append(voc_idx)
+                                    break
+                                vocative_indices.append(voc_idx)
+                            
+                            if vocative_indices:
+                                # Create vocative phrase
+                                all_vocative_indices = [idx] + vocative_indices
+                                vocative_text = ' '.join([tokens[vi].text for vi in all_vocative_indices])
+                                
+                                voc_node = SyntacticNode(
+                                    node_id=self._get_node_id(),
+                                    node_type='clause' if not in_quotes else 'phrase',
+                                    text=vocative_text
+                                )
+                                
+                                # Add all tokens as children
+                                for vi in all_vocative_indices:
+                                    if vi in token_nodes:
+                                        edge = 'punct' if tokens[vi].text in [',', '.', '!', '?'] else 'word'
+                                        self._assign_child(voc_node, token_nodes[vi], edge)
+                                
+                                # Mark all indices as part of vocative
+                                for vi in all_vocative_indices:
+                                    vocatives[vi] = voc_node if vi == idx else None
+                                
+                                return vocatives
         
         # If no end vocative found, check other patterns
         for idx in clause_indices:
@@ -543,7 +735,7 @@ class ClauseBuilder:
                     voc_text = f"{token.text} ,"
                     voc_node = SyntacticNode(
                         node_id=self._get_node_id(),
-                        node_type='clause',
+                        node_type='clause' if not in_quotes else 'phrase',
                         text=voc_text
                     )
                     self._assign_child(voc_node, token_nodes[idx], 'word')
@@ -1260,7 +1452,7 @@ class ClauseBuilder:
             # Attach verb phrase to parent
             edge_label = 'tverb' if verb_idx == main_verb_idx else 'verb'
             self._assign_child(parent_node, verb_phrase, edge_label)
-    
+        
     def _find_main_verb(self, clause_indices: List[int], tokens: List[TokenInfo]) -> Optional[int]:
         """Find the main verb in a clause."""
         for idx in clause_indices:
