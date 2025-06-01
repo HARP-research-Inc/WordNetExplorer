@@ -19,14 +19,37 @@ class SyntacticNode:
     token_info: Optional[TokenInfo] = None  # For word nodes
     
     def add_child(self, child: 'SyntacticNode', edge_label: str):
-        """Add a child with an edge label."""
-        # If child already has a parent, remove it from the old parent first
-        if child.parent and child in child.parent.children:
-            child.parent.children.remove(child)
-        
+        """Add a child with an edge label, ensuring tree integrity."""
+        # If child already has a parent, detach it from the old parent
+        if child.parent is not None:
+            if child in child.parent.children:
+                child.parent.children.remove(child)
+            # Set child's old parent to None, in case it was only partially detached
+            # child.parent = None 
+            # Re-evaluating if setting child.parent to None here is always safe or if it could mask issues.
+            # For now, the removal from old parent's children list is the primary goal.
+
+        # Set new parent-child relationship
         child.parent = self
         child.edge_label = edge_label
-        self.children.append(child)
+        
+        # Add to children list, ensuring no duplicates by object identity
+        if child not in self.children:
+            self.children.append(child)
+        else:
+            # If child is already in list, update its edge_label if different
+            # This can happen if a node is moved under the same parent with a new role
+            for existing_child in self.children:
+                if existing_child is child:
+                    existing_child.edge_label = edge_label
+                    break
+    
+    def remove_child(self, child_to_remove: 'SyntacticNode'):
+        """Remove a specific child node."""
+        if child_to_remove in self.children:
+            self.children.remove(child_to_remove)
+            child_to_remove.parent = None
+            child_to_remove.edge_label = None
 
 
 class PhraseBuilder:

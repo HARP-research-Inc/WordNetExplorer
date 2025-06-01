@@ -578,7 +578,7 @@ def render_sentence_content(explorer, session_manager, settings):
     
     # Import required modules
     try:
-        from src.services.sentence_analyzer_v3 import SentenceAnalyzer
+        from src.services.sentence_analyzer_v2 import SentenceAnalyzerV2 as SentenceAnalyzer
         from src.ui.sentence_graph import render_sentence_graph_visualization, render_sentence_legend
     except ImportError as e:
         st.error(f"Error importing required modules: {e}")
