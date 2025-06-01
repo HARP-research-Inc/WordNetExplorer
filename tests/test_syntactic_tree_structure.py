@@ -273,6 +273,72 @@ class TestSyntacticTreeStructure(unittest.TestCase):
                 break
         
         self.assertTrue(adverb_found, "Adverb should be a sibling of verb phrase at clause level")
+    
+    def test_modal_auxiliary_verbs(self):
+        """Test that modal auxiliary verbs (will, would, can, etc.) are included in verb phrases."""
+        analysis = self.analyzer.analyze_sentence("I will burn this house to the ground.")
+        
+        verb_phrases = self.find_verb_phrases(analysis.syntactic_tree)
+        
+        self.assertGreater(len(verb_phrases), 0, 
+                          "Should have verb phrase with modal auxiliary")
+        
+        # Find the main verb phrase
+        main_vp = None
+        for vp in verb_phrases:
+            if 'burn' in vp.text:
+                main_vp = vp
+                break
+        
+        self.assertIsNotNone(main_vp, "Should find verb phrase containing 'burn'")
+        
+        # Check that "will" is included
+        self.assertIn('will', main_vp.text.lower(), 
+                     "Modal auxiliary 'will' should be in verb phrase")
+        
+        # Check children
+        child_labels = self.get_child_edge_labels(main_vp)
+        self.assertIn('aux', child_labels, "Should have auxiliary as child")
+        
+        # Find the aux child
+        aux_found = False
+        for child in main_vp.children:
+            if child.edge_label == 'aux' and child.text.lower() == 'will':
+                aux_found = True
+                break
+        
+        self.assertTrue(aux_found, "Should have 'will' as auxiliary child")
+    
+    def test_phrasal_verb_run_over(self):
+        """Test that 'run over' is recognized as a phrasal verb, not verb + prepositional phrase."""
+        analysis = self.analyzer.analyze_sentence("I ran over my friend.")
+        
+        verb_phrases = self.find_verb_phrases(analysis.syntactic_tree)
+        
+        self.assertGreater(len(verb_phrases), 0, "Should have verb phrase")
+        
+        # Check for phrasal verb structure
+        phrasal_verb_found = False
+        for vp in verb_phrases:
+            # Look for a phrase node containing "ran over"
+            for child in vp.children:
+                if (child.node_type == 'phrase' and 
+                    'ran' in child.text.lower() and 
+                    'over' in child.text.lower()):
+                    phrasal_verb_found = True
+                    # Check that it has both verb and particle as children
+                    child_labels = self.get_child_edge_labels(child)
+                    self.assertIn('verb_head', child_labels, 
+                                 "Phrasal verb should have verb_head")
+                    self.assertIn('particle', child_labels, 
+                                 "Phrasal verb should have particle")
+                    break
+            
+            if phrasal_verb_found:
+                break
+        
+        self.assertTrue(phrasal_verb_found, 
+                       "'ran over' should be recognized as a phrasal verb")
 
 
 if __name__ == '__main__':

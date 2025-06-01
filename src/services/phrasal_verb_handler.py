@@ -17,6 +17,22 @@ class PhrasalVerbHandler:
             'up', 'down', 'out', 'off', 'on', 'in', 'over', 'away', 
             'back', 'through', 'around', 'along', 'across', 'by'
         }
+        
+        # Known phrasal verbs where the particle might be parsed as prep
+        # Format: (verb_lemma, particle) -> is_phrasal_verb
+        self.known_phrasal_verbs = {
+            ('run', 'over'): True,  # run over = hit with vehicle
+            ('look', 'up'): True,   # look up = search for
+            ('look', 'after'): True, # look after = take care of
+            ('get', 'over'): True,  # get over = recover from
+            ('take', 'over'): True, # take over = assume control
+            ('come', 'across'): True, # come across = find/encounter
+            ('put', 'off'): True,   # put off = postpone
+            ('turn', 'down'): True, # turn down = reject
+            ('give', 'up'): True,   # give up = quit
+            ('pick', 'up'): True,   # pick up = collect
+            ('take', 'off'): True,  # take off = remove/depart
+        }
     
     def identify_phrasal_verbs(self, tokens: List[TokenInfo]) -> Dict[int, List[int]]:
         """
@@ -45,31 +61,57 @@ class PhrasalVerbHandler:
                     elif (other_token.head == i and
                           other_token.dep in ['prep', 'advmod'] and
                           other_token.lemma.lower() in self.particles):
-                        # Additional check: is there an object directly after?
-                        # For "ran over my friend", we want "ran over" as phrasal verb
-                        # For "ran over the hill", we want "over the hill" as prep phrase
                         
-                        # Look for a direct object of the verb
-                        has_direct_obj = any(
-                            t.head == i and t.dep in ['dobj', 'obj'] 
-                            for t in tokens
-                        )
+                        # Check if this is a known phrasal verb combination
+                        verb_lemma = token.lemma.lower()
+                        particle_lemma = other_token.lemma.lower()
                         
-                        # If verb has a direct object, this is likely a particle
-                        # E.g., "ran over my friend" -> "ran over" + "my friend"
-                        if has_direct_obj:
+                        if (verb_lemma, particle_lemma) in self.known_phrasal_verbs:
+                            # This is a known phrasal verb
                             particles.append(j)
-                        # Otherwise check if the prep has noun dependents
                         else:
-                            # Check if this preposition has a pobj
-                            has_pobj = any(
-                                t.head == j and t.dep == 'pobj'
+                            # Additional check: is there an object directly after?
+                            # For "ran over my friend", we want "ran over" as phrasal verb
+                            # For "ran over the hill", we want "over the hill" as prep phrase
+                            
+                            # Look for a direct object of the verb
+                            has_direct_obj = any(
+                                t.head == i and t.dep in ['dobj', 'obj'] 
                                 for t in tokens
                             )
-                            # If it has pobj and verb has no dobj, it's a prep phrase
-                            if not has_pobj:
-                                # No pobj, might be a particle
+                            
+                            # If verb has a direct object, this is likely a particle
+                            # E.g., "looked up the word" -> "looked up" + "the word"
+                            if has_direct_obj:
                                 particles.append(j)
+                            else:
+                                # Check if this preposition has a pobj
+                                has_pobj = any(
+                                    t.head == j and t.dep == 'pobj'
+                                    for t in tokens
+                                )
+                                
+                                # For some verbs, even with pobj, it might be phrasal
+                                # Check semantic clues
+                                if has_pobj and j + 1 < len(tokens):
+                                    # If the "object" is animate/person, likely phrasal
+                                    # e.g. "ran over my friend" vs "ran over the bridge"
+                                    next_noun_idx = None
+                                    for k in range(j + 1, len(tokens)):
+                                        if tokens[k].pos == 'NOUN' and tokens[k].head == j:
+                                            next_noun_idx = k
+                                            break
+                                    
+                                    # Simple heuristic: if followed by possessive pronoun,
+                                    # more likely to be phrasal verb
+                                    if (j + 1 < len(tokens) and 
+                                        tokens[j + 1].pos == 'PRON' and 
+                                        tokens[j + 1].dep == 'poss'):
+                                        particles.append(j)
+                                
+                                elif not has_pobj:
+                                    # No pobj, might be a particle
+                                    particles.append(j)
                 
                 if particles:
                     phrasal_verbs[i] = particles
