@@ -502,6 +502,19 @@ class ClauseBuilder:
                     for _, label, arg_idx in arguments
                 )
                 
+                # Check for modal auxiliaries (will, would, can, could, etc.)
+                modal_aux_nodes = []
+                other_aux_nodes = []
+                for arg_node, label, arg_idx in arguments:
+                    if label == 'aux':
+                        # Modal auxiliaries
+                        if tokens[arg_idx].lemma.lower() in {'will', 'would', 'can', 'could', 
+                                                              'may', 'might', 'shall', 'should', 
+                                                              'must', 'ought'}:
+                            modal_aux_nodes.append((arg_idx, arg_node))
+                        else:
+                            other_aux_nodes.append((arg_idx, arg_node))
+                
                 # Collect all elements with their indices for proper ordering
                 all_elements = []
                 
@@ -510,30 +523,62 @@ class ClauseBuilder:
                     if label == 'subj':
                         all_elements.append((arg_idx, arg_node, label))
                 
-                # Add auxiliaries and the verb in proper order
-                # Always collect auxiliary verbs, not just for infinitives
-                verb_elements = [(verb_idx, token_nodes[verb_idx], 'verb_head')]
+                # If we have modal auxiliaries, create a sub-phrase for modal+verb
+                if modal_aux_nodes:
+                    # Create modal+verb phrase
+                    modal_verb_elements = []
+                    modal_verb_elements.extend([(idx, node, 'aux') for idx, node in modal_aux_nodes])
+                    modal_verb_elements.append((verb_idx, token_nodes[verb_idx], 'verb_head'))
+                    
+                    # Sort by index to preserve order
+                    modal_verb_elements.sort(key=lambda x: x[0])
+                    
+                    # Create phrase text
+                    modal_verb_text = ' '.join([node.text for _, node, _ in modal_verb_elements])
+                    
+                    # Create modal+verb phrase node
+                    modal_verb_phrase = SyntacticNode(
+                        node_id=self._get_node_id(),
+                        node_type='phrase',
+                        text=modal_verb_text
+                    )
+                    
+                    # Add children to modal+verb phrase
+                    for _, node, label in modal_verb_elements:
+                        self._assign_child(modal_verb_phrase, node, label)
+                    
+                    # Add modal+verb phrase to all_elements
+                    min_idx = min(idx for idx, _, _ in modal_verb_elements)
+                    all_elements.append((min_idx, modal_verb_phrase, 'verb'))
+                    
+                    # Add other auxiliaries separately
+                    for idx, node in other_aux_nodes:
+                        all_elements.append((idx, node, 'aux'))
+                else:
+                    # No modal auxiliaries, add elements as before
+                    # Add auxiliaries and the verb in proper order
+                    verb_elements = [(verb_idx, token_nodes[verb_idx], 'verb_head')]
+                    
+                    # Add aux elements
+                    for arg_node, label, arg_idx in arguments:
+                        if label == 'aux':
+                            verb_elements.append((arg_idx, arg_node, label))
                 
-                # Add aux elements (including auxiliary verbs like "has", "been")
-                for arg_node, label, arg_idx in arguments:
-                    if label == 'aux':
-                        verb_elements.append((arg_idx, arg_node, label))
-                
-                if has_infinitive_marker:
-                    # Check for prepositional phrases modifying the infinitive
-                    # e.g., "to ride with" - "with" should be part of the infinitive phrase
-                    for prep_idx in range(verb_idx + 1, min(verb_idx + 3, len(tokens))):
-                        if prep_idx in clause_indices:
-                            prep_token = tokens[prep_idx]
-                            if (prep_token.pos == 'ADP' and 
-                                prep_token.head == verb_idx and
-                                prep_idx in token_nodes):
-                                # This preposition modifies our verb
-                                verb_elements.append((prep_idx, token_nodes[prep_idx], 'prep'))
-                
-                # Sort verb elements by index
-                verb_elements.sort(key=lambda x: x[0])
-                all_elements.extend(verb_elements)
+                    if has_infinitive_marker:
+                        # Check for prepositional phrases modifying the infinitive
+                        # e.g., "to ride with" - "with" should be part of the infinitive phrase
+                        for prep_idx in range(verb_idx + 1, min(verb_idx + 3, len(tokens))):
+                            if prep_idx in clause_indices:
+                                prep_token = tokens[prep_idx]
+                                if (prep_token.pos == 'ADP' and 
+                                    prep_token.head == verb_idx and
+                                    prep_idx in token_nodes):
+                                    # This preposition modifies our verb
+                                    verb_elements.append((prep_idx, token_nodes[prep_idx], 'prep'))
+                    
+                    # Sort verb elements by index
+                    verb_elements.sort(key=lambda x: x[0])
+                    all_elements.extend(verb_elements)
                 
                 # Add other arguments
                 for arg_node, label, arg_idx in arguments:
@@ -557,17 +602,20 @@ class ClauseBuilder:
                         self._assign_child(verb_phrase, node, label)
                         break
                 
-                # Add aux elements (always, not just for infinitives)
+                # Add verb or modal+verb phrase
                 for _, node, label in all_elements:
-                    if label == 'aux':
+                    if label == 'verb':  # This is our modal+verb phrase
                         self._assign_child(verb_phrase, node, label)
-                
-                # Add verb
-                for _, node, label in all_elements:
-                    if label == 'verb_head':
+                        break
+                    elif label == 'verb_head' and not modal_aux_nodes:
+                        # Only add verb_head directly if no modal auxiliaries
                         edge_label = 'verb_head' if arguments else 'verb'
                         self._assign_child(verb_phrase, node, edge_label)
-                        break
+                
+                # Add other auxiliaries (non-modal)
+                for _, node, label in all_elements:
+                    if label == 'aux' and node not in [n for _, n in modal_aux_nodes]:
+                        self._assign_child(verb_phrase, node, label)
                 
                 # Add prepositions that are part of the infinitive
                 for _, node, label in all_elements:
@@ -581,7 +629,7 @@ class ClauseBuilder:
                 
                 # Add other arguments
                 for _, node, label in all_elements:
-                    if label not in ['subj', 'aux', 'verb_head', 'prep', 'prep_phrase']:
+                    if label not in ['subj', 'aux', 'verb_head', 'verb', 'prep', 'prep_phrase']:
                         self._assign_child(verb_phrase, node, label)
             
             # Attach verb phrase to parent

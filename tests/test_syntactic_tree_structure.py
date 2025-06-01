@@ -275,7 +275,7 @@ class TestSyntacticTreeStructure(unittest.TestCase):
         self.assertTrue(adverb_found, "Adverb should be a sibling of verb phrase at clause level")
     
     def test_modal_auxiliary_verbs(self):
-        """Test that modal auxiliary verbs (will, would, can, etc.) are included in verb phrases."""
+        """Test that modal auxiliary verbs (will, would, can, etc.) are grouped with main verb."""
         analysis = self.analyzer.analyze_sentence("I will burn this house to the ground.")
         
         verb_phrases = self.find_verb_phrases(analysis.syntactic_tree)
@@ -292,22 +292,31 @@ class TestSyntacticTreeStructure(unittest.TestCase):
         
         self.assertIsNotNone(main_vp, "Should find verb phrase containing 'burn'")
         
-        # Check that "will" is included
-        self.assertIn('will', main_vp.text.lower(), 
-                     "Modal auxiliary 'will' should be in verb phrase")
-        
-        # Check children
-        child_labels = self.get_child_edge_labels(main_vp)
-        self.assertIn('aux', child_labels, "Should have auxiliary as child")
-        
-        # Find the aux child
-        aux_found = False
+        # Check that there's a sub-phrase containing "will burn"
+        modal_verb_phrase_found = False
         for child in main_vp.children:
-            if child.edge_label == 'aux' and child.text.lower() == 'will':
-                aux_found = True
+            if (child.node_type == 'phrase' and 
+                'will' in child.text.lower() and 
+                'burn' in child.text.lower()):
+                modal_verb_phrase_found = True
+                
+                # Check structure of modal+verb phrase
+                child_labels = self.get_child_edge_labels(child)
+                self.assertIn('aux', child_labels, "Should have auxiliary")
+                self.assertIn('verb_head', child_labels, "Should have verb head")
+                
+                # Verify specific children
+                has_will = any(c.text.lower() == 'will' and c.edge_label == 'aux' 
+                              for c in child.children)
+                has_burn = any(c.text.lower() == 'burn' and c.edge_label == 'verb_head' 
+                              for c in child.children)
+                
+                self.assertTrue(has_will, "Should have 'will' as aux child")
+                self.assertTrue(has_burn, "Should have 'burn' as verb_head child")
                 break
         
-        self.assertTrue(aux_found, "Should have 'will' as auxiliary child")
+        self.assertTrue(modal_verb_phrase_found, 
+                       "Modal auxiliary 'will' should be grouped with verb 'burn' in a phrase")
     
     def test_phrasal_verb_run_over(self):
         """Test that 'run over' is recognized as a phrasal verb, not verb + prepositional phrase."""
