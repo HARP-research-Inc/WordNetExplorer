@@ -76,14 +76,9 @@ class PhraseBuilder:
         
         # Build hierarchical structure
         # Start with the noun as the innermost element
-        # Create a fresh word node for the noun (don't reuse token_nodes which might have children)
-        noun_node = SyntacticNode(
-            node_id=self._get_node_id(),
-            node_type='word',
-            text=noun_token.text,
-            token_info=noun_token
-        )
-        current_node = noun_node
+        # Use the token node but ensure it has no children
+        current_node = token_nodes[noun_idx]
+        current_node.children = []  # Clear any existing children
         
         # Layer 1: Add compounds and adjectives closest to the noun
         if compounds or adjectives:
@@ -114,10 +109,12 @@ class PhraseBuilder:
             
             # Add compounds in order
             for comp_idx, _ in sorted(compounds):
+                token_nodes[comp_idx].children = []  # Clear any existing children
                 immediate_np.add_child(token_nodes[comp_idx], 'compound')
             
             # Add adjectives in order
             for adj_idx, _ in sorted(adjectives):
+                token_nodes[adj_idx].children = []  # Clear any existing children
                 immediate_np.add_child(token_nodes[adj_idx], 'adj')
             
             # Add noun as head
@@ -161,10 +158,12 @@ class PhraseBuilder:
             
             # Add possessives first
             for poss_idx, _ in sorted(possessives):
+                token_nodes[poss_idx].children = []  # Clear any existing children
                 outer_np.add_child(token_nodes[poss_idx], 'poss')
             
             # Add numerals
             for num_idx, _ in sorted(numerals):
+                token_nodes[num_idx].children = []  # Clear any existing children
                 outer_np.add_child(token_nodes[num_idx], 'num')
             
             # Add the inner phrase
@@ -186,6 +185,7 @@ class PhraseBuilder:
             
             # Add determiners first
             for det_idx, _ in sorted(determiners):
+                token_nodes[det_idx].children = []  # Clear any existing children
                 final_np.add_child(token_nodes[det_idx], 'det')
             
             # Add the rest of the phrase
