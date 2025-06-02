@@ -154,16 +154,16 @@ class SentenceAnalyzerV2:
             logger.debug("No quoted speech found, identifying clauses")
             clauses = self._identify_clauses(doc, tokens)
             logger.info(f"Identified {len(clauses)} clause(s)")
-            
-            if len(clauses) == 1:
-                # Simple sentence - build directly
-                logger.debug("Building simple sentence structure")
-                clause_builder = ClauseBuilder(self._get_node_id)
-                clause_builder.build_clause_tree(root, clauses[0], tokens, 'main')
-            else:
-                # Complex sentence - identify relationships
-                logger.debug("Building complex sentence structure")
-                self._build_complex_sentence_tree(root, clauses, tokens, doc)
+        
+        if len(clauses) == 1:
+            # Simple sentence - build directly
+            logger.debug("Building simple sentence structure")
+            clause_builder = ClauseBuilder(self._get_node_id)
+            clause_builder.build_clause_tree(root, clauses[0], tokens, 'main')
+        else:
+            # Complex sentence - identify relationships
+            logger.debug("Building complex sentence structure")
+            self._build_complex_sentence_tree(root, clauses, tokens, doc)
         
         return root
     
@@ -525,7 +525,7 @@ class ClauseBuilder:
         # Then add sentence adverbs
         for adv_idx in sentence_adverbs:
             self._assign_child(clause_node, token_nodes[adv_idx], 'adv_mod')
-        
+            
         # Process the rest
         if remaining_indices:
             # If we removed vocatives or adverbs, create a subclause
@@ -934,7 +934,7 @@ class ClauseBuilder:
                     else:
                         # Not modifying a verb, attach normally
                         self._attach_prep_phrase(prep_phrase_node, token, phrasal_verbs,
-                                                token_nodes, parent_node, tokens)
+                                            token_nodes, parent_node, tokens)
                 else:
                     self._assign_child(parent_node, token_nodes[idx], self._edge_mapper.get_edge_label(token))
                     processed.add(idx)
@@ -1571,7 +1571,7 @@ class ClauseBuilder:
             # Attach verb phrase to parent
             edge_label = 'tverb' if verb_idx == main_verb_idx else 'verb'
             self._assign_child(parent_node, verb_phrase, edge_label)
-        
+    
     def _find_main_verb(self, clause_indices: List[int], tokens: List[TokenInfo]) -> Optional[int]:
         """Find the main verb in a clause."""
         for idx in clause_indices:
